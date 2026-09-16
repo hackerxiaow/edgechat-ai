@@ -7,7 +7,7 @@ import initSqlJs from "sql.js";
 import { registerChannelRoutes } from "../worker/src/api/channels.ts";
 import { hardDeleteChannel } from "../worker/src/data/channel-deletion.ts";
 import { ApiError } from "../worker/src/errors.ts";
-import { runScheduledGc } from "../worker/src/gc.js";
+import { runScheduledGc } from "../worker/src/gc.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

@@ -1,5 +1,5 @@
 import type { RoomMeta, SessionUser } from "./types.ts";
-import { cleanupR2Keys } from "./gc.js";
+import { cleanupR2Keys } from "./gc.ts";
 import {
 	getMessageDeletionTarget,
 	softDeleteMessage,
@@ -37,7 +37,10 @@ type GetDeletionTargetFn = (
 	db: D1Database,
 	messageId: number,
 ) => Promise<MessageDeletionTarget | null>;
-type CleanupFn = (env: unknown, keys: string[]) => Promise<unknown>;
+type CleanupFn = (
+	env: { DB: D1Database; FILES?: R2Bucket },
+	keys: string[],
+) => Promise<unknown>;
 
 export function createMessageDeletion({
 	authorize = authorizeMessageModeration as AuthorizeFn,

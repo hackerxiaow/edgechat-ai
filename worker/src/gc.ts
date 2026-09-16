@@ -1,5 +1,79 @@
 import { hardDeleteChannels } from "./data/channel-deletion.ts";
 import { classifyStoredSiteIcon } from "./site-icon.ts";
+import type { AppBindings } from "./types.ts";
+
+/** GC 只依赖 D1 与可选的 R2，其余读取自 env 字符串变量。 */
+type GcEnv = Pick<AppBindings, "DB" | "FILES"> & Record<string, unknown>;
+
+interface GcConfig {
+	messageRetentionDays: number;
+	softDeleteRetentionDays: number;
+	batchSize: number;
+	maxBatchesPerRun: number;
+	r2DeleteMaxRetry: number;
+	orphanUploadRetentionDays: number;
+	internalOperationBudget: number;
+	d1StatementBudget: number;
+	r2OperationBudget: number;
+	trustedSiteOrigins: string[];
+}
+
+interface GcBudgetCost {
+	d1ApiCalls?: number;
+	d1Statements?: number;
+	r2Operations?: number;
+}
+
+interface GcBudgetSnapshot {
+	d1ApiCalls: number;
+	d1Statements: number;
+	r2Operations: number;
+	internalOperations: number;
+	exhausted: boolean;
+	limits: {
+		internalOperations: number;
+		d1Statements: number;
+		r2Operations: number;
+	};
+}
+
+interface GcBudget {
+	canSpend(cost?: GcBudgetCost): boolean;
+	spend(cost: GcBudgetCost): boolean;
+	remainingInternalOperations(): number;
+	remainingD1Statements(): number;
+	remainingR2Operations(): number;
+	markExhausted(): void;
+	snapshot(): GcBudgetSnapshot;
+}
+
+interface GcSummary {
+	retryQueueFetched: number;
+	retryQueueDeleted: number;
+	retryQueueFailed: number;
+	retryQueueSkippedReferenced: number;
+	expiredMessagesDeleted: number;
+	invitesDeleted: number;
+	channelsDeleted: number;
+	channelMembersDeleted: number;
+	channelMessagesDeleted: number;
+	usersDeleted: number;
+	userMessagesDeleted: number;
+	userMembershipsDeleted: number;
+	expiredRealtimeTicketsDeleted: number;
+	expiredMessageEventsDeleted: number;
+	expiredDeviceSessionsDeleted: number;
+	r2Deleted: number;
+	r2DeleteFailed: number;
+	r2DeleteQueued: number;
+	r2SkippedReferenced: number;
+	orphanUploadsQueued: number;
+	orphanUploadsDeleted: number;
+	budget: GcBudgetSnapshot | null;
+}
+
+type GcRow = Record<string, unknown>;
+
 
 const DEFAULT_MESSAGE_RETENTION_DAYS = 7;
 const DEFAULT_SOFT_DELETE_RETENTION_DAYS = 60;
@@ -40,13 +114,13 @@ export const ORPHAN_UPLOAD_QUERY = `SELECT object_key, created_at
 	ORDER BY created_at ASC, object_key ASC
 	LIMIT ?`;
 
-function toPositiveInteger(value, fallback) {
+function toPositiveInteger(value: unknown, fallback: number): number {
 	const parsed = Number(value);
 	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
 	return Math.floor(parsed);
 }
 
-function getGcConfig(env) {
+function getGcConfig(env: GcEnv): GcConfig {
 	return {
 		messageRetentionDays: toPositiveInteger(
 			env.MESSAGE_RETENTION_DAYS,
@@ -91,11 +165,11 @@ function getGcConfig(env) {
 	};
 }
 
-function createExecutionBudget(config) {
+function createExecutionBudget(config: GcConfig): GcBudget {
 	const used = { d1ApiCalls: 0, d1Statements: 0, r2Operations: 0 };
 	let exhausted = false;
 
-	function canSpend({ d1ApiCalls = 0, d1Statements = 0, r2Operations = 0 }) {
+	function canSpend({ d1ApiCalls = 0, d1Statements = 0, r2Operations = 0 }: GcBudgetCost = {}): boolean {
 		return (
 			used.d1ApiCalls + used.r2Operations + d1ApiCalls + r2Operations <=
 				config.internalOperationBudget &&
@@ -106,7 +180,7 @@ function createExecutionBudget(config) {
 
 	return {
 		canSpend,
-		spend(cost) {
+		spend(cost: GcBudgetCost): boolean {
 			if (!canSpend(cost)) {
 				exhausted = true;
 				return false;
@@ -143,7 +217,7 @@ function createExecutionBudget(config) {
 	};
 }
 
-function createSummary() {
+function createSummary(): GcSummary {
 	return {
 		retryQueueFetched: 0,
 		retryQueueDeleted: 0,
@@ -170,19 +244,19 @@ function createSummary() {
 	};
 }
 
-function safeErrorMessage(error) {
-	return String(error?.message || error || "unknown_error").slice(0, MAX_ERROR_LENGTH);
+function safeErrorMessage(error: unknown): string {
+	return String((error as { message?: unknown })?.message || error || "unknown_error").slice(0, MAX_ERROR_LENGTH);
 }
 
-function placeholders(length) {
+function placeholders(length: number): string {
 	return Array.from({ length }, () => "?").join(", ");
 }
 
-function valueRows(length) {
+function valueRows(length: number): string {
 	return Array.from({ length }, () => "(?)").join(", ");
 }
 
-function uniqueKeys(keys) {
+function uniqueKeys(keys: unknown[]): string[] {
 	return [
 		...new Set(
 			keys
@@ -192,11 +266,11 @@ function uniqueKeys(keys) {
 	];
 }
 
-function resultChanges(result) {
-	return Number(result?.meta?.changes || 0);
+function resultChanges(result: unknown): number {
+	return Number((result as { meta?: { changes?: unknown } })?.meta?.changes || 0);
 }
 
-async function loadSiteIconGuard(db, config, budget) {
+async function loadSiteIconGuard(db: D1Database, config: GcConfig, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 1 })) return null;
 	const { results } = await db
 		.prepare(
@@ -211,7 +285,7 @@ async function loadSiteIconGuard(db, config, budget) {
 	return reference.key || null;
 }
 
-async function findReferencedKeys(db, keys, siteIconKey, budget) {
+async function findReferencedKeys(db: D1Database, keys: string[], siteIconKey: string | null, budget: GcBudget): Promise<Set<string> | null> {
 	const unique = uniqueKeys(keys);
 	if (!unique.length) return new Set();
 	if (unique.length > MAX_IN_PARAMETERS) throw new Error("Too many GC reference keys");
@@ -239,7 +313,7 @@ async function findReferencedKeys(db, keys, siteIconKey, budget) {
 	return referenced;
 }
 
-async function reserveR2DeleteKeys(db, keys, budget) {
+async function reserveR2DeleteKeys(db: D1Database, keys: string[], budget: GcBudget): Promise<number | null> {
 	const unique = uniqueKeys(keys);
 	if (!unique.length) return 0;
 	if (unique.length > MAX_IN_PARAMETERS) throw new Error("Too many GC reserve keys");
@@ -254,7 +328,7 @@ async function reserveR2DeleteKeys(db, keys, budget) {
 	return resultChanges(result);
 }
 
-async function removePendingR2DeleteKeys(db, keys, budget) {
+async function removePendingR2DeleteKeys(db: D1Database, keys: string[], budget: GcBudget): Promise<number | null> {
 	const unique = uniqueKeys(keys);
 	if (!unique.length) return 0;
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 1 })) return null;
@@ -268,7 +342,7 @@ async function removePendingR2DeleteKeys(db, keys, budget) {
 	return resultChanges(result);
 }
 
-async function completeR2Delete(db, key, budget) {
+async function completeR2Delete(db: D1Database, key: string, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 2 })) return false;
 	await db.batch([
 		db.prepare("DELETE FROM uploaded_files WHERE object_key = ?").bind(key),
@@ -277,12 +351,12 @@ async function completeR2Delete(db, key, budget) {
 	return true;
 }
 
-function retryDelayMinutes(nextRetryCount, retryExponentCap) {
+function retryDelayMinutes(nextRetryCount: number, retryExponentCap: number): number {
 	const exponent = Math.min(Math.max(nextRetryCount, 1), retryExponentCap);
 	return Math.min(2 ** exponent, 24 * 60);
 }
 
-async function markR2RetryFailure(db, key, retryCount, delayMinutes, errorMessage, budget) {
+async function markR2RetryFailure(db: D1Database, key: string, retryCount: number, delayMinutes: number, errorMessage: string, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 1 })) return false;
 	await db
 		.prepare(
@@ -298,11 +372,14 @@ async function markR2RetryFailure(db, key, retryCount, delayMinutes, errorMessag
 	return true;
 }
 
-async function processR2Rows(env, config, summary, rows, siteIconKey, budget) {
+async function processR2Rows(env: GcEnv, config: GcConfig, summary: GcSummary, rows: GcRow[], siteIconKey: string | null, budget: GcBudget) {
 	if (!rows.length) return false;
+	// 没有绑定 R2 的部署没有可删对象，直接跳过，避免 env.FILES 为空时抛错。
+	const files = env.FILES;
+	if (!files) return false;
 	const referenced = await findReferencedKeys(
 		env.DB,
-		rows.map((row) => row.object_key),
+		rows.map((row) => String(row.object_key)),
 		siteIconKey,
 		budget,
 	);
@@ -329,7 +406,7 @@ async function processR2Rows(env, config, summary, rows, siteIconKey, budget) {
 		budget.spend({ r2Operations: 1 });
 		progressed = true;
 		try {
-			await env.FILES.delete(key);
+			await files.delete(key);
 			const completed = await completeR2Delete(env.DB, key, budget);
 			if (!completed) {
 				budget.markExhausted();
@@ -358,7 +435,7 @@ async function processR2Rows(env, config, summary, rows, siteIconKey, budget) {
 	return progressed;
 }
 
-async function runRetryQueueStep(env, config, summary, siteIconKey, budget) {
+async function runRetryQueueStep(env: GcEnv, config: GcConfig, summary: GcSummary, siteIconKey: string | null, budget: GcBudget) {
 	const capacity = Math.min(
 		config.batchSize,
 		budget.remainingR2Operations(),
@@ -383,7 +460,7 @@ async function runRetryQueueStep(env, config, summary, siteIconKey, budget) {
 	return processR2Rows(env, config, summary, results, siteIconKey, budget);
 }
 
-async function runMobileProtocolCleanupStep(env, config, summary, budget) {
+async function runMobileProtocolCleanupStep(env: GcEnv, config: GcConfig, summary: GcSummary, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 3, d1Statements: 4 })) return { progress: false, more: true };
 	const ticketResult = await env.DB.prepare(
 		`DELETE FROM realtime_tickets
@@ -447,7 +524,7 @@ async function runMobileProtocolCleanupStep(env, config, summary, budget) {
 	};
 }
 
-async function runExpiredMessagesStep(env, config, summary, budget) {
+async function runExpiredMessagesStep(env: GcEnv, config: GcConfig, summary: GcSummary, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 2 })) {
 		return { progress: false, more: true };
 	}
@@ -478,7 +555,7 @@ async function runExpiredMessagesStep(env, config, summary, budget) {
 	return { progress: deletedCount > 0, more: deletedCount >= config.batchSize };
 }
 
-async function runHardDeleteInvitesStep(env, config, summary, budget) {
+async function runHardDeleteInvitesStep(env: GcEnv, config: GcConfig, summary: GcSummary, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 1 })) {
 		return { progress: false, more: true };
 	}
@@ -499,7 +576,7 @@ async function runHardDeleteInvitesStep(env, config, summary, budget) {
 	return { progress: deleted > 0, more: deleted >= config.batchSize };
 }
 
-async function runHardDeleteChannelsStep(env, config, summary, budget) {
+async function runHardDeleteChannelsStep(env: GcEnv, config: GcConfig, summary: GcSummary, budget: GcBudget) {
 	if (!budget.canSpend({ d1ApiCalls: 2, d1Statements: 6 })) {
 		budget.markExhausted();
 		return { progress: false, more: true };
@@ -530,7 +607,7 @@ async function runHardDeleteChannelsStep(env, config, summary, budget) {
 	return { progress: deleted.channelsDeleted > 0, more: results.length >= channelBatchSize };
 }
 
-async function runHardDeleteUsersStep(env, config, summary, budget) {
+async function runHardDeleteUsersStep(env: GcEnv, config: GcConfig, summary: GcSummary, budget: GcBudget) {
 	if (!budget.canSpend({ d1ApiCalls: 3, d1Statements: 10 })) {
 		budget.markExhausted();
 		return { progress: false, more: true };
@@ -582,7 +659,7 @@ async function runHardDeleteUsersStep(env, config, summary, budget) {
 	return { progress: resultChanges(cleanup[7]) > 0, more: results.length >= userBatchSize };
 }
 
-async function runOrphanedUploadsStep(env, config, summary, siteIconKey, budget) {
+async function runOrphanedUploadsStep(env: GcEnv, config: GcConfig, summary: GcSummary, siteIconKey: string | null, budget: GcBudget) {
 	if (!budget.canSpend({ d1ApiCalls: 2, d1Statements: 2 })) {
 		budget.markExhausted();
 		return { progress: false, more: true };
@@ -598,7 +675,7 @@ async function runOrphanedUploadsStep(env, config, summary, siteIconKey, budget)
 	if (!results.length) return { progress: false, more: false };
 	const queued = await reserveR2DeleteKeys(
 		env.DB,
-		results.map((row) => row.object_key),
+		results.map((row) => String(row.object_key)),
 		budget,
 	);
 	if (queued === null) return { progress: false, more: true };
@@ -607,7 +684,7 @@ async function runOrphanedUploadsStep(env, config, summary, siteIconKey, budget)
 	return { progress: queued > 0, more: results.length >= config.batchSize };
 }
 
-export async function runScheduledGc(env) {
+export async function runScheduledGc(env: GcEnv) {
 	const config = getGcConfig(env);
 	const budget = createExecutionBudget(config);
 	const summary = createSummary();
@@ -657,7 +734,7 @@ export async function runScheduledGc(env) {
 	return summary;
 }
 
-export async function cleanupR2Keys(env, keys) {
+export async function cleanupR2Keys(env: GcEnv, keys: string[]) {
 	const config = getGcConfig(env);
 	const budget = createExecutionBudget(config);
 	const summary = createSummary();

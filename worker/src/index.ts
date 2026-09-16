@@ -33,7 +33,7 @@ import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
-import { runScheduledGc } from './gc.js';
+import { runScheduledGc } from './gc.ts';
 import { isUserDisabled } from './user-status.ts';
 import type { AppEnv, SessionUser } from './types.ts';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.ts';

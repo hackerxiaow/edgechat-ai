@@ -10,7 +10,7 @@ import {
   insertMessageIdempotent,
   listRoomMessageEvents
 } from '../worker/src/data/messages.ts';
-import { runScheduledGc } from '../worker/src/gc.js';
+import { runScheduledGc } from '../worker/src/gc.ts';
 import { saveUploadedFile } from '../worker/src/api/upload.ts';
 import {
   createMobileDeviceSession,
