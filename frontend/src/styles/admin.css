@@ -74,16 +74,7 @@
   background-color: var(--admin-active);
 }
 
-.admin-topbar .language-switch__menu {
-  background: var(--admin-panel);
-  border-color: var(--admin-border);
-  -webkit-backdrop-filter: var(--blur-md, blur(12px));
-  backdrop-filter: var(--blur-md, blur(12px));
-}
-
-.admin-topbar .language-switch__option {
-  color: var(--admin-text);
-}
+/* 下拉菜单与选项的完整样式统一放在文件末尾（需要 !important 才能压过组件的 scoped 样式）。 */
 
 /* 顶栏主按钮：原来用 ink/panel 反色配对，暗色下 ink 变浅导致按钮变成亮块。
    改用品牌色，两种模式下语义一致。 */
@@ -250,7 +241,7 @@ html.dark textarea {
 
 .admin-topbar .language-switch__menu {
   z-index: 60;
-  background: var(--admin-panel) !important;
+  background: var(--surface-solid, #ffffff) !important;
   border: 1px solid var(--admin-border) !important;
   -webkit-backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;
   backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;

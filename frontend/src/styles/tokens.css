@@ -8,6 +8,8 @@
   --surface-0: rgba(255, 255, 255, 0.5);
   --surface-1: rgba(255, 255, 255, 0.4);
   --surface-2: rgba(255, 255, 255, 0.85);
+  /* 浮层（下拉菜单等）必须不透明，否则会透出下层内容。 */
+  --surface-solid: #ffffff;
   
   --text: #172b4d;
   --text-soft: #5e6c84;
@@ -49,6 +51,7 @@ html.dark {
   --surface-0: rgba(20, 32, 46, 0.5);
   --surface-1: rgba(20, 32, 46, 0.35);
   --surface-2: rgba(20, 32, 46, 0.85);
+  --surface-solid: #141f2c;
   
   --text: #e8f0f9;
   --text-soft: #93a8bd;

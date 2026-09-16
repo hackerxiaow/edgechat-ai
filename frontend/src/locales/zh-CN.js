@@ -104,8 +104,6 @@ export default {
   'nav.admin': '管理后台',
   'nav.personalSettings': '个人设置',
   'nav.openNavigation': '打开导航',
-  'nav.githubRepository': 'GitHub 仓库',
-  'nav.openGithubRepository': '打开 EdgeChat GitHub 仓库',
   'nav.backToChat': '返回聊天',
   'nav.chats': '聊天',
   'contacts.title': '通讯录',

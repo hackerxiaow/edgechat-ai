@@ -77,10 +77,6 @@ useOverlayLifecycle({
               <LayoutDashboard :size="21" aria-hidden="true" />
               <span>{{ t('nav.admin') }}</span>
             </button>
-            <a href="https://github.com/aozorae/Edgechat" target="_blank" rel="noopener noreferrer">
-              <img src="/github.svg" width="21" height="21" alt="" />
-              <span>{{ t('nav.githubRepository') }}</span>
-            </a>
             <button type="button" class="mobile-navigation-drawer__danger" @click="emit('logout')">
               <LogOut :size="21" aria-hidden="true" />
               <span>{{ t('auth.signOut') }}</span>

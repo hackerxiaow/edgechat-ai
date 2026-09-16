@@ -742,7 +742,6 @@ onBeforeUnmount(() => {
               <Settings :size="19" aria-hidden="true" />
               <span>{{ t('chat.groupSettings') }}</span>
             </button>
-            <LanguageSwitch class="chat-header__language-switch" />
           </div>
         </header>
 
@@ -1281,15 +1280,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.chat-header__language-switch {
-  width: var(--chat-control);
-  min-width: var(--chat-control);
-  height: var(--chat-control);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 .chat-header__button {
   display: inline-flex;
   align-items: center;
@@ -1538,7 +1528,8 @@ onBeforeUnmount(() => {
 }
 
 .header-language-switch :deep(.language-switch__menu) {
-  background: var(--chat-paper);
+  /* 不透明底色：菜单浮在会话列表之上，半透明会透出下层内容。 */
+  background: var(--surface-solid);
   border-color: var(--chat-line);
   color: var(--chat-ink);
 }
@@ -1752,15 +1743,6 @@ onBeforeUnmount(() => {
 
   .chat-header__actions {
     gap: 0;
-  }
-
-  .chat-header__language-switch {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
   }
 
   .chat-messages {

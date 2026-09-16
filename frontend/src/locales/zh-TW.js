@@ -165,8 +165,6 @@ export default {
   "nav.admin": "管理後臺",
   "nav.personalSettings": "個人設置",
   "nav.openNavigation": "打開導航",
-  "nav.githubRepository": "GitHub 倉庫",
-  "nav.openGithubRepository": "打開 EdgeChat GitHub 倉庫",
   "nav.backToChat": "返回聊天",
   "nav.chats": "聊天",
   "contacts.title": "通訊錄",

@@ -104,8 +104,6 @@ export default {
   'nav.admin': 'Admin',
   'nav.personalSettings': 'Personal settings',
   'nav.openNavigation': 'Open navigation',
-  'nav.githubRepository': 'GitHub repository',
-  'nav.openGithubRepository': 'Open the EdgeChat GitHub repository',
   'nav.backToChat': 'Back to chat',
   'nav.chats': 'Chats',
   'contacts.title': 'Contacts',

@@ -149,8 +149,9 @@ test("聊天侧栏跟随全屏根节点且不污染后台根节点", () => {
 
 	test("语言切换入口唯一且常驻，移动端保持可达", () => {
 		assert.doesNotMatch(chatPage, /right-sidebar-action--language/);
-		assert.match(chatPage, /<LanguageSwitch class="chat-header__language-switch" \/>/);
-		// 空状态里不再额外放一个语言切换，只在会话列表顶栏保留常驻入口。
+		// 会话列表顶栏保留唯一入口；聊天顶栏与空状态都不再重复放置。
+		assert.match(chatPage, /<LanguageSwitch class="header-language-switch" \/>/);
+		assert.doesNotMatch(chatPage, /chat-header__language-switch/);
 		assert.doesNotMatch(chatPage, /chat-empty__language-switch|empty-language-switch/);
 		assert.doesNotMatch(chatPage, /mobile-language-switch/);
 		// 深浅色切换只保留右侧导航栏那一处，避免同一屏出现两个。

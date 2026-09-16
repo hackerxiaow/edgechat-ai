@@ -7,7 +7,6 @@
     "/assets/*",
     "/vendor/*",
     "/favicon.ico",
-    "/logo.svg",
-    "/github.svg"
+    "/logo.svg"
   ]
 }
