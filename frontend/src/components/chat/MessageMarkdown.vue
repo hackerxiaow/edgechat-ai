@@ -37,11 +37,11 @@ function stopLinkGesture(event: Event) {
 	overflow-wrap: anywhere;
 }
 
-/* 为气泡右下角的绝对定位时间戳保留稳定空间。 */
+/* 为气泡右下角的绝对定位时间戳保留稳定空间（HH:MM:SS 比原来的 HH:MM 宽）。 */
 .message-markdown::after {
 	content: "";
 	display: inline-block;
-	width: 3.5em;
+	width: 4em;
 	height: 0;
 }
 

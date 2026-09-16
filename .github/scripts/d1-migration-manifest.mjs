@@ -214,6 +214,11 @@ export const D1_MIGRATIONS = [
 		file: "worker/migrations/2026-09-16-verification-codes.sql",
 		artifacts: ["table:verification_codes", "index:idx_verification_codes_lookup"],
 	},
+	{
+		id: "2026-09-17-room-typing",
+		file: "worker/migrations/2026-09-17-room-typing.sql",
+		artifacts: ["table:room_typing", "index:idx_room_typing_channel_updated"],
+	},
 ];
 
 // b3f6855 曾发布、0c13e8f 已撤回的迁移：仅识别历史 ledger，不要求新安装创建废弃表，也不删除旧数据。

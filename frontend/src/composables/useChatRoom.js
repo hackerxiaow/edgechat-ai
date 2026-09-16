@@ -30,11 +30,39 @@ export function useChatRoom({
 	const pendingAttachment = ref(null);
 	const sending = ref(false);
 	const messagesEl = ref(null);
+	/** 当前房间里仍在输入的人（不含自己）。 */
+	const typingUsers = ref([]);
+	let typingSentAt = 0;
+	let typingActive = false;
 	let messageLoadGeneration = 0;
 	let highlightTimer = null;
 
 	function roomKey(room = activeRoom.value) {
 		return room?.kind && room?.id ? `${room.kind}:${room.id}` : "";
+	}
+
+	/**
+	 * 上报「正在输入」。D1 模式下 socket.send 是空操作，必须走独立 HTTP 请求
+	 * （与 markRoomRead 同一模式）。按 2.5 秒节流，避免每敲一个字就打一次 D1。
+	 */
+	function reportTyping(typing) {
+		const room = activeRoom.value;
+		if (!room?.kind || !room?.id) return;
+		const now = Date.now();
+		if (typing) {
+			if (typingActive && now - typingSentAt < 2500) return;
+			typingActive = true;
+			typingSentAt = now;
+		} else {
+			if (!typingActive) return;
+			typingActive = false;
+			typingSentAt = 0;
+		}
+		void roomApi.setRoomTyping(room.kind, room.id, typing).catch(() => {});
+	}
+
+	function clearTyping() {
+		typingUsers.value = [];
 	}
 
 	function isOwnMessage(message) {
@@ -152,6 +180,11 @@ export function useChatRoom({
 				kind: params.kind,
 				roomId: params.roomId,
 				...handlers,
+				// typing 随 800ms 轮询的响应一起回来，不额外发请求。
+				onTyping: (users) => {
+					if (roomKey() !== `${params.kind}:${params.roomId}`) return;
+					typingUsers.value = Array.isArray(users) ? users : [];
+				},
 			});
 		},
 		onStatus(event) {
@@ -279,6 +312,7 @@ export function useChatRoom({
 			}
 
 			sending.value = true;
+		reportTyping(false);
 			error.value = "";
 			const clientMessageId = crypto.randomUUID();
 			const content = composerText.value;
@@ -487,6 +521,9 @@ export function useChatRoom({
 		pendingAttachment,
 		sending,
 		messagesEl,
+		typingUsers,
+		reportTyping,
+		clearTyping,
 		isOwnMessage,
 		loadMessages,
 		activateRoom,

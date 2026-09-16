@@ -24,7 +24,8 @@ const state = reactive({
   site: {
     siteName: 'Edgechat',
     siteIconUrl: '',
-    allowOpenRegistration: false
+    allowOpenRegistration: false,
+    maxFileSize: 0
   }
 });
 
@@ -136,7 +137,9 @@ function setSite(site) {
   state.site = {
     siteName: String(site?.siteName || 'Edgechat').trim() || 'Edgechat',
     siteIconUrl: String(site?.siteIconUrl || '').trim(),
-    allowOpenRegistration: Boolean(site?.allowOpenRegistration)
+    allowOpenRegistration: Boolean(site?.allowOpenRegistration),
+    // 供客户端在上传前做大小预校验，避免超限文件白传一遍。
+    maxFileSize: Number(site?.maxFileSize) || 0
   };
   applySiteMetadata(state.site);
 }

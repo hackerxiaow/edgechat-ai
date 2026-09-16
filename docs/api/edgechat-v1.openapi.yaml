@@ -730,3 +730,13 @@ components:
               createdAt: { type: string }
         nextCursor: { type: integer }
         hasMore: { type: boolean }
+        # 后加的可选字段：老客户端忽略即可。
+        typing:
+          type: array
+          items:
+            type: object
+            required: [userId]
+            properties:
+              userId: { type: integer }
+              displayName: { type: string }
+              avatarUrl: { type: string }

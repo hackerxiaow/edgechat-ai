@@ -101,7 +101,8 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
         siteOrigins: payload.siteOrigins,
         allowOpenRegistration: payload.allowOpenRegistration,
         smtpRelayUrl: payload.smtpRelayUrl,
-        smtpApiKey: payload.smtpApiKey
+        smtpApiKey: payload.smtpApiKey,
+        externalUploadUrl: payload.externalUploadUrl
       });
       return c.json({ site });
     } catch (error) {

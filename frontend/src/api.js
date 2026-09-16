@@ -167,6 +167,13 @@ export default {
     const query = new URLSearchParams(cursor ? { cursor: String(cursor) } : {});
     return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/sync?${query.toString()}`);
   },
+  setRoomTyping(kind, roomId, typing) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${encodeURIComponent(roomId)}/typing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { typing: Boolean(typing) }
+    });
+  },
   markRoomRead(kind, roomId, messageId) {
     return request('/messages/read', {
       method: 'POST',
@@ -223,6 +230,11 @@ export default {
     }
     if (isDemoMode) {
       return getRuntimeFileUrl(raw);
+    }
+
+    // 外置图床的直链是绝对地址，原样返回：它不受本站鉴权保护，也不能拼 /files/。
+    if (/^https?:\/\//i.test(raw)) {
+      return raw;
     }
 
     const url = raw.startsWith('/files/')

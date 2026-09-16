@@ -50,12 +50,20 @@ test("短文本消息为右下角时间戳预留末行空间", () => {
 
 	assert.match(
 		messageMarkdown,
-		/\.message-markdown::after\s*{[^}]*display:\s*inline-block;[^}]*width:\s*3\.5em;/s,
+		/\.message-markdown::after\s*{[^}]*display:\s*inline-block;[^}]*width:\s*4em;/s,
 	);
 });
 
-test("非本人消息在气泡前显示圆形发送者头像", () => {
-	assert.match(chatPage, /<button\s+v-if="!isOwnMessage\(msg\)"/);
+test("气泡时间戳固定 24 小时制并精确到秒", () => {
+	assert.match(
+		chatPage,
+		/formatLocaleTime\(value,\s*\{[^}]*second:\s*'2-digit'[^}]*hour12:\s*false/s,
+	);
+});
+
+test("双方消息都在气泡旁显示圆形发送者头像", () => {
+	// 本人消息也要显示头像，所以头像不再带 !isOwnMessage 条件。
+	assert.doesNotMatch(chatPage, /v-if="!isOwnMessage\(msg\)"/);
 	assert.match(chatPage, /class="profile-avatar-trigger message-avatar-trigger"/);
 	assert.match(chatPage, /<UiAvatar class="message-avatar"/);
 	assert.match(chatPage, /:src="msg\.sender\.avatarUrl"/);
@@ -64,6 +72,10 @@ test("非本人消息在气泡前显示圆形发送者头像", () => {
 	const row = getStyleRule(".message-row");
 	assert.match(row, /align-items:\s*flex-end;/);
 	assert.match(row, /gap:\s*10px;/);
+
+	// 本人一侧头像位于气泡右侧，用 order 调换而非复制 DOM。
+	assert.match(getStyleRule(".message-row--own .message-bubble"), /order:\s*1;/);
+	assert.match(getStyleRule(".message-row--own .message-avatar-trigger"), /order:\s*2;/);
 
 	const avatar = getStyleRule(".message-avatar");
 	assert.match(avatar, /width:\s*34px;/);

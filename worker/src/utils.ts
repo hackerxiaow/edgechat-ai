@@ -50,8 +50,19 @@ export function sanitizeLimit(value: unknown, fallback = 30, max = 100): number 
   return Math.min(parsed, max);
 }
 
+/** 外置图床的直链：这类 key 不是本地 `<userId>/...` 形态，也不能再拼成 /files/ 路径。 */
+export function isAbsoluteFileUrl(value: unknown): boolean {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
 function keyBelongsToOwner(key: string, ownerUserId: number | string | null | undefined): boolean {
   if (ownerUserId === undefined || ownerUserId === null) {
+    return true;
+  }
+
+  // 外置存储的附件其 key 本身就是图床直链，没有本地归属前缀可校验；
+  // 归属由 uploaded_files.owner_user_id 保证，不依赖 key 形态。
+  if (isAbsoluteFileUrl(key)) {
     return true;
   }
 
@@ -95,13 +106,15 @@ export function pickAttachment(
     name: String(candidate.name),
     type,
     size: Number(candidate.size) || 0,
-    url: `/files/${encodeURIComponent(key)}`,
+    url: publicFileUrl(key),
     ...normalizeAudioAttachmentMetadata(candidate, type),
   };
 }
 
 export function publicFileUrl(key: string | number): string {
-  return `/files/${encodeURIComponent(key)}`;
+  const value = String(key);
+  // 外置图床直链原样返回；只有本地 key 才拼 /files/ 前缀。
+  return isAbsoluteFileUrl(value) ? value : `/files/${encodeURIComponent(value)}`;
 }
 
 export function nextDailyUtcHour(hour: number): Date {

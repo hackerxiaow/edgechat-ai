@@ -3,6 +3,7 @@ import { ChevronDown, LoaderCircle, Mic, Paperclip, Send, Trash2, Type, X } from
 import { computed, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { isCapacitorAndroid, openNativeAppSettings, pickNativeFile } from "../../capacitor-platform.ts";
 import { getLocale, t } from "../../i18n.js";
+import store from "../../store.js";
 import { useVoiceRecorder } from "../../composables/useVoiceRecorder.ts";
 import { formatVoiceDuration } from "../../voice-message.js";
 import UiTextarea from "../ui/Textarea.vue";
@@ -52,7 +53,16 @@ const emit = defineEmits([
 	"clear-attachment",
 	"voice-recorded",
 	"cancel-reply",
+	"typing",
 ]);
+// 监听输入内容而不是分别挂到两个编辑器上：纯文本与富文本编辑都经由 modelValue 回流。
+watch(
+	() => props.modelValue,
+	(value) => {
+		emit("typing", Boolean(String(value || "").trim()));
+	},
+);
+
 const fileInput = ref(null);
 const textarea = ref(null);
 const mentionStart = ref(-1);
@@ -192,6 +202,7 @@ function handleRichEditorInitializationError() {
 }
 
 async function requestSend() {
+	emit("typing", false);
 	if (richEditorOpen.value) {
 		richEditor.value?.syncValue();
 		await nextTick();
@@ -253,8 +264,16 @@ async function openPicker() {
 
 function handleFileSelected(event) {
 	const file = event.target.files?.[0];
-	if (file) emit("upload", file);
 	event.target.value = "";
+	if (!file) return;
+	// 上传前先按服务端下发的上限挡一次，避免超限文件白传一遍。
+	const limit = Number(store.site?.maxFileSize) || 0;
+	if (limit && file.size > limit) {
+		pickerError.value = `文件大小不能超过 ${Math.round(limit / 1024 / 1024)}MB`;
+		return;
+	}
+	pickerError.value = '';
+	emit("upload", file);
 }
 
 async function startVoiceRecording() {

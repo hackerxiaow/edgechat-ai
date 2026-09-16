@@ -21,7 +21,10 @@ const OVERSIZED_ROW_MESSAGE = '该附件超过 D1 单行上限，请改用更小
 const REJECTABLE_UPLOAD_MESSAGES = [
   '文件大小不能超过',
   '该文件类型不允许上传',
-  OVERSIZED_ROW_MESSAGE
+  OVERSIZED_ROW_MESSAGE,
+  '外部图床连接失败',
+  '外部图床上传失败',
+  '外部图床返回了无法识别的结果'
 ];
 const BLOCKED_MIME_TYPES = new Set([
   'text/html',
@@ -80,8 +83,8 @@ function validateUpload(settings: RuntimeSettings, file: File): void {
     throw new Error(maxFileSizeMessage(settings.maxFileSize));
   }
 
-  // 正文直接落进 uploaded_files.data，超行会被 D1 拒绝；这里先给出可读的业务错误。
-  if (file.size + ATTACHMENT_ENVELOPE_OVERHEAD_BYTES > D1_MAX_ROW_BYTES) {
+  // 只有本地 D1 存储才受单行上限约束；走外部图床时正文不进数据库。
+  if (!settings.externalUploadUrl && file.size + ATTACHMENT_ENVELOPE_OVERHEAD_BYTES > D1_MAX_ROW_BYTES) {
     throw new Error(OVERSIZED_ROW_MESSAGE);
   }
 
@@ -94,6 +97,49 @@ function validateUpload(settings: RuntimeSettings, file: File): void {
   if (allowed.length && !allowed.some((prefix) => contentType.startsWith(prefix))) {
     throw new Error('该文件类型不允许上传');
   }
+}
+
+/** 各家图床返回结构不一，按常见字段宽松地取出直链。 */
+async function uploadToExternalHost(uploadUrl: string, file: File): Promise<string> {
+  const body = new FormData();
+  body.append('file', file, file.name || 'file');
+
+  let response: Response;
+  try {
+    response = await fetch(uploadUrl, { method: 'POST', body });
+  } catch (error) {
+    console.error('external_upload_failed', error);
+    throw new Error('外部图床连接失败，请稍后重试或联系管理员');
+  }
+
+  const text = await response.text();
+  if (!response.ok) {
+    console.error('external_upload_http_error', response.status, text.slice(0, 200));
+    throw new Error('外部图床上传失败，请稍后重试或联系管理员');
+  }
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // 图床也可能直接返回纯文本直链。
+  }
+
+  const candidates = [
+    (parsed as { url?: unknown } | null)?.url,
+    (parsed as { data?: { url?: unknown } } | null)?.data?.url,
+    (parsed as { link?: unknown } | null)?.link,
+    parsed === null ? text : null
+  ];
+  const resolved = candidates
+    .map((value) => String(value || '').trim())
+    .find((value) => /^https?:\/\//i.test(value));
+
+  if (!resolved) {
+    console.error('external_upload_unrecognized_response', text.slice(0, 200));
+    throw new Error('外部图床返回了无法识别的结果，请联系管理员核对接口');
+  }
+  return resolved;
 }
 
 export function registerUploadRoutes(app: Hono<AppEnv>) {
@@ -196,10 +242,31 @@ export async function saveUploadedFile(
     if (existing) return { file: existing, created: false };
   }
 
-  const extension = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
-  const key = `${session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
   const filename = sanitizeFilename(file.name);
   const contentType = normalizeContentType(file.type) || 'application/octet-stream';
+
+  // 配置了外部图床时，正文上传到图床、数据库只留一条 metadata；
+  // key 直接就是图床直链（见 publicFileUrl / keyBelongsToOwner 的约定）。
+  if (resolved.externalUploadUrl) {
+    const externalUrl = await uploadToExternalHost(resolved.externalUploadUrl, file);
+    // data 留空：正文已在图床，这里只留一条归属 metadata（触发器要求存在该行）。
+    await recordUploadedFile(env.DB, {
+      key: externalUrl,
+      ownerUserId: session.userId,
+      filename,
+      contentType,
+      size: file.size,
+      clientUploadId,
+      data: null
+    });
+    return {
+      created: true,
+      file: { key: externalUrl, name: filename, type: contentType, size: file.size, url: externalUrl }
+    };
+  }
+
+  const extension = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+  const key = `${session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
 
   const fileBytes = await file.arrayBuffer();
   const encryptedBytes = await encryptAttachment(env, fileBytes, key);

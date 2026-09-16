@@ -6,8 +6,8 @@ import UiButton from '../ui/Button.vue';
 import UiSurface from '../ui/Surface.vue';
 import { t } from '../../i18n.js';
 
-/** 与后端 D1 单行上限保持一致：超过这个值写入必然失败，前端先挡住。 */
-const MAX_UPLOAD_MB = 1.8;
+/** 配置了外部图床时的后端上限（MAX_EXTERNAL_UPLOAD_CEILING_BYTES）；未配置图床时后端会按 D1 单行 1.9MB 自行拒绝。 */
+const MAX_UPLOAD_MB = 100;
 const BYTES_PER_MB = 1048576;
 
 const loading = ref(false);
@@ -27,6 +27,7 @@ const siteForm = reactive({
   allowOpenRegistration: false,
   smtpRelayUrl: '',
   smtpApiKey: '',
+  externalUploadUrl: '',
   siteOrigins: ''
 });
 
@@ -44,6 +45,7 @@ function applySite(site) {
   siteForm.allowOpenRegistration = Boolean(site?.allowOpenRegistration);
   siteForm.smtpRelayUrl = site?.smtpRelayUrl || '';
   siteForm.smtpApiKey = site?.smtpApiKey || '';
+  siteForm.externalUploadUrl = site?.externalUploadUrl || '';
   siteForm.siteOrigins = (site?.siteOrigins || []).join(', ');
 }
 
@@ -99,6 +101,7 @@ async function saveSiteSettings() {
       allowOpenRegistration: siteForm.allowOpenRegistration,
       smtpRelayUrl: siteForm.smtpRelayUrl,
       smtpApiKey: siteForm.smtpApiKey,
+      externalUploadUrl: siteForm.externalUploadUrl,
       siteOrigins: siteForm.siteOrigins
     });
     applySite(payload.site);
@@ -208,6 +211,16 @@ onMounted(loadSiteSettings);
         <input v-model="siteForm.allowOpenRegistration" type="checkbox" />
         <span>{{ t('site.runtime.allowOpenRegistration') }}</span>
         <small>{{ t('site.runtime.allowOpenRegistrationHint') }}</small>
+      </label>
+
+      <label class="field">
+        <span>{{ t('site.runtime.externalUploadUrl') }}</span>
+        <input
+          v-model.trim="siteForm.externalUploadUrl"
+          type="url"
+          placeholder="https://img.example.com/upload"
+        />
+        <small>{{ t('site.runtime.externalUploadUrlHint') }}</small>
       </label>
 
       <label class="field">

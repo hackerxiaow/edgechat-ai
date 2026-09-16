@@ -1,4 +1,5 @@
 import { normalizeSiteIconForStorage, siteIconUrlFromStored } from "../site-icon.ts";
+import { ApiError } from "../errors.ts";
 
 export interface SiteSettings {
 	siteName: string;
@@ -25,6 +26,8 @@ export interface RuntimeSettings extends SiteSettings {
 	allowOpenRegistration: boolean;
 	smtpRelayUrl: string;
 	smtpApiKey: string;
+	/** 外部图床的上传接口；配置后附件走图床直链，不再进 D1。留空则回退本地加密存储。 */
+	externalUploadUrl: string;
 }
 
 export interface UpdateSiteSettingsInput {
@@ -41,6 +44,7 @@ export interface UpdateSiteSettingsInput {
 	allowOpenRegistration?: unknown;
 	smtpRelayUrl?: unknown;
 	smtpApiKey?: unknown;
+	externalUploadUrl?: unknown;
 }
 
 interface SiteSettingRow {
@@ -48,8 +52,10 @@ interface SiteSettingRow {
 	setting_value: string;
 }
 
-/** D1 单行（含 BLOB）上限 2,000,000 字节，留出信封开销后作为上传上限的天花板。 */
+/** 未配置外部图床时的上限天花板：正文落 D1 单行，必须留在 2MB 之内。 */
 export const MAX_UPLOAD_CEILING_BYTES = 1_900_000;
+/** 配置了外部图床时的上限天花板：不再受 D1 单行约束。 */
+export const MAX_EXTERNAL_UPLOAD_CEILING_BYTES = 100 * 1024 * 1024;
 export const MIN_UPLOAD_BYTES = 65_536;
 export const MAX_ALLOWED_FILE_TYPES = 20;
 export const MAX_SITE_ORIGINS = 10;
@@ -68,6 +74,7 @@ export const RUNTIME_SETTING_DEFAULTS: RuntimeSettings = {
 	allowOpenRegistration: false,
 	smtpRelayUrl: '',
 	smtpApiKey: '',
+	externalUploadUrl: '',
 };
 
 /** 设置项在表里的键名，导出给后台表单复用，避免两处写死字符串。 */
@@ -84,6 +91,7 @@ export const RUNTIME_SETTING_KEYS = {
 	allowOpenRegistration: "allow_open_registration",
 	smtpRelayUrl: "smtp_relay_url",
 	smtpApiKey: "smtp_api_key",
+	externalUploadUrl: "external_upload_url",
 } as const;
 
 function toPositiveInteger(value: unknown, fallback: number, { min = 1, max = 3650 } = {}): number {
@@ -125,7 +133,8 @@ export async function getRuntimeSettings(db: D1Database): Promise<RuntimeSetting
 		siteIconUrl: siteIconUrlFromStored(map.site_icon_url),
 		maxFileSize: toPositiveInteger(map.max_file_size, defaults.maxFileSize, {
 			min: MIN_UPLOAD_BYTES,
-			max: MAX_UPLOAD_CEILING_BYTES,
+			// 配了外部图床就不再受 D1 单行限制，上限放宽。
+			max: map.external_upload_url ? MAX_EXTERNAL_UPLOAD_CEILING_BYTES : MAX_UPLOAD_CEILING_BYTES,
 		}),
 		allowedFileTypes:
 			map.allowed_file_types === undefined || map.allowed_file_types === ""
@@ -151,6 +160,7 @@ export async function getRuntimeSettings(db: D1Database): Promise<RuntimeSetting
 		allowOpenRegistration: map.allow_open_registration === "1",
 		smtpRelayUrl: map.smtp_relay_url || defaults.smtpRelayUrl,
 		smtpApiKey: map.smtp_api_key || defaults.smtpApiKey,
+		externalUploadUrl: String(map.external_upload_url || '').trim(),
 	};
 }
 
@@ -281,6 +291,13 @@ export async function updateSiteSettings(
 		statements.push(
 			upsert(db, RUNTIME_SETTING_KEYS.smtpApiKey, String(input.smtpApiKey || "").trim()),
 		);
+	}
+	if (input.externalUploadUrl !== undefined) {
+		const raw = String(input.externalUploadUrl || "").trim();
+		if (raw && !/^https:\/\//i.test(raw)) {
+			throw new ApiError("外部图床地址必须是 https 链接");
+		}
+		statements.push(upsert(db, RUNTIME_SETTING_KEYS.externalUploadUrl, raw));
 	}
 
 	if (statements.length) {

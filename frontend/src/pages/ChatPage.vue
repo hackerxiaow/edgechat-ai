@@ -153,7 +153,7 @@ function handleRoomAccessRevoked(room) {
 
 const {
   messages, pinnedMessage, highlightedMessageId, loading, wsStatus, composerText, pendingAttachment, sending,
-  messagesEl, isOwnMessage,
+  messagesEl, isOwnMessage, typingUsers, reportTyping,
 	  loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
 	  pinMessage, unpinMessage, revealPinnedMessage,
 	  revealMessage,
@@ -482,8 +482,18 @@ onMounted(() => {
     openNativeRoom();
   });
 });
+const typingLabel = computed(() => {
+  const names = typingUsers.value.map((user) => user.displayName).filter(Boolean);
+  if (!names.length) return t('chat.typing');
+  if (names.length === 1) return t('chat.userTyping', { name: names[0] });
+  return t('chat.usersTyping', { name: names[0], count: names.length });
+});
+
 function formatBubbleTime(value) {
-  return value ? formatLocaleTime(value) : '';
+  // 固定 24 小时制并显示到秒：气泡时间戳不跟随区域设置的 12/24 小时习惯。
+  return value
+    ? formatLocaleTime(value, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    : '';
 }
 
 onBeforeUnmount(() => {
@@ -768,7 +778,6 @@ onBeforeUnmount(() => {
 			}"
           >
             <button
-              v-if="!isOwnMessage(msg)"
               type="button"
               class="profile-avatar-trigger message-avatar-trigger"
               :aria-label="t('profile.view', { name: msg.sender.displayName })"
@@ -827,6 +836,23 @@ onBeforeUnmount(() => {
           @delete="confirmDeleteMessage"
         />
 
+		<!-- 「正在输入」：头像 + 三个循环闪烁的点，跟在消息流末尾。 -->
+		<div v-if="typingUsers.length" class="typing-row">
+		  <UiAvatar
+		    class="message-avatar"
+		    :src="typingUsers[0].avatarUrl"
+		    :alt="typingUsers[0].displayName"
+		    :fallback="typingUsers[0].displayName"
+		    size="sm"
+		  />
+		  <div class="typing-bubble">
+		    <span class="sr-only">{{ typingLabel }}</span>
+		    <span class="typing-dot" aria-hidden="true" />
+		    <span class="typing-dot" aria-hidden="true" />
+		    <span class="typing-dot" aria-hidden="true" />
+		  </div>
+		</div>
+
 		<MessageComposer
 		  ref="messageComposer"
 		  v-model="composerText"
@@ -840,6 +866,7 @@ onBeforeUnmount(() => {
 			  @send="sendComposerMessage"
 			  @voice-recorded="sendComposerVoice"
 			  @cancel-reply="replyingTo = null"
+		  @typing="reportTyping"
 		  @upload="uploadAttachment"
 		  @clear-attachment="clearAttachment"
 		/>
@@ -1469,6 +1496,66 @@ onBeforeUnmount(() => {
 .message-row--own .message-bubble {
   background: var(--chat-outgoing);
   border-radius: 14px 14px 4px 14px;
+  /* 本人消息的头像排到气泡右侧；用 order 调换顺序，避免复制一份头像 DOM。 */
+  order: 1;
+}
+
+.message-row--own .message-avatar-trigger {
+  order: 2;
+}
+
+/* ===== 「正在输入」气泡 ===== */
+.typing-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--chat-paper);
+  box-shadow: var(--chat-shadow);
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chat-muted);
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .message-sender-name {

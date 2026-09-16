@@ -5,7 +5,7 @@ import {
 	isDemoMode,
 } from "./runtime.js";
 
-function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
+function createPollingRoomSocket({ kind, roomId, onMessage, onTyping, onStatus }) {
 	let closed = false;
 	let cursor = 0;
 	let cursorInitialized = false;
@@ -19,6 +19,7 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 				const res = await api.getRecentMessages(kind, roomId, 30);
 				cursor = Number(res?.syncCursor) || 0;
 				cursorInitialized = true;
+				onTyping?.(Array.isArray(res?.typing) ? res.typing : []);
 				if (Array.isArray(res?.messages)) {
 					for (const m of res.messages) {
 						lastSeenMessageIds.add(Number(m.id));
@@ -48,6 +49,7 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 				if (res?.nextCursor) {
 					cursor = Math.max(cursor, Number(res.nextCursor) || 0);
 				}
+				onTyping?.(Array.isArray(res?.typing) ? res.typing : []);
 			}
 		} catch (e) {
 			if (String(e?.message || '').includes('expired') || e?.status === 409) {
@@ -81,11 +83,11 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 	return socket;
 }
 
-export function connectRoomSocket({ kind, roomId, onMessage, onStatus }) {
+export function connectRoomSocket({ kind, roomId, onMessage, onTyping, onStatus }) {
 	if (isDemoMode) {
 		return connectRuntimeRoomSocket({ kind, roomId, onMessage, onStatus });
 	}
-	return createPollingRoomSocket({ kind, roomId, onMessage, onStatus });
+	return createPollingRoomSocket({ kind, roomId, onMessage, onTyping, onStatus });
 }
 
 export function connectInboxSocket({ onMessage, onStatus }) {

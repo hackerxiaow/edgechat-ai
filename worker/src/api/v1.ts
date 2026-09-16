@@ -21,6 +21,7 @@ import {
 import { issueRealtimeTicket } from '../realtime-tickets.ts';
 import { authorizeRoom, isRoomKind } from '../room-access.ts';
 import { markRoomRead } from '../data/unread.ts';
+import { listRoomTypingUsers, setRoomTyping } from '../data/typing.ts';
 import { isUserDisabled } from '../user-status.ts';
 import {
   errorCodeForStatus,
@@ -194,18 +195,25 @@ export function registerV1Routes(app: Hono<AppEnv>) {
   app.get('/api/v1/rooms/:kind/:id/sync', authMiddleware, async (c) => {
     const { roomId } = await requireRoom(c);
     const cursor = Math.max(0, Number(c.req.query('cursor')) || 0);
-    const result = await listRoomMessageEvents(
-      c.env,
-      roomId,
-      cursor,
-      sanitizeLimit(c.req.query('limit'), 100, 100)
-    ).catch((error) => {
-      if (error?.code === 'sync_cursor_expired') {
-        throw new ApiError('同步游标已过期，请重新加载会话', 409, error.code);
-      }
-      throw error;
-    });
-    return c.json(result);
+    const [result, typing] = await Promise.all([
+      listRoomMessageEvents(
+        c.env,
+        roomId,
+        cursor,
+        sanitizeLimit(c.req.query('limit'), 100, 100)
+      ).catch((error) => {
+        if (error?.code === 'sync_cursor_expired') {
+          throw new ApiError('同步游标已过期，请重新加载会话', 409, error.code);
+        }
+        throw error;
+      }),
+      listRoomTypingUsers(c.env.DB, {
+        channelId: roomId,
+        excludeUserId: c.get('session').userId
+      })
+    ]);
+    // typing 是后加的字段：老客户端忽略即可，移动端 v1 契约保持向后兼容。
+    return c.json({ ...result, typing });
   });
 
   app.post('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {
@@ -257,6 +265,17 @@ export function registerV1Routes(app: Hono<AppEnv>) {
       messageId
     });
     return c.json({ ok: true, lastReadMessageId });
+  });
+
+  app.post('/api/v1/rooms/:kind/:id/typing', authMiddleware, async (c) => {
+    const { session, roomId } = await requireRoom(c);
+    const payload = await parseJsonRequest(c.req.raw);
+    await setRoomTyping(c.env.DB, {
+      channelId: roomId,
+      userId: session.userId,
+      typing: payload.typing !== false
+    });
+    return c.json({ ok: true });
   });
 
   app.post('/api/v1/uploads', authMiddleware, async (c) => {
