@@ -547,7 +547,18 @@ export default {
   "demo.local": "本地演示",
   "demo.selectPage": "選擇演示頁面",
   "demo.reset": "重置演示數據",
-  "demo.buildMessage": "純前端演示構建"
+  "demo.buildMessage": "純前端演示構建",
+  'chat.addPeopleSubtitle': '選擇發起會話的類型',
+  'chat.startDirectConversation': '發起私聊會話',
+  'chat.startDirectConversationDesc': '與選定成員開始一對一私密對話',
+  'chat.createGroupChat': '創建群聊會話',
+  'chat.createGroupChatDesc': '建立支持多人實時互動的群組',
+  'chat.chooseContacts': '選擇聯系人',
+  'chat.searchUsers': '搜索用戶...',
+  'chat.noMatchingUsers': '未找到匹配的用戶',
+  'theme.toggle': '切換主題',
+  'theme.dark': '深色模式',
+  'theme.light': '淺色模式',
 };
 
 export { localizeServerError } from './server-errors/zh-TW.js';

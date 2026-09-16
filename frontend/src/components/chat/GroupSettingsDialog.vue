@@ -13,7 +13,7 @@ const props = defineProps({
   avatarUploading: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['close', 'upload-avatar', 'save']);
+const emit = defineEmits(['close', 'upload-avatar', 'save', 'delete-group']);
 const avatarInput = ref(null);
 const nameInputEl = ref(null);
 const pickerError = ref('');
@@ -41,6 +41,7 @@ async function openAvatarPicker() {
 </script>
 
 <template>
+  <Teleport to="body">
   <Transition name="modal-fade">
     <div v-if="show" class="room-dialog-overlay" @click.self="emit('close')">
       <section class="room-dialog" role="dialog" aria-modal="true" aria-labelledby="group-settings-title">
@@ -60,6 +61,12 @@ async function openAvatarPicker() {
           <input ref="nameInputEl" v-model="form.name" type="text" class="room-dialog__input" :disabled="room?.isGeneral" />
         </label>
 
+        <div v-if="room && !room.isGeneral && room.canManage" class="room-dialog__danger-zone">
+          <button type="button" class="room-dialog__danger" @click="emit('delete-group')">
+            {{ t('group.delete') }}
+          </button>
+        </div>
+
         <div class="room-dialog__actions">
           <button type="button" class="room-dialog__secondary" @click="emit('close')">{{ t('common.cancel') }}</button>
           <button type="button" class="room-dialog__primary" :disabled="!form.name.trim() || saving" @click="emit('save')">
@@ -69,13 +76,14 @@ async function openAvatarPicker() {
       </section>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
 .room-dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,6 +106,9 @@ async function openAvatarPicker() {
 .room-dialog__secondary { border: 1px solid #e8ecf0; background: #fff; }
 .room-dialog__primary { border: 0; background: #008069; color: #fff; }
 .room-dialog__primary:disabled, .room-dialog__secondary:disabled { cursor: not-allowed; opacity: 0.55; }
+.room-dialog__danger-zone { margin-top: 20px; padding-top: 16px; border-top: 1px solid #f2f4f7; }
+.room-dialog__danger { width: 100%; min-height: 44px; padding: 10px 16px; border: 1px solid #fee4e2; border-radius: 8px; background: #fef3f2; color: #d92d20; font-weight: 500; cursor: pointer; }
+.room-dialog__danger:hover { background: #fee4e2; }
 .modal-fade-enter-active { transition: opacity 200ms; }
 .modal-fade-leave-active { transition: opacity 150ms; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }

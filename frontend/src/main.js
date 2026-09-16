@@ -1,3 +1,4 @@
+import { useTheme } from './composables/useTheme.js';
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router.js';
@@ -28,7 +29,8 @@ if (customBg) {
 }
 
 initializeI18n().then(() => store.initialize()).finally(() => {
-  const app = createApp(App);
+  useTheme();
+const app = createApp(App);
   app.use(router);
   app.mount('#app');
   void registerEdgeChatWebMcp();

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, toRef, watch } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { useOverlayLifecycle } from '../../composables/useOverlayLifecycle.js';
 import { t } from '../../i18n.js';
 import UiAvatar from '../ui/Avatar.vue';
@@ -7,129 +7,144 @@ import UiAvatar from '../ui/Avatar.vue';
 const props = defineProps({
   show: { type: Boolean, default: false },
   users: { type: Array, default: () => [] },
-  openingDmUserId: { type: Number, default: null },
+  openingUserId: { type: Number, default: null },
   error: { type: String, default: '' }
 });
 
-const emit = defineEmits(['close', 'create-group', 'open-dm']);
-const step = ref('choose');
-const firstActionEl = ref(null);
+const emit = defineEmits(['close', 'open-dm', 'create-group']);
+const search = ref('');
+const rootEl = ref(null);
 
 useOverlayLifecycle({
   open: toRef(props, 'show'),
   onClose: () => emit('close'),
-  focusTarget: firstActionEl
+  focusTarget: rootEl
 });
 
-watch(
-  () => props.show,
-  () => {
-    step.value = 'choose';
-  }
-);
+const filteredUsers = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  if (!query) return props.users;
+  return props.users.filter((user) =>
+    user.username?.toLowerCase().includes(query)
+    || user.displayName?.toLowerCase().includes(query)
+  );
+});
 </script>
 
 <template>
-  <Transition name="add-conversation-fade">
-    <div
-      v-if="show"
-      class="add-conversation-overlay"
-      @click.self="emit('close')"
-    >
-      <section
-        class="add-conversation-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-conversation-title"
-      >
-        <header class="add-conversation-dialog__header">
-          <div>
-            <h2 id="add-conversation-title">{{ t('chat.addPeople') }}</h2>
-            <p>{{ step === 'dm' ? t('conversation.chooseContact') : t('conversation.chooseType') }}</p>
-          </div>
-          <button type="button" class="add-conversation-dialog__close" :aria-label="t('common.close')" @click="emit('close')">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <title>{{ t('common.close') }}</title>
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </header>
-
-        <div v-if="step === 'choose'" class="add-conversation-dialog__choices">
-          <button ref="firstActionEl" type="button" class="add-conversation-choice" @click="step = 'dm'">
-            <span class="add-conversation-choice__icon">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <title>{{ t('conversation.startNew') }}</title>
-                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+  <Teleport to="body">
+    <Transition name="add-conversation-fade">
+      <div v-if="show" class="add-conversation-overlay" @click.self="emit('close')">
+        <section
+          ref="rootEl"
+          class="add-conversation-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('chat.addPeople')"
+          tabindex="-1"
+        >
+          <header class="add-conversation-header">
+            <div class="add-conversation-title-wrap">
+              <h2 class="add-conversation-title">{{ t('chat.addPeople') }}</h2>
+              <p class="add-conversation-subtitle">{{ t('chat.addPeopleSubtitle') }}</p>
+            </div>
+            <button type="button" class="add-conversation-close" :aria-label="t('common.close')" @click="emit('close')">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
-            </span>
-            <span>
-              <strong>{{ t('conversation.startNew') }}</strong>
-              <small>{{ t('conversation.startNewDescription') }}</small>
-            </span>
-            <svg class="add-conversation-choice__arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <title>{{ t('conversation.chooseContacts') }}</title>
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
+            </button>
+          </header>
 
-          <button type="button" class="add-conversation-choice" @click="emit('create-group')">
-            <span class="add-conversation-choice__icon">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <title>{{ t('conversation.createGroup') }}</title>
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <path d="M20 8v6M23 11h-6" />
-              </svg>
-            </span>
-            <span>
-              <strong>{{ t('conversation.createGroup') }}</strong>
-              <small>{{ t('conversation.createGroupDescription') }}</small>
-            </span>
-            <svg class="add-conversation-choice__arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <title>{{ t('conversation.enterGroupCreation') }}</title>
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </div>
+          <p v-if="error" class="add-conversation-error" role="alert">{{ error }}</p>
 
-        <div v-else class="add-conversation-dialog__people">
-          <button type="button" class="add-conversation-dialog__back" @click="step = 'choose'">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <title>{{ t('common.back') }}</title>
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            {{ t('common.back') }}
-          </button>
-
-          <p v-if="error" class="add-conversation-dialog__error" role="alert">{{ error }}</p>
-          <p v-if="!users.length" class="add-conversation-dialog__empty">
-            {{ t('conversation.allUsersHaveDm') }}
-          </p>
-
-          <div v-else class="add-conversation-dialog__list">
+          <div class="add-conversation-choices" role="list">
             <button
-              v-for="user in users"
-              :key="user.id"
               type="button"
-              class="add-conversation-person"
-              :disabled="openingDmUserId !== null"
-              @click="emit('open-dm', user)"
+              class="add-conversation-choice add-conversation-choice--active"
+              role="listitem"
             >
-              <UiAvatar :src="user.avatarUrl" :fallback="user.displayName?.[0] || '?'" size="sm" />
-              <span class="add-conversation-person__identity">
-                <strong>{{ user.displayName }}</strong>
-                <small>@{{ user.username }}</small>
-              </span>
-              <span class="add-conversation-person__status" aria-live="polite">
-                {{ openingDmUserId === Number(user.id) ? t('common.opening') : t('conversation.start') }}
-              </span>
+              <div class="add-conversation-choice__icon add-conversation-choice__icon--dm" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <div class="add-conversation-choice__body">
+                <strong class="add-conversation-choice__title">{{ t('chat.startDirectConversation') }}</strong>
+                <span class="add-conversation-choice__desc">{{ t('chat.startDirectConversationDesc') }}</span>
+              </div>
+              <svg class="add-conversation-choice__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              class="add-conversation-choice"
+              role="listitem"
+              @click="emit('create-group')"
+            >
+              <div class="add-conversation-choice__icon add-conversation-choice__icon--group" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  <path d="M20 8v6M23 11h-6" />
+                </svg>
+              </div>
+              <div class="add-conversation-choice__body">
+                <strong class="add-conversation-choice__title">{{ t('chat.createGroupChat') }}</strong>
+                <span class="add-conversation-choice__desc">{{ t('chat.createGroupChatDesc') }}</span>
+              </div>
+              <svg class="add-conversation-choice__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
             </button>
           </div>
-        </div>
-      </section>
-    </div>
-  </Transition>
+
+          <div class="add-conversation-dm-section">
+            <h3 class="add-conversation-section-title">{{ t('chat.chooseContacts') }}</h3>
+            <label class="add-conversation-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m21 21-4.35-4.35" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <input
+                v-model="search"
+                type="search"
+                :placeholder="t('chat.searchUsers')"
+                autocomplete="off"
+              />
+            </label>
+
+            <ul class="add-conversation-users" role="list">
+              <li v-for="user in filteredUsers" :key="user.id" class="add-conversation-user-item">
+                <button
+                  type="button"
+                  class="add-conversation-user-btn"
+                  :disabled="openingUserId === user.id"
+                  @click="emit('open-dm', user)"
+                >
+                  <UiAvatar :src="user.avatarUrl" :fallback="user.displayName?.[0] || user.username?.[0] || '?'" />
+                  <div class="add-conversation-user-info">
+                    <strong class="add-conversation-user-name">{{ user.displayName || user.username }}</strong>
+                    <span class="add-conversation-user-handle">@{{ user.username }}</span>
+                  </div>
+                  <span v-if="openingUserId === user.id" class="add-conversation-opening">{{ t('common.opening') }}</span>
+                </button>
+              </li>
+              <li v-if="filteredUsers.length === 0" class="add-conversation-empty">
+                {{ t('chat.noMatchingUsers') }}
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -140,220 +155,274 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding:
-    max(16px, env(safe-area-inset-top))
-    max(16px, env(safe-area-inset-right))
-    max(16px, env(safe-area-inset-bottom))
-    max(16px, env(safe-area-inset-left));
-  background: rgba(0, 0, 0, 0.4);
+  padding: 16px;
+  background: rgba(11, 20, 26, 0.48);
+  backdrop-filter: blur(4px);
 }
 
 .add-conversation-dialog {
   width: min(440px, 100%);
-  max-height: min(620px, calc(100dvh - 32px));
-  overflow: hidden;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-primary, #ffffff);
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 24px 64px rgba(11, 20, 26, 0.2);
+  overflow: hidden;
+  outline: none;
 }
 
-.add-conversation-dialog__header {
+.add-conversation-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  padding: 24px 24px 16px;
+  gap: 12px;
+  padding: 20px 20px 12px;
 }
 
-.add-conversation-dialog__header h2 {
+.add-conversation-title {
   margin: 0;
-  color: #111b21;
   font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #111b21);
 }
 
-.add-conversation-dialog__header p {
-  margin: 6px 0 0;
-  color: #667781;
+.add-conversation-subtitle {
+  margin: 4px 0 0;
   font-size: 13px;
+  color: var(--text-secondary, #667781);
 }
 
-.add-conversation-dialog__close {
-  display: inline-flex;
+.add-conversation-close {
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  margin: -10px -10px 0 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #54656f;
+  color: var(--text-secondary, #667781);
   cursor: pointer;
-  transition: background 150ms, color 150ms;
 }
 
-.add-conversation-dialog__close:hover {
-  background: #f0f2f5;
-  color: #111b21;
+.add-conversation-close:hover {
+  background: var(--surface-hover, #f0f2f5);
+  color: var(--text-primary, #111b21);
 }
 
-.add-conversation-dialog__choices,
-.add-conversation-dialog__people {
-  display: grid;
-  gap: 12px;
-  padding: 8px 24px 24px;
+.add-conversation-close svg {
+  width: 20px;
+  height: 20px;
 }
 
-.add-conversation-choice,
-.add-conversation-person {
-  width: 100%;
-  min-height: 64px;
-  border: 1px solid #e8ecf0;
-  border-radius: 12px;
-  background: #fff;
-  color: #111b21;
-  cursor: pointer;
-  transition: background 150ms, border-color 150ms, box-shadow 150ms;
+.add-conversation-error {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.add-conversation-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 12px;
 }
 
 .add-conversation-choice {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 20px;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light, #e9edef);
+  border-radius: 12px;
+  background: var(--surface-primary, #ffffff);
+  color: inherit;
   text-align: left;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
 }
 
-.add-conversation-choice:hover,
-.add-conversation-person:hover:not(:disabled) {
-  border-color: #b7d8d2;
-  background: #f5fbf9;
-  box-shadow: 0 4px 14px rgba(0, 128, 105, 0.08);
+.add-conversation-choice:hover {
+  background: var(--surface-hover, #f5f7f8);
+  border-color: var(--border-medium, #d1d7db);
+}
+
+.add-conversation-choice--active {
+  border-color: var(--color-primary, #00a884);
+  background: var(--surface-active, #f0faf6);
 }
 
 .add-conversation-choice__icon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #e7f4f1;
-  color: #008069;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
 }
 
-.add-conversation-choice span:nth-child(2) {
-  display: grid;
-  gap: 4px;
+.add-conversation-choice__icon svg {
+  width: 22px;
+  height: 22px;
 }
 
-.add-conversation-choice strong,
-.add-conversation-person strong {
-  font-size: 14px;
-  font-weight: 600;
+.add-conversation-choice__icon--dm {
+  background: #e7f8f3;
+  color: #00a884;
 }
 
-.add-conversation-choice small,
-.add-conversation-person small {
-  color: #667781;
-  font-size: 12px;
+.add-conversation-choice__icon--group {
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
-.add-conversation-choice__arrow {
-  color: #8696a0;
-}
-
-.add-conversation-dialog__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  min-height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #008069;
-  cursor: pointer;
-}
-
-.add-conversation-dialog__back:hover {
-  background: #f0f2f5;
-}
-
-.add-conversation-dialog__list {
-  display: grid;
-  gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.add-conversation-person {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  text-align: left;
-}
-
-.add-conversation-person:disabled {
-  cursor: wait;
-  opacity: 0.58;
-}
-
-.add-conversation-person__identity {
-  display: grid;
-  gap: 3px;
+.add-conversation-choice__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-width: 0;
 }
 
-.add-conversation-person__identity strong,
-.add-conversation-person__identity small {
+.add-conversation-choice__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111b21);
+}
+
+.add-conversation-choice__desc {
+  font-size: 12px;
+  color: var(--text-secondary, #667781);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.add-conversation-person__status {
-  color: #008069;
+.add-conversation-choice__arrow {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted, #8696a0);
+  flex-shrink: 0;
+}
+
+.add-conversation-dm-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border-light, #e9edef);
+}
+
+.add-conversation-section-title {
+  margin: 0 0 8px;
   font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #667781);
 }
 
-.add-conversation-dialog__empty,
-.add-conversation-dialog__error {
+.add-conversation-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-search, #f0f2f5);
+  margin-bottom: 8px;
+}
+
+.add-conversation-search svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary, #667781);
+  flex-shrink: 0;
+}
+
+.add-conversation-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-primary, #111b21);
+  outline: none;
+}
+
+.add-conversation-users {
+  list-style: none;
   margin: 0;
-  padding: 14px 16px;
-  border-radius: 10px;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 200px;
+}
+
+.add-conversation-user-item {
+  margin: 0;
+}
+
+.add-conversation-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.add-conversation-user-btn:hover {
+  background: var(--surface-hover, #f5f7f8);
+}
+
+.add-conversation-user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.add-conversation-user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111b21);
+}
+
+.add-conversation-user-handle {
+  font-size: 12px;
+  color: var(--text-secondary, #667781);
+}
+
+.add-conversation-opening {
+  font-size: 12px;
+  color: var(--color-primary, #00a884);
+}
+
+.add-conversation-empty {
+  padding: 16px;
+  text-align: center;
   font-size: 13px;
-}
-
-.add-conversation-dialog__empty {
-  background: #f5f7fa;
-  color: #667781;
-}
-
-.add-conversation-dialog__error {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.add-conversation-dialog button:focus-visible {
-  outline: 3px solid rgba(0, 128, 105, 0.24);
-  outline-offset: 2px;
+  color: var(--text-secondary, #667781);
 }
 
 .add-conversation-fade-enter-active {
   transition: opacity 200ms ease-out;
 }
-
 .add-conversation-fade-leave-active {
   transition: opacity 150ms ease-in;
 }
-
 .add-conversation-fade-enter-from,
 .add-conversation-fade-leave-to {
   opacity: 0;
@@ -364,33 +433,10 @@ watch(
     align-items: flex-end;
     padding: 0;
   }
-
   .add-conversation-dialog {
     width: 100%;
-    max-height: calc(100dvh - env(safe-area-inset-top));
+    max-height: 85dvh;
     border-radius: 16px 16px 0 0;
-  }
-
-  .add-conversation-dialog__header,
-  .add-conversation-dialog__choices,
-  .add-conversation-dialog__people {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .add-conversation-dialog__people {
-    min-height: 0;
-  }
-
-  .add-conversation-dialog__list {
-    max-height: min(50dvh, 360px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .add-conversation-fade-enter-active,
-  .add-conversation-fade-leave-active {
-    transition: none;
   }
 }
 </style>

@@ -24,6 +24,7 @@ useOverlayLifecycle({
 </script>
 
 <template>
+  <Teleport to="body">
   <Transition name="modal-fade">
     <div v-if="show" class="room-dialog-overlay" @click.self="emit('close')">
       <section class="room-dialog" role="dialog" aria-modal="true" aria-labelledby="create-group-title">
@@ -88,13 +89,14 @@ useOverlayLifecycle({
       </section>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
 .room-dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;

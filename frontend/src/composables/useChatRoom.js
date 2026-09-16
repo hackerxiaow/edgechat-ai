@@ -154,6 +154,24 @@ export function useChatRoom({
 				applyActiveRoomActivity(payload.message);
 				nextTick().then(scrollToBottom);
 			}
+			if (payload.type === "message_stream" && payload.messageId) {
+				const target = messages.value.find((item) => Number(item.id) === Number(payload.messageId));
+				if (target) {
+					if (payload.replace) {
+						target.content = payload.delta;
+					} else {
+						target.content = (target.content || "") + payload.delta;
+					}
+					nextTick().then(scrollToBottom);
+				}
+			}
+			if (payload.type === "message_updated" && payload.message) {
+				const index = messages.value.findIndex((item) => Number(item.id) === Number(payload.message.id));
+				if (index !== -1) {
+					messages.value[index] = { ...messages.value[index], ...payload.message };
+					nextTick().then(scrollToBottom);
+				}
+			}
 			if (payload.type === "message_deleted") {
 				const messageId = Number(payload.messageId);
 				messages.value = messages.value

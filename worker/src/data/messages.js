@@ -198,7 +198,7 @@ const MESSAGE_SELECT = `SELECT
 export async function getMessageDeletionTarget(db, messageId) {
 	const { results } = await db
 		.prepare(
-			`SELECT m.id, m.channel_id, m.sender_id, m.attachment_key,
+			`SELECT m.id, m.channel_id, m.sender_id, m.source, m.sender_kind, m.attachment_key,
 			        c.kind AS channel_kind
 			 FROM messages m
 			 JOIN channels c ON c.id = m.channel_id

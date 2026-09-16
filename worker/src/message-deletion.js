@@ -21,21 +21,40 @@ export function createMessageDeletion({
 			throw new MessageDeletionError("消息不存在");
 		}
 
-		const access = await authorize(
-			env.DB,
-			meta.principal,
-			meta.room.kind,
-			meta.room.id,
-		);
-		if (!access.ok) {
+		const target = await getDeletionTarget(env.DB, messageId);
+		if (!target || Number(target.channel_id) !== Number(meta.room.id)) {
+			throw new MessageDeletionError("消息不存在或已被删除");
+		}
+
+		// 检查删除权限：
+		// 1. 全站管理员
+		// 2. 本人发送的消息 (target.sender_id === meta.principal.userId)
+		// 3. AI 机器人消息 (target.source === 'ai' 允许当前频道成员删除清理)
+		// 4. 群主 (owner)
+		let canDelete = Boolean(meta.principal.isAdmin);
+		if (!canDelete && target.sender_id && Number(target.sender_id) === Number(meta.principal.userId)) {
+			canDelete = true;
+		}
+		if (!canDelete && target.source === 'ai') {
+			canDelete = true;
+		}
+		if (!canDelete) {
+			const access = await authorize(
+				env.DB,
+				meta.principal,
+				meta.room.kind,
+				meta.room.id,
+			);
+			if (access.ok) {
+				canDelete = true;
+			}
+		}
+
+		if (!canDelete) {
 			throw new MessageDeletionError("无权删除该消息");
 		}
 
-		let attachmentKey = null;
-		if (env.FILES) {
-			const target = await getDeletionTarget(env.DB, messageId);
-			attachmentKey = target?.attachment_key || null;
-		}
+		let attachmentKey = target?.attachment_key || null;
 
 		const deleted = await persistDeletion(env.DB, {
 			channelId: meta.room.id,

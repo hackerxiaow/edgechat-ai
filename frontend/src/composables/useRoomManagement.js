@@ -85,7 +85,10 @@ export function useRoomManagement({
 				kind: createGroupForm.kind,
 				memberUserIds: createGroupForm.memberUserIds,
 			});
-			await refreshAndOpen(payload.channel);
+			await refreshAndOpen(
+        { kind: payload.channel.kind, id: payload.channel.id },
+        { kind: payload.channel.kind, id: payload.channel.id, source: payload.channel }
+      );
 			closeCreateGroup();
 		} catch (currentError) {
 			error.value = currentError.message;

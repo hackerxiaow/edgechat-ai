@@ -37,3 +37,89 @@
   --chat-space-lg: 16px;
   --chat-space-xl: 24px;
 }
+
+/* 暗黑模式主题覆盖 */
+html[data-theme="dark"],
+html.dark {
+  --chat-paper: oklch(22% 0.015 160);
+  --chat-canvas: oklch(18% 0.012 160);
+  --chat-rail: oklch(15% 0.010 160);
+  --chat-hover: oklch(26% 0.018 160);
+  --chat-selected: oklch(28% 0.035 160);
+  --chat-pressed: oklch(32% 0.040 160);
+  --chat-outgoing: oklch(30% 0.055 155);
+  --chat-ink: oklch(92% 0.010 165);
+  --chat-muted: oklch(72% 0.015 165);
+  --chat-subtle: oklch(65% 0.018 165);
+  --chat-line: oklch(28% 0.015 160);
+  --chat-accent: oklch(62% 0.120 165);
+  --chat-accent-hover: oklch(68% 0.110 165);
+  --chat-accent-pressed: oklch(55% 0.100 165);
+  --chat-danger: oklch(65% 0.18 25);
+  --chat-danger-soft: oklch(25% 0.05 25);
+  --chat-disabled: oklch(30% 0.01 160);
+  --chat-online: oklch(65% 0.15 150);
+  --chat-scrollbar: oklch(45% 0.02 160 / 0.5);
+  --chat-scrim: oklch(10% 0.01 160 / 0.7);
+  --chat-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --chat-shadow-panel: 0 12px 36px rgba(0, 0, 0, 0.6);
+  
+  /* 通用 Surface 与 Background 适配 */
+  --surface-primary: #1e2428;
+  --surface-secondary: #111b21;
+  --surface-hover: #2a3942;
+  --surface-active: #202c33;
+  --surface-search: #202c33;
+  --text-primary: #e9edef;
+  --text-secondary: #8696a0;
+  --text-muted: #667781;
+  --border-light: #222d34;
+  --border-medium: #2a3942;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body,
+html.dark body {
+  background-color: var(--chat-canvas);
+  color: var(--chat-ink);
+}
+
+html[data-theme="dark"] .room-dialog,
+html.dark .room-dialog,
+html[data-theme="dark"] .add-conversation-dialog,
+html.dark .add-conversation-dialog {
+  background: #1e2428 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .room-dialog h2,
+html.dark .room-dialog h2,
+html[data-theme="dark"] .add-conversation-title,
+html.dark .add-conversation-title {
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .room-dialog__input,
+html.dark .room-dialog__input,
+html[data-theme="dark"] .add-conversation-search,
+html.dark .add-conversation-search {
+  background: #111b21 !important;
+  border-color: #2a3942 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .room-dialog__secondary,
+html.dark .room-dialog__secondary,
+html[data-theme="dark"] .add-conversation-choice,
+html.dark .add-conversation-choice {
+  background: #1e2428 !important;
+  border-color: #2a3942 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .room-dialog__secondary:hover,
+html.dark .room-dialog__secondary:hover,
+html[data-theme="dark"] .add-conversation-choice:hover,
+html.dark .add-conversation-choice:hover {
+  background: #2a3942 !important;
+}

@@ -32,7 +32,8 @@ export function useConversationCreation({
 	}
 
 	function startGroupCreation() {
-		closeAddConversation();
+		showAddConversation.value = false;
+		error.value = "";
 		openGroupDialog();
 	}
 

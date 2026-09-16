@@ -1,3 +1,4 @@
+import { processAiBotResponse } from '../integrations/ai-bot.js';
 import {
   MessageSubmissionError,
   submitRoomMessage,
@@ -161,7 +162,8 @@ export class ChannelRoom {
           message,
           replyToSenderId
         }),
-        forwardEdgeChatMessageToTelegram(this.env, { room, message })
+        forwardEdgeChatMessageToTelegram(this.env, { room, message }),
+        processAiBotResponse(this, { room, message })
       ])
     );
   }

@@ -480,5 +480,16 @@ export default {
   'demo.local': '本地演示',
   'demo.selectPage': '选择演示页面',
   'demo.reset': '重置演示数据',
-  'demo.buildMessage': '纯前端演示构建'
+  'demo.buildMessage': '纯前端演示构建',
+  'chat.addPeopleSubtitle': '选择发起会话的类型',
+  'chat.startDirectConversation': '发起私聊会话',
+  'chat.startDirectConversationDesc': '与选定成员开始一对一私密对话',
+  'chat.createGroupChat': '创建群聊会话',
+  'chat.createGroupChatDesc': '建立支持多人实时互动的群组',
+  'chat.chooseContacts': '选择联系人',
+  'chat.searchUsers': '搜索用户...',
+  'chat.noMatchingUsers': '未找到匹配的用户',
+  'theme.toggle': '切换主题',
+  'theme.dark': '深色模式',
+  'theme.light': '浅色模式',
 };

@@ -480,7 +480,18 @@ export default {
   'demo.local': 'Local demo',
   'demo.selectPage': 'Select demo page',
   'demo.reset': 'Reset demo data',
-  'demo.buildMessage': 'Frontend-only demo build'
+  'demo.buildMessage': 'Frontend-only demo build',
+  'chat.addPeopleSubtitle': 'Choose a conversation type',
+  'chat.startDirectConversation': 'Start a new conversation',
+  'chat.startDirectConversationDesc': 'Start a private conversation with someone new',
+  'chat.createGroupChat': 'Create group chat',
+  'chat.createGroupChatDesc': 'Start a group conversation with multiple members',
+  'chat.chooseContacts': 'Choose contacts',
+  'chat.searchUsers': 'Search users...',
+  'chat.noMatchingUsers': 'No matching users found',
+  'theme.toggle': 'Toggle theme',
+  'theme.dark': 'Dark mode',
+  'theme.light': 'Light mode',
 };
 
 export { localizeServerError } from './server-errors/en-US.js';
