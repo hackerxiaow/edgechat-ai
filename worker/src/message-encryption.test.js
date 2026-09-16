@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { insertMessage } from './data/messages.ts';
-import { isEncryptedMessageContent } from './encryption.js';
+import { isEncryptedMessageContent } from './encryption.ts';
 
 const testKeyring = JSON.stringify({
   activeKeyId: 'v1',

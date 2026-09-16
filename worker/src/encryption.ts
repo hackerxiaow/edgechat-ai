@@ -7,11 +7,46 @@ const NONCE_BYTES = 12;
 const FILE_MAGIC = new Uint8Array([0x45, 0x44, 0x47, 0x45, 0x43, 0x30, 0x31, 0x00]);
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder('utf-8', { fatal: true });
-let cachedRawKeyring = null;
-let cachedKeyring = null;
+// workers-types 要求显式声明 ignoreBOM；false 与运行时的默认行为一致。
+const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false });
 
-function bytesToBase64(bytes) {
+/** 密钥来源：既可以是旧的裸 keyring 字符串，也可以是带 EDGECHAT_ENCRYPTION_* 的 env。 */
+export type EncryptionSource = unknown;
+
+export interface MessageContext {
+  channelId: number | string;
+  senderId: number | string;
+  /** 外部消息使用来源+外部 ID 作为 AAD，缺省表示本地消息。 */
+  senderContext?: string;
+}
+
+export interface DecryptedAttachment {
+  bytes: Uint8Array;
+  encrypted: boolean;
+  keyId: string | null;
+}
+
+interface KeyEntry {
+  bytes: Uint8Array;
+  cryptoKey: Promise<CryptoKey>;
+}
+
+export interface EncryptionKeyring {
+  activeKeyId: string;
+  keys: Map<string, KeyEntry>;
+}
+
+interface KeyringSource {
+  cacheKey: string;
+  legacyRaw: string;
+  activeKeyId: string;
+  generatedKeys: [string, string][];
+}
+
+let cachedRawKeyring: string | null = null;
+let cachedKeyring: EncryptionKeyring | null = null;
+
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunkSize = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -20,13 +55,13 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
-function base64ToBytes(value, label) {
+function base64ToBytes(value: unknown, label: string): Uint8Array {
   const input = String(value || '');
   if (!input || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input)) {
     throw new Error(`${label} must be valid padded Base64`);
   }
 
-  let binary;
+  let binary: string;
   try {
     binary = atob(input);
   } catch {
@@ -36,7 +71,7 @@ function base64ToBytes(value, label) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-function getKeyringSource(source) {
+function getKeyringSource(source: EncryptionSource): KeyringSource {
   if (typeof source === 'string') {
     return {
       cacheKey: `legacy:${source}`,
@@ -46,14 +81,15 @@ function getKeyringSource(source) {
     };
   }
 
-  const legacyRaw = String(source?.EDGECHAT_ENCRYPTION_KEYRING || '');
-  const activeKeyId = String(source?.EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID || '');
-  const generatedKeys = Object.entries(source || {})
-    .map(([bindingName, value]) => {
+  const env = (source || {}) as Record<string, unknown>;
+  const legacyRaw = String(env.EDGECHAT_ENCRYPTION_KEYRING || '');
+  const activeKeyId = String(env.EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID || '');
+  const generatedKeys = Object.entries(env)
+    .map(([bindingName, value]): [string, string] | null => {
       const match = /^EDGECHAT_ENCRYPTION_KEY_(\d+)$/.exec(bindingName);
       return match ? [`auto-v${Number(match[1])}`, String(value || '')] : null;
     })
-    .filter(Boolean)
+    .filter((entry): entry is [string, string] => entry !== null)
     .sort(([left], [right]) => left.localeCompare(right));
 
   return {
@@ -64,12 +100,12 @@ function getKeyringSource(source) {
   };
 }
 
-function parseLegacyKeyring(raw) {
+function parseLegacyKeyring(raw: string): { activeKeyId: string; keys: [string, string][] } {
   if (!raw) {
     return { activeKeyId: '', keys: [] };
   }
 
-  let payload;
+  let payload: { activeKeyId?: unknown; keys?: unknown };
   try {
     payload = JSON.parse(raw);
   } catch {
@@ -84,10 +120,15 @@ function parseLegacyKeyring(raw) {
     throw new Error('Encryption keys must be an object');
   }
 
-  return { activeKeyId, keys: Object.entries(payload.keys) };
+  return {
+    activeKeyId,
+    keys: Object.entries(payload.keys as Record<string, unknown>).map(
+      ([keyId, encodedKey]) => [keyId, String(encodedKey ?? '')] as [string, string],
+    )
+  };
 }
 
-function addKey(keys, keyId, encodedKey) {
+function addKey(keys: Map<string, KeyEntry>, keyId: string, encodedKey: unknown): void {
   if (!KEY_ID_PATTERN.test(keyId)) {
     throw new Error(`Encryption key id is invalid: ${keyId}`);
   }
@@ -104,7 +145,7 @@ function addKey(keys, keyId, encodedKey) {
   });
 }
 
-export function loadEncryptionKeyring(source) {
+export function loadEncryptionKeyring(source: EncryptionSource): EncryptionKeyring {
   const keyringSource = getKeyringSource(source);
   if (!keyringSource.legacyRaw && keyringSource.generatedKeys.length === 0) {
     // 绝不回退到内置密钥：那会让未配置密钥的部署用公开密钥加密，比明文更危险。
@@ -120,7 +161,7 @@ export function loadEncryptionKeyring(source) {
     throw new Error('Encryption activeKeyId is invalid');
   }
 
-  const keys = new Map();
+  const keys = new Map<string, KeyEntry>();
   for (const [keyId, encodedKey] of legacyKeyring.keys) {
     addKey(keys, keyId, encodedKey);
   }
@@ -137,7 +178,7 @@ export function loadEncryptionKeyring(source) {
   return cachedKeyring;
 }
 
-async function getCryptoKey(keyring, keyId) {
+async function getCryptoKey(keyring: EncryptionKeyring, keyId: string): Promise<CryptoKey> {
   const entry = keyring.keys.get(keyId);
   if (!entry) {
     throw new Error(`Encryption key is unavailable: ${keyId}`);
@@ -145,46 +186,46 @@ async function getCryptoKey(keyring, keyId) {
   return entry.cryptoKey;
 }
 
-function messageAad(channelId, senderId) {
+function messageAad(channelId: number | string, senderId: number | string): Uint8Array {
   // 把密文绑定到原会话与发送者，防止数据库中的密文被挪到另一条消息后仍能通过认证。
   return encoder.encode(`edgechat:message:v1:${Number(channelId)}:${Number(senderId)}`);
 }
 
-function externalMessageAad(channelId, senderContext) {
+function externalMessageAad(channelId: number | string, senderContext: string): Uint8Array {
   // 外部用户没有本地数值账号，v2 使用来源与外部 ID 绑定密文，同时保留 v1 本地消息兼容性。
   return encoder.encode(`edgechat:message:v2:${Number(channelId)}:${String(senderContext)}`);
 }
 
-function attachmentAad(objectKey) {
+function attachmentAad(objectKey: string): Uint8Array {
   // R2 对象键参与认证，避免同一份密文被替换到其他下载地址。
   return encoder.encode(`edgechat:attachment:v1:${String(objectKey)}`);
 }
 
-function secretAad(context) {
+function secretAad(context: string): Uint8Array {
   // 配置密文绑定到明确用途，避免数据库中的 Bot Token 与 Webhook Secret 被互换后仍能解密。
   return encoder.encode(`edgechat:secret:v1:${String(context)}`);
 }
 
-export function isEncryptedMessageContent(value) {
+export function isEncryptedMessageContent(value: unknown): boolean {
   return (
     typeof value === 'string' &&
     (value.startsWith(MESSAGE_V1_PREFIX) || value.startsWith(MESSAGE_V2_PREFIX))
   );
 }
 
-export function getMessageEnvelopeKeyId(value) {
+export function getMessageEnvelopeKeyId(value: unknown): string | null {
   if (!isEncryptedMessageContent(value)) {
     return null;
   }
-  const parts = value.split(':');
+  const parts = String(value).split(':');
   return parts.length === 6 && KEY_ID_PATTERN.test(parts[3]) ? parts[3] : null;
 }
 
 export async function encryptMessageContent(
-  source,
-  plaintext,
-  { channelId, senderId, senderContext = '' }
-) {
+  source: EncryptionSource,
+  plaintext: unknown,
+  { channelId, senderId, senderContext = '' }: MessageContext
+): Promise<string> {
   const cleanPlaintext = String(plaintext || '');
   if (!cleanPlaintext) {
     return '';
@@ -213,10 +254,10 @@ export async function encryptMessageContent(
 }
 
 export async function decryptMessageContent(
-  source,
-  value,
-  { channelId, senderId, senderContext = '' }
-) {
+  source: EncryptionSource,
+  value: unknown,
+  { channelId, senderId, senderContext = '' }: MessageContext
+): Promise<string> {
   const content = String(value || '');
   // 历史明文保持原样读取，不做请求内回写，也不触发后台批量迁移。
   if (!isEncryptedMessageContent(content)) {
@@ -263,7 +304,11 @@ export async function decryptMessageContent(
   }
 }
 
-export async function encryptSecretValue(source, plaintext, context) {
+export async function encryptSecretValue(
+  source: EncryptionSource,
+  plaintext: unknown,
+  context: string
+): Promise<string> {
   const cleanPlaintext = String(plaintext || '');
   if (!cleanPlaintext) {
     return '';
@@ -282,7 +327,11 @@ export async function encryptSecretValue(source, plaintext, context) {
   return `${SECRET_PREFIX}${keyring.activeKeyId}:${bytesToBase64(nonce)}:${bytesToBase64(ciphertext)}`;
 }
 
-export async function decryptSecretValue(source, value, context) {
+export async function decryptSecretValue(
+  source: EncryptionSource,
+  value: unknown,
+  context: string
+): Promise<string> {
   const encrypted = String(value || '');
   if (!encrypted.startsWith(SECRET_PREFIX)) {
     throw new Error('Encrypted secret envelope is malformed');
@@ -315,7 +364,7 @@ export async function decryptSecretValue(source, value, context) {
   }
 }
 
-function toBytes(value) {
+function toBytes(value: unknown): Uint8Array {
   if (value instanceof Uint8Array) {
     return value;
   }
@@ -328,7 +377,7 @@ function toBytes(value) {
   throw new Error('Attachment payload must be binary');
 }
 
-export function isEncryptedAttachment(value) {
+export function isEncryptedAttachment(value: unknown): boolean {
   const bytes = toBytes(value);
   return (
     bytes.byteLength >= FILE_MAGIC.byteLength &&
@@ -336,7 +385,7 @@ export function isEncryptedAttachment(value) {
   );
 }
 
-export function getAttachmentEnvelopeKeyId(value) {
+export function getAttachmentEnvelopeKeyId(value: unknown): string | null {
   const bytes = toBytes(value);
   if (!isEncryptedAttachment(bytes)) {
     return null;
@@ -355,7 +404,11 @@ export function getAttachmentEnvelopeKeyId(value) {
   return keyId;
 }
 
-export async function encryptAttachment(source, value, objectKey) {
+export async function encryptAttachment(
+  source: EncryptionSource,
+  value: unknown,
+  objectKey: string
+): Promise<Uint8Array> {
   const plaintext = toBytes(value);
   const keyring = loadEncryptionKeyring(source);
   const keyIdBytes = encoder.encode(keyring.activeKeyId);
@@ -384,14 +437,18 @@ export async function encryptAttachment(source, value, objectKey) {
   return envelope;
 }
 
-export async function decryptAttachment(source, value, objectKey) {
+export async function decryptAttachment(
+  source: EncryptionSource,
+  value: unknown,
+  objectKey: string
+): Promise<DecryptedAttachment> {
   const bytes = toBytes(value);
   // 旧附件仍按原始字节返回，只对部署后新上传的加密信封做解密。
   if (!isEncryptedAttachment(bytes)) {
     return { bytes, encrypted: false, keyId: null };
   }
 
-  const keyId = getAttachmentEnvelopeKeyId(bytes);
+  const keyId = getAttachmentEnvelopeKeyId(bytes) as string;
   const keyIdLength = bytes[FILE_MAGIC.byteLength];
   const nonceOffset = FILE_MAGIC.byteLength + 1 + keyIdLength;
   const nonce = bytes.subarray(nonceOffset, nonceOffset + NONCE_BYTES);

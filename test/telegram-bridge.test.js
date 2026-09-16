@@ -11,7 +11,7 @@ import {
 	decryptSecretValue,
 	encryptMessageContent,
 	encryptSecretValue,
-} from "../worker/src/encryption.js";
+} from "../worker/src/encryption.ts";
 import { parseTelegramMessageUpdate } from "../worker/src/integrations/telegram/parser.ts";
 import {
 	formatTelegramMessage,

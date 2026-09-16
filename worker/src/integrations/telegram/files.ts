@@ -3,7 +3,7 @@ import {
 	safeFilenameExtension,
 	sanitizeFilename,
 } from "../../attachment-metadata.ts";
-import { decryptAttachment, encryptAttachment } from "../../encryption.js";
+import { decryptAttachment, encryptAttachment } from "../../encryption.ts";
 import type { AppBindings } from "../../types.ts";
 import { downloadTelegramFile, getTelegramFile } from "./client.ts";
 import type { TelegramAttachmentInput } from "./parser.ts";

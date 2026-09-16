@@ -10,7 +10,7 @@ import {
   isEncryptedAttachment,
   isEncryptedMessageContent,
   loadEncryptionKeyring
-} from './encryption.js';
+} from './encryption.ts';
 
 function encodedKey(seed) {
   return Buffer.from(Uint8Array.from({ length: 32 }, (_, index) => (seed + index) % 256)).toString(

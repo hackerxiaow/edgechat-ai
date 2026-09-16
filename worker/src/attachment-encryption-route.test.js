@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Hono } from 'hono';
 import { registerUploadRoutes } from './api/upload.ts';
-import { encryptAttachment } from './encryption.js';
+import { encryptAttachment } from './encryption.ts';
 
 const keyring = JSON.stringify({
   activeKeyId: 'v1',

@@ -6,7 +6,7 @@ import {
   getUploadedFileMetadata,
   recordUploadedFile
 } from '../data/uploaded-files.ts';
-import { decryptAttachment, encryptAttachment } from '../encryption.js';
+import { decryptAttachment, encryptAttachment } from '../encryption.ts';
 import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.ts';
 import { validateSession } from '../session.ts';
 import { errorResponse, requestBodyTooLarge } from '../utils.ts';

@@ -1,5 +1,5 @@
 import type { AppBindings, SessionUser } from './types.ts';
-import { decryptSecretValue, encryptSecretValue } from './encryption.js';
+import { decryptSecretValue, encryptSecretValue } from './encryption.ts';
 import { ApiError } from './errors.ts';
 import { hashOpaqueToken } from './mobile-session.ts';
 import { validateSession } from './session.ts';

@@ -1,4 +1,4 @@
-import { decryptMessageContent, encryptMessageContent } from "../encryption.js";
+import { decryptMessageContent, encryptMessageContent } from "../encryption.ts";
 import type { AppBindings } from "../types.ts";
 import { pickAttachment, publicFileUrl } from "../utils.ts";
 import { normalizeMentionUserIds } from "./mentions.ts";

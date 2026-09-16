@@ -1,5 +1,5 @@
 import type { AppBindings } from "../types.ts";
-import { decryptSecretValue, encryptSecretValue } from "../encryption.js";
+import { decryptSecretValue, encryptSecretValue } from "../encryption.ts";
 
 const BOT_TOKEN_CONTEXT = "telegram:bot-token";
 const WEBHOOK_SECRET_CONTEXT = "telegram:webhook-secret";
