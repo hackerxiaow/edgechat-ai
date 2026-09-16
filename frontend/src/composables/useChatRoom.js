@@ -1,3 +1,24 @@
+
+function typewriteMessage(target, fullText, scrollTo) {
+	if (!fullText || fullText === '...' || typeof fullText !== 'string') {
+		target.content = fullText;
+		return;
+	}
+	let idx = 0;
+	target.content = '';
+	const total = fullText.length;
+	const step = Math.max(1, Math.ceil(total / 35));
+	const timer = setInterval(() => {
+		idx = Math.min(total, idx + step);
+		target.content = fullText.slice(0, idx);
+		scrollTo?.();
+		if (idx >= total) {
+			clearInterval(timer);
+			target.content = fullText;
+			scrollTo?.();
+		}
+	}, 25);
+}
 import { nextTick, ref, watch } from "vue";
 import api from "../api.js";
 import { dispatchAuthInvalid } from "../auth-storage.js";
@@ -147,12 +168,39 @@ export function useChatRoom({
 				return;
 			}
 			if (payload.type === "message" && payload.message) {
-				if (messages.value.some((item) => item.id === payload.message.id)) {
+				const existing = messages.value.find((item) => Number(item.id) === Number(payload.message.id));
+				if (existing) {
+					if (existing.content !== payload.message.content) {
+						if (payload.message.source === 'ai') {
+							typewriteMessage(existing, payload.message.content, scrollToBottom);
+						} else {
+							existing.content = payload.message.content;
+							nextTick().then(scrollToBottom);
+						}
+					}
 					return;
 				}
-				messages.value = [...messages.value, payload.message];
+				const newMsg = { ...payload.message };
+				messages.value = [...messages.value, newMsg];
 				applyActiveRoomActivity(payload.message);
-				nextTick().then(scrollToBottom);
+				if (payload.message.source === 'ai' && payload.message.content !== '...') {
+					typewriteMessage(newMsg, payload.message.content, scrollToBottom);
+				} else {
+					nextTick().then(scrollToBottom);
+				}
+			}
+			if (payload.type === "message_updated" && payload.message) {
+				const existing = messages.value.find((item) => Number(item.id) === Number(payload.message.id));
+				if (existing) {
+					if (existing.content !== payload.message.content) {
+						if (payload.message.source === 'ai') {
+							typewriteMessage(existing, payload.message.content, scrollToBottom);
+						} else {
+							existing.content = payload.message.content;
+							nextTick().then(scrollToBottom);
+						}
+					}
+				}
 			}
 			if (payload.type === "message_stream" && payload.messageId) {
 				const target = messages.value.find((item) => Number(item.id) === Number(payload.messageId));
@@ -278,35 +326,59 @@ export function useChatRoom({
 	}
 
 		async function sendMessage(mentionUserIds = [], replyMessageId = null) {
-			const key = activeRoom.value
-				? `${activeRoom.value.kind}:${activeRoom.value.id}`
-				: "";
-			if (!roomSession.isOpenFor(key)) {
-				error.value = t('chat.realtimeNotReady');
-				return false;
-			}
+			if (!activeRoom.value) return false;
 			if (!composerText.value.trim() && !pendingAttachment.value) {
 				return false;
 			}
 
 			sending.value = true;
 			error.value = "";
+			const clientMessageId = crypto.randomUUID();
+			const content = composerText.value;
+			const attachment = pendingAttachment.value;
+			composerText.value = "";
+			pendingAttachment.value = null;
+
+			// 乐观立即上屏：0ms 即刻看到自己的消息！
+			const tempId = -Date.now();
+			const optimisticMsg = {
+				id: tempId,
+				content,
+				attachment,
+				sender: {
+					kind: 'local',
+					id: Number(session.value?.userId || 1),
+					username: session.value?.username || 'me',
+					displayName: session.value?.displayName || session.value?.username || 'me',
+					avatarUrl: session.value?.avatarUrl || '',
+					source: 'edgechat'
+				},
+				createdAt: new Date().toISOString(),
+				source: 'edgechat',
+				clientMessageId
+			};
+			messages.value = [...messages.value, optimisticMsg];
+			await nextTick();
+			scrollToBottom();
+
 			try {
-				roomSession.send(
-					JSON.stringify({
-						type: "send",
-						content: composerText.value,
-						attachment: pendingAttachment.value,
-						mentionUserIds,
-						replyMessageId: replyMessageId ? Number(replyMessageId) : null,
-					}),
-					key,
-				);
-				composerText.value = "";
-				pendingAttachment.value = null;
+				const res = await roomApi.sendRoomMessage(activeRoom.value.kind, activeRoom.value.id, {
+					clientMessageId,
+					content,
+					attachment,
+					mentionUserIds,
+					replyMessageId: replyMessageId ? Number(replyMessageId) : null
+				});
+				if (res?.message) {
+					const idx = messages.value.findIndex(m => m.id === tempId || m.clientMessageId === clientMessageId);
+					if (idx !== -1) {
+						messages.value[idx] = res.message;
+					}
+				}
 				return true;
 			} catch (currentError) {
 				error.value = currentError.message;
+				messages.value = messages.value.filter(m => m.id !== tempId);
 				return false;
 			} finally {
 				sending.value = false;

@@ -338,6 +338,18 @@ export async function listRoomMessageEvents(env, channelId, afterSequence = 0, l
 			});
 			continue;
 		}
+		if (row.event_type === "updated") {
+			const message = await getMessageById(env, row.message_id);
+			if (message) {
+				events.push({
+					sequence: Number(row.sequence),
+					type: "message_updated",
+					message,
+					createdAt: row.created_at,
+				});
+			}
+			continue;
+		}
 		const message = await getMessageById(env, row.message_id);
 		if (message) {
 			events.push({

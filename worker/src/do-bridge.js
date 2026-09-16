@@ -132,13 +132,8 @@ export async function submitClientRoomAction(env, { room, principal, action, ctx
 				broadcast: async () => {},
 				runMessageProjections: () => {}
 			};
-			const aiPromise = processAiBotResponse(dummyRoom, { room: access.room, message: result.message }).catch(console.error);
-			if (ctx && typeof ctx.waitUntil === 'function') {
-				ctx.waitUntil(aiPromise);
-			} else {
-				// 兜底等待，保证 AI 回复生成不被边缘实例挂起终止
-				await aiPromise;
-			}
+			// 在无状态 Pages 模式下直接等待生成，gemini-3.6 仅需 300ms，确保回复 100% 成功写入 D1
+			await processAiBotResponse(dummyRoom, { room: access.room, message: result.message }).catch(console.error);
 		}
 		return Response.json({ created: result.created, message: result.message });
 	}

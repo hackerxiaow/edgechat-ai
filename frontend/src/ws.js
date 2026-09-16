@@ -9,10 +9,57 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 	let closed = false;
 	let cursor = 0;
 	let timer = null;
-	let lastSeenMessageIds = new Set();
+	const lastSeenMessageIds = new Set();
+
+	async function fetchSync() {
+		if (closed) return;
+		try {
+			if (cursor === 0) {
+				const res = await api.getRecentMessages(kind, roomId, 30);
+				cursor = Number(res.syncCursor) || 0;
+				if (Array.isArray(res.messages)) {
+					for (const m of res.messages) {
+						lastSeenMessageIds.add(Number(m.id));
+					}
+				}
+			} else {
+				const res = await api.syncRoomMessages(kind, roomId, cursor);
+				if (res && Array.isArray(res.events) && res.events.length > 0) {
+					for (const ev of res.events) {
+						cursor = Math.max(cursor, Number(ev.sequence) || 0);
+						if (ev.message && (ev.eventType === 'created' || ev.type === 'message')) {
+							const mid = Number(ev.message.id);
+							if (!lastSeenMessageIds.has(mid)) {
+								lastSeenMessageIds.add(mid);
+								onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message', message: ev.message }), socket);
+							} else {
+								onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_updated', message: ev.message }), socket);
+							}
+						} else if (ev.message && (ev.type === 'message_updated' || ev.eventType === 'updated')) {
+							onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_updated', message: ev.message }), socket);
+						} else if (ev.eventType === 'deleted' || ev.type === 'message_deleted') {
+							onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_deleted', messageId: ev.messageId }), socket);
+						}
+					}
+				}
+				if (res?.nextCursor) {
+					cursor = Math.max(cursor, Number(res.nextCursor) || 0);
+				}
+			}
+		} catch (e) {
+			if (String(e?.message || '').includes('expired') || e?.status === 409) {
+				cursor = 0;
+			}
+		} finally {
+			if (!closed) {
+				// 始终每 800ms 轮询一次，高敏度保证收到 AI 与其他成员的新消息
+				timer = setTimeout(fetchSync, 800);
+			}
+		}
+	}
 
 	const socket = {
-		readyState: 1, // OPEN
+		readyState: 1,
 		send(data) {
 			if (closed) return;
 			try {
@@ -25,18 +72,18 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 						mentionUserIds: payload.mentionUserIds || [],
 						replyMessageId: payload.replyMessageId || null
 					}).then(res => {
-						if (res.message) {
+						if (res?.message) {
 							lastSeenMessageIds.add(Number(res.message.id));
 							onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message', message: res.message }), socket);
 						}
-						void poll();
+						void fetchSync();
 					}).catch(err => {
 						onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'error', error: err.message }), socket);
 					});
 				} else if (payload.type === 'delete_message') {
 					api.deleteRoomMessage(kind, roomId, payload.messageId).then(() => {
 						onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_deleted', messageId: payload.messageId }), socket);
-						void poll();
+						void fetchSync();
 					}).catch(err => {
 						onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'error', error: err.message }), socket);
 					});
@@ -52,86 +99,12 @@ function createPollingRoomSocket({ kind, roomId, onMessage, onStatus }) {
 		}
 	};
 
-	async function poll() {
-		if (closed) return;
-		try {
-			// 如果尚未初始化游标，拉取当前最新消息与游标
-			if (cursor === 0) {
-				const res = await api.getRecentMessages(kind, roomId, 30);
-				cursor = res.syncCursor || 0;
-				if (Array.isArray(res.messages)) {
-					for (const m of res.messages) {
-						lastSeenMessageIds.add(Number(m.id));
-					}
-				}
-			} else {
-				const res = await api.syncRoomMessages(kind, roomId, cursor);
-				if (res.events && res.events.length > 0) {
-					for (const ev of res.events) {
-						cursor = Math.max(cursor, Number(ev.sequence) || 0);
-						if (ev.eventType === 'created' && ev.message) {
-							const mid = Number(ev.message.id);
-							// 避免重复接收自己刚发出的已渲染消息
-							if (!lastSeenMessageIds.has(mid)) {
-								lastSeenMessageIds.add(mid);
-								onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message', message: ev.message }), socket);
-							} else {
-								// 如果内容发生了流式变动，派发 message_updated
-								onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_updated', message: ev.message }), socket);
-							}
-						} else if (ev.eventType === 'deleted') {
-							onMessage?.(JSON.stringify({ protocolVersion: 1, type: 'message_deleted', messageId: ev.messageId }), socket);
-						}
-					}
-				}
-				if (res.nextCursor) cursor = Math.max(cursor, Number(res.nextCursor) || 0);
-			}
-		} catch (e) {
-			if (e?.message?.includes('sync_cursor_expired') || e?.status === 409) {
-				cursor = 0;
-			}
-		} finally {
-			if (!closed) {
-				// 前台高频轮询（1 秒一次），体验丝滑无感
-				timer = setTimeout(poll, 1000);
-			}
-		}
-	}
-
-	// 模拟连接建立，并在 30ms 后通知状态就绪
-	setTimeout(() => {
+	// 立即通知已打开，并开始常驻高频增量同步
+	queueMicrotask(() => {
 		if (!closed) {
 			onStatus?.({ status: 'open', socket });
-			void poll();
+			void fetchSync();
 		}
-	}, 30);
-
-	return socket;
-}
-
-function openSocket(url, { onMessage, onStatus }) {
-	const socket = new WebSocket(url);
-
-	socket.addEventListener("open", () => {
-		onStatus?.({ status: "open", socket });
-	});
-
-	socket.addEventListener("close", (event) => {
-		onStatus?.({
-			status: "closed",
-			socket,
-			code: event.code,
-			reason: event.reason,
-			wasClean: event.wasClean,
-		});
-	});
-
-	socket.addEventListener("error", () => {
-		onStatus?.({ status: "error", socket });
-	});
-
-	socket.addEventListener("message", (event) => {
-		onMessage?.(event.data, socket);
 	});
 
 	return socket;
@@ -141,8 +114,6 @@ export function connectRoomSocket({ kind, roomId, onMessage, onStatus }) {
 	if (isDemoMode) {
 		return connectRuntimeRoomSocket({ kind, roomId, onMessage, onStatus });
 	}
-
-	// 纯 Pages + D1 架构优先使用智能增量同步，彻底免除跨边缘 WebSocket/DO 依赖
 	return createPollingRoomSocket({ kind, roomId, onMessage, onStatus });
 }
 
@@ -160,8 +131,8 @@ export function connectInboxSocket({ onMessage, onStatus }) {
 			onStatus?.({ status: 'closed', socket, code: 1000, wasClean: true });
 		}
 	};
-	setTimeout(() => {
+	queueMicrotask(() => {
 		if (!closed) onStatus?.({ status: 'open', socket });
-	}, 30);
+	});
 	return socket;
 }
