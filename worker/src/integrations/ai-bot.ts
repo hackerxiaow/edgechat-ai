@@ -7,7 +7,7 @@ const AI_API_URL = 'https://api.seurl.eu.org/v1/chat/completions';
 // TODO: 迁移到 Worker Secret。当前保留源码内默认值以维持既有行为，
 // 但已支持 AI_BOT_API_KEY 覆盖，配好 Secret 后即可删除这里的字面量。
 const DEFAULT_AI_API_KEY = 'sk_cf_2781e99f40f74df98c51a4592ab7ad95';
-const AI_MODEL = 'gemini/gemini-3.6-flash-high';
+const AI_MODEL = 'chatgpt/gpt-5.6-luna';
 
 interface AiBotRoom {
 	id: number | string;
