@@ -19,6 +19,8 @@ import './styles/chat.css';
 import './styles/chat-messages.css';
 import './styles/chat-attachments.css';
 import './styles/chat-theme.css';
+// 认证页（登录/注册）共用视觉，放在最后以确保覆盖 tokens.css 里遗留的同名选择器。
+import './styles/auth.css';
 import { initLiquidGlass } from './liquid-glass.js';
 import { initializeI18n } from './i18n.js';
 
