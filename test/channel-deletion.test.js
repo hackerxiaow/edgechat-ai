@@ -4,7 +4,7 @@ import test from "node:test";
 import { Hono } from "hono";
 import initSqlJs from "sql.js";
 
-import { registerChannelRoutes } from "../worker/src/api/channels.js";
+import { registerChannelRoutes } from "../worker/src/api/channels.ts";
 import { hardDeleteChannel } from "../worker/src/data/channel-deletion.ts";
 import { ApiError } from "../worker/src/errors.js";
 import { runScheduledGc } from "../worker/src/gc.js";

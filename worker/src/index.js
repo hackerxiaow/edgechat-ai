@@ -19,20 +19,20 @@ import { getSiteSettings } from './data/site-settings.ts';
 import { getUserByUsername, listActiveUsers } from './data/users.ts';
 import { ApiError } from './errors.js';
 import { adminMiddleware, authMiddleware } from './middleware.js';
-import { registerAdminRoutes } from './api/admin.js';
+import { registerAdminRoutes } from './api/admin.ts';
 import { registerMaintenanceRoutes } from './api/maintenance.ts';
-import { registerChannelRoutes } from './api/channels.js';
+import { registerChannelRoutes } from './api/channels.ts';
 import { registerContactRoutes } from './api/contacts.ts';
-import { registerDmRoutes } from './api/dm.js';
-import { registerMessageRoutes } from './api/messages.js';
-import { registerUploadRoutes } from './api/upload.js';
+import { registerDmRoutes } from './api/dm.ts';
+import { registerMessageRoutes } from './api/messages.ts';
+import { registerUploadRoutes } from './api/upload.ts';
 import { registerUserBlockRoutes } from './api/user-blocks.ts';
 import { registerUserProfileRoutes } from './api/user-profile.ts';
-import { registerV1Routes } from './api/v1.js';
+import { registerV1Routes } from './api/v1.ts';
 import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
-} from './api/telegram.js';
+} from './api/telegram.ts';
 import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.js';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.js';
 import {

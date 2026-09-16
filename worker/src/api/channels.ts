@@ -1,3 +1,5 @@
+import type { Hono } from 'hono';
+import type { AppEnv } from '../types.ts';
 import {
   listAdminChannels,
   listChannelMembers,
@@ -23,7 +25,7 @@ import { errorResponse, parseJsonRequest, publicFileUrl } from '../utils.js';
 import { activeUserSql } from '../user-status.js';
 import { hardDeleteChannel } from '../data/channel-deletion.ts';
 
-function normalizeMemberIds(payload) {
+function normalizeMemberIds(payload: Record<string, unknown>): number[] {
   const source = Array.isArray(payload.memberUserIds)
     ? payload.memberUserIds
     : Array.isArray(payload.userIds)
@@ -33,7 +35,7 @@ function normalizeMemberIds(payload) {
   return [...new Set(source.map((value) => Number(value)).filter((value) => Number.isFinite(value)))];
 }
 
-async function ensureValidInvitees(db, userIds) {
+async function ensureValidInvitees(db: D1Database, userIds: number[]): Promise<number[]> {
   if (!userIds.length) {
     return [];
   }
@@ -48,12 +50,12 @@ async function ensureValidInvitees(db, userIds) {
          AND id IN (${placeholders})`
     )
     .bind(...userIds)
-    .all();
+    .all<{ id: number }>();
 
   return results.map((row) => Number(row.id));
 }
 
-export function registerChannelRoutes(app) {
+export function registerChannelRoutes(app: Hono<AppEnv>) {
   app.get('/api/channels', async (c) => {
     const session = c.get('session');
     await ensureGeneralChannelMembership(c.env.DB, session.userId);
@@ -92,15 +94,15 @@ export function registerChannelRoutes(app) {
     )
       .bind(name, description, kind, session.userId)
       .run()
-      .catch((error) => {
-        if (String(error.message).includes('UNIQUE')) {
+      .catch((error: unknown) => {
+        if (String((error as { message?: unknown })?.message).includes('UNIQUE')) {
           throw new ApiError('群组名称已存在');
         }
         throw error;
       });
 
-    const channelId = Number(result.meta.last_row_id);
-    const statements = [
+    const channelId = Number(result.meta.last_row_id ?? 0);
+    const statements: D1PreparedStatement[] = [
       c.env.DB
         .prepare(
           `INSERT OR IGNORE INTO channel_members (channel_id, user_id, role, invited_by)
@@ -221,8 +223,8 @@ export function registerChannelRoutes(app) {
 
     const avatarUpdate = await resolveAvatarKeyUpdate(c.env.DB, session.userId, payload);
 
-    const updates = [];
-    const binds = [];
+    const updates: string[] = [];
+    const binds: (string | null)[] = [];
     if (name !== undefined) {
       updates.push('name = ?');
       binds.push(name);
@@ -250,7 +252,7 @@ export function registerChannelRoutes(app) {
       if (isR2ObjectUnavailableError(error)) {
         return errorResponse('头像文件不存在或正在清理，请重新上传');
       }
-      if (String(error.message).includes('UNIQUE')) {
+      if (String((error as { message?: unknown })?.message).includes('UNIQUE')) {
         return errorResponse('群组名称已存在');
       }
       throw error;

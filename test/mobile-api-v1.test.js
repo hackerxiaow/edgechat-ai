@@ -11,7 +11,7 @@ import {
   listRoomMessageEvents
 } from '../worker/src/data/messages.ts';
 import { runScheduledGc } from '../worker/src/gc.js';
-import { saveUploadedFile } from '../worker/src/api/upload.js';
+import { saveUploadedFile } from '../worker/src/api/upload.ts';
 import {
   createMobileDeviceSession,
   refreshMobileDeviceSession,

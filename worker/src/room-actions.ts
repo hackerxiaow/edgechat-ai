@@ -1,3 +1,4 @@
+import type { AppBindings, SessionUser } from './types.ts';
 import { authorizeRoom } from './room-access.js';
 import { submitRoomMessageIdempotent } from './message-submission.js';
 import { deleteRoomMessage } from './message-deletion.js';
@@ -5,9 +6,25 @@ import { pinRoomMessage, unpinRoomMessage } from './message-pinning.js';
 import { forwardEdgeChatMessageToTelegram } from './integrations/telegram/bridge.js';
 import { processAiBotResponse } from './integrations/ai-bot.js';
 
+export interface RoomAction {
+	type: 'send' | 'delete_message' | 'pin_message' | 'unpin_message';
+	[key: string]: unknown;
+}
+
+export interface SubmitClientRoomActionInput {
+	room: { id: number | string; kind: string; name?: string };
+	principal: SessionUser;
+	action: RoomAction;
+	/** 传入时把 AI 回复挂到 waitUntil；缺省则同步等待。 */
+	ctx?: { waitUntil(promise: Promise<unknown>): void } | null;
+}
+
 // 会话消息操作直接在 D1 内完成：没有 Durable Objects，也没有内部请求转发。
 // 提交后的投影（Telegram 出站、AI 回复）属于尽力而为的副作用，不阻塞响应。
-export async function submitClientRoomAction(env, { room, principal, action, ctx = null }) {
+export async function submitClientRoomAction(
+	env: Pick<AppBindings, 'DB'>,
+	{ room, principal, action, ctx = null }: SubmitClientRoomActionInput,
+): Promise<Response> {
 	const access = await authorizeRoom(env.DB, principal, room.kind, room.id);
 	if (!access.ok) {
 		return Response.json(

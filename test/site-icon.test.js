@@ -4,7 +4,7 @@ import test from "node:test";
 import { Hono } from "hono";
 import initSqlJs from "sql.js";
 
-import { registerAdminRoutes } from "../worker/src/api/admin.js";
+import { registerAdminRoutes } from "../worker/src/api/admin.ts";
 import { getSiteSettings, updateSiteSettings } from "../worker/src/data/site-settings.ts";
 import { runScheduledGc } from "../worker/src/gc.js";
 import {

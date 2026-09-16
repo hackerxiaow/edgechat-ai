@@ -8,7 +8,7 @@ function read(relativePath) {
 
 const routerSource = read('../frontend/src/router.js');
 const apiSource = read('../frontend/src/api.js');
-const adminApiSource = read('../worker/src/api/admin.js');
+const adminApiSource = read('../worker/src/api/admin.ts');
 const mainSource = read('../frontend/src/main.js');
 const navigationSource = read('../frontend/src/admin/navigation.js');
 const sidebarSource = read('../frontend/src/components/admin/AdminSidebar.vue');

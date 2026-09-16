@@ -184,7 +184,7 @@ test("数据库与后台界面完整声明可使用次数能力", () => {
 		new URL("../frontend/src/pages/AdminSitePage.vue", import.meta.url),
 		"utf8",
 	);
-	const adminApi = readFileSync(new URL("../worker/src/api/admin.js", import.meta.url), "utf8");
+	const adminApi = readFileSync(new URL("../worker/src/api/admin.ts", import.meta.url), "utf8");
 
 	for (const sql of [schema, migration]) {
 		assert.match(sql, /max_uses INTEGER NOT NULL DEFAULT 1/);

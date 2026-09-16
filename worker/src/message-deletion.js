@@ -54,7 +54,7 @@ export function createMessageDeletion({
 			throw new MessageDeletionError("无权删除该消息");
 		}
 
-		let attachmentKey = target?.attachment_key || null;
+		const attachmentKey = target?.attachment_key || null;
 
 		const deleted = await persistDeletion(env.DB, {
 			channelId: meta.room.id,

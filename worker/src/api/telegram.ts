@@ -1,3 +1,5 @@
+import type { Hono } from "hono";
+import type { AppEnv } from "../types.ts";
 import { externalSenderExists } from "../data/messages.ts";
 import {
 	createTelegramMapping,
@@ -19,14 +21,14 @@ import { ingestTelegramMessage } from "../integrations/telegram/bridge.js";
 import { parseTelegramMessageUpdate } from "../integrations/telegram/parser.js";
 import { errorResponse, parseJsonRequest, randomToken } from "../utils.js";
 
-function webhookUrl(requestUrl) {
+function webhookUrl(requestUrl: string): string {
 	const url = new URL(requestUrl);
 	url.pathname = "/api/integrations/telegram/webhook";
 	url.search = "";
 	return url.toString();
 }
 
-function telegramApiError(error) {
+function telegramApiError(error: unknown): Response | null {
 	return error instanceof TelegramApiError
 		? errorResponse(error.message, 400)
 		: null;
@@ -35,20 +37,25 @@ function telegramApiError(error) {
 const AVATAR_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400";
 const MISSING_AVATAR_CACHE_CONTROL = "public, max-age=600, s-maxage=600";
 
-function avatarCacheKey(request, userId) {
+function avatarCacheKey(request: Request, userId: string): Request {
 	const url = new URL(request.url);
 	url.pathname = `/api/integrations/telegram/avatar/${userId}`;
 	url.search = "";
 	return new Request(url.toString());
 }
 
-function missingAvatarResponse() {
+function missingAvatarResponse(): Response {
 	const response = errorResponse("头像不存在", 404);
 	response.headers.set("Cache-Control", MISSING_AVATAR_CACHE_CONTROL);
 	return response;
 }
 
-function telegramAvatarResponse(avatar) {
+interface TelegramAvatar {
+	bytes: Uint8Array;
+	contentType: string;
+}
+
+function telegramAvatarResponse(avatar: TelegramAvatar): Response {
 	return new Response(avatar.bytes, {
 		headers: {
 			"Cache-Control": AVATAR_CACHE_CONTROL,
@@ -61,7 +68,7 @@ function telegramAvatarResponse(avatar) {
 	});
 }
 
-export function registerTelegramPublicRoutes(app) {
+export function registerTelegramPublicRoutes(app: Hono<AppEnv>) {
 	app.get("/api/integrations/telegram/avatar/:userId", async (c) => {
 		const userId = String(c.req.param("userId") || "");
 		if (!/^\d+$/.test(userId)) {
@@ -124,7 +131,7 @@ export function registerTelegramPublicRoutes(app) {
 	});
 }
 
-export function registerTelegramAdminRoutes(app) {
+export function registerTelegramAdminRoutes(app: Hono<AppEnv>) {
 	app.get("/api/admin/telegram", async (c) => {
 		return c.json(await listTelegramBridgeAdminState(c.env));
 	});
@@ -187,7 +194,7 @@ export function registerTelegramAdminRoutes(app) {
 			if (telegramError) {
 				return telegramError;
 			}
-			if (String(error?.message || error).includes("UNIQUE")) {
+			if (String((error as { message?: unknown })?.message || error).includes("UNIQUE")) {
 				return errorResponse("这个 EdgeChat 群组或 Telegram 群已经绑定");
 			}
 			throw error;

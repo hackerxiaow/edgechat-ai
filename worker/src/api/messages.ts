@@ -1,10 +1,12 @@
+import type { Hono } from 'hono';
+import type { AppEnv } from '../types.ts';
 import { listMessages } from '../data/messages.ts';
 import { getPinnedMessage } from '../data/pins.ts';
 import { markRoomRead } from '../data/unread.ts';
 import { authorizeRoom, isRoomKind } from '../room-access.js';
 import { errorResponse, parseJsonRequest, sanitizeLimit } from '../utils.js';
 
-export function registerMessageRoutes(app) {
+export function registerMessageRoutes(app: Hono<AppEnv>) {
   app.get('/api/messages', async (c) => {
     const session = c.get('session');
     const kind = c.req.query('kind');

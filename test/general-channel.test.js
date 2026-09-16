@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
 
-import { registerChannelRoutes } from "../worker/src/api/channels.js";
+import { registerChannelRoutes } from "../worker/src/api/channels.ts";
 import {
 	GENERAL_CHANNEL_NAME,
 	ensureGeneralChannelMembership,

@@ -1,3 +1,5 @@
+import type { Hono } from 'hono';
+import type { AppEnv } from '../types.ts';
 import { hashPassword } from '../auth.js';
 import { listAdminChannels } from '../data/channels.ts';
 import { listAdminDms } from '../data/dm-queries.ts';
@@ -10,7 +12,7 @@ import {
 } from '../data/registration-invites.ts';
 import { getSiteSettings, updateSiteSettings } from '../data/site-settings.ts';
 import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
-import { listAdminUsers, listStorageOwners } from '../data/users.ts';
+import { listAdminUsers, listStorageOwners, type StorageOwner } from '../data/users.ts';
 import { ApiError } from '../errors.js';
 import { summarizeR2Objects } from '../storage-statistics.js';
 import { errorResponse, parseJsonRequest, randomToken } from '../utils.js';
@@ -18,7 +20,16 @@ import { banExpiryFromMinutes } from '../user-status.js';
 
 const STORAGE_SCAN_PAGE_SIZE = 1000;
 
-export function registerAdminRoutes(app) {
+interface StorageScanResponse {
+  items: unknown;
+  scannedObjects: number;
+  truncated: boolean;
+  cursor: string | null;
+  /** 仅在首页（无 cursor）返回，避免分页时重复下发全量用户。 */
+  users?: StorageOwner[];
+}
+
+export function registerAdminRoutes(app: Hono<AppEnv>) {
   app.get('/api/admin/storage/scan', async (c) => {
     if (!c.env.FILES) {
       return errorResponse('当前部署没有绑定 R2，无法统计存储空间', 503);
@@ -27,14 +38,13 @@ export function registerAdminRoutes(app) {
     const cursor = new URL(c.req.url).searchParams.get('cursor') || undefined;
     const listed = await c.env.FILES.list({
       limit: STORAGE_SCAN_PAGE_SIZE,
-      ...(cursor ? { cursor } : {}),
-      include: []
+      ...(cursor ? { cursor } : {})
     });
-    const response = {
+    const response: StorageScanResponse = {
       items: summarizeR2Objects(listed.objects),
       scannedObjects: listed.objects.length,
       truncated: listed.truncated,
-      cursor: listed.truncated ? listed.cursor : null
+      cursor: listed.truncated ? listed.cursor ?? null : null
     };
 
     if (!cursor) {
@@ -157,18 +167,19 @@ export function registerAdminRoutes(app) {
     )
       .bind(username, displayName, hashed.hash, hashed.salt)
       .run()
-      .catch((error) => {
-        if (String(error.message).includes('UNIQUE')) {
+      .catch((error: unknown) => {
+        if (String((error as { message?: unknown })?.message).includes('UNIQUE')) {
           throw new ApiError('用户名已存在');
         }
         throw error;
       });
 
-    await ensureGeneralChannelMembership(c.env.DB, result.meta.last_row_id);
+    const createdUserId = Number(result.meta.last_row_id ?? 0);
+    await ensureGeneralChannelMembership(c.env.DB, createdUserId);
 
     return c.json({
       user: {
-        id: result.meta.last_row_id,
+        id: createdUserId,
         username,
         displayName,
         isDisabled: false,

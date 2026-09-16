@@ -1,10 +1,19 @@
+import type { Hono } from 'hono';
+import type { AppEnv } from '../types.ts';
 import { ensureDmChannel } from '../data/dm-provisioning.ts';
 import { listAdminDms, listUserDms } from '../data/dm-queries.ts';
 import { getUserBlockStatus } from '../data/user-blocks.ts';
 import { errorResponse, parseJsonRequest } from '../utils.js';
 import { activeUserSql } from '../user-status.js';
 
-export function registerDmRoutes(app) {
+interface DmTargetRow {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar_key: string | null;
+}
+
+export function registerDmRoutes(app: Hono<AppEnv>) {
   app.get('/api/dm', async (c) => {
     const session = c.get('session');
     const dms = await listUserDms(c.env.DB, session.userId);
@@ -29,9 +38,10 @@ export function registerDmRoutes(app) {
        LIMIT 1`
     )
       .bind(targetUserId)
-      .all();
+      .all<DmTargetRow>();
 
-    if (!targetUser.results[0]) {
+    const target = targetUser.results[0];
+    if (!target) {
       return errorResponse('目标用户不存在', 404);
     }
 
@@ -45,11 +55,11 @@ export function registerDmRoutes(app) {
         kind: 'dm',
         name: channel.dm_key,
         otherUser: {
-          id: Number(targetUser.results[0].id),
-          username: targetUser.results[0].username,
-          displayName: targetUser.results[0].display_name,
-          avatarUrl: targetUser.results[0].avatar_key
-            ? `/files/${encodeURIComponent(targetUser.results[0].avatar_key)}`
+          id: Number(target.id),
+          username: target.username,
+          displayName: target.display_name,
+          avatarUrl: target.avatar_key
+            ? `/files/${encodeURIComponent(target.avatar_key)}`
             : ''
         },
         isBlockedByMe: blockStatus.blockedByMe

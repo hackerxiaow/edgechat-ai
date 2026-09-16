@@ -11,7 +11,7 @@ import {
   storageOwnerFromObjectKey,
   summarizeR2Objects
 } from '../worker/src/storage-statistics.js';
-import { registerAdminRoutes } from '../worker/src/api/admin.js';
+import { registerAdminRoutes } from '../worker/src/api/admin.ts';
 
 function storageScanHandler() {
   let handler;

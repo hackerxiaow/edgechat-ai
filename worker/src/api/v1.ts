@@ -1,5 +1,7 @@
+import type { Context, Hono } from 'hono';
+import type { AppEnv } from '../types.ts';
 import { verifyPassword } from '../auth.js';
-import { saveUploadedFile } from './upload.js';
+import { saveUploadedFile } from './upload.ts';
 import {
   getRoomSyncCursor,
   listMessages,
@@ -7,7 +9,7 @@ import {
 } from '../data/messages.ts';
 import { getSiteSettings } from '../data/site-settings.ts';
 import { getUserByUsername } from '../data/users.ts';
-import { submitClientRoomAction } from '../room-actions.js';
+import { submitClientRoomAction } from '../room-actions.ts';
 import { ApiError } from '../errors.js';
 import { authMiddleware } from '../middleware.js';
 import {
@@ -29,15 +31,15 @@ import {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function isUuid(value) {
+function isUuid(value: unknown): boolean {
   return UUID_PATTERN.test(String(value || '').trim());
 }
 
-function validRoomRequest(kind, roomId) {
+function validRoomRequest(kind: unknown, roomId: number): boolean {
   return isRoomKind(kind) && Number.isInteger(roomId) && roomId > 0;
 }
 
-async function requireRoom(c) {
+async function requireRoom(c: Context<AppEnv>) {
   const kind = String(c.req.param('kind') || '');
   const roomId = Number(c.req.param('id'));
   if (!validRoomRequest(kind, roomId)) {
@@ -51,10 +53,10 @@ async function requireRoom(c) {
   return { session, kind, roomId, room: access.room };
 }
 
-async function legacyProxyRequest(request, pathname) {
+async function legacyProxyRequest(request: Request, pathname: string): Promise<Request> {
   const url = new URL(request.url);
   url.pathname = pathname;
-  const init = { method: request.method, headers: request.headers };
+  const init: RequestInit = { method: request.method, headers: request.headers };
   if (!['GET', 'HEAD'].includes(request.method)) {
     // 内部复用旧路由时固化请求体，避免跨运行时传递 ReadableStream 时需要 Node duplex 扩展。
     init.body = await request.arrayBuffer();
@@ -62,11 +64,11 @@ async function legacyProxyRequest(request, pathname) {
   return new Request(url.toString(), init);
 }
 
-async function convertLegacyError(response) {
+async function convertLegacyError(response: Response): Promise<Response> {
   if (response.status < 400) return response;
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) return response;
-  const payload = await response.clone().json().catch(() => null);
+  const payload = await response.clone().json().catch(() => null) as { error?: unknown } | null;
   if (typeof payload?.error !== 'string') return response;
   return v1ErrorResponse(
     errorCodeForStatus(response.status),
@@ -75,7 +77,7 @@ async function convertLegacyError(response) {
   );
 }
 
-export function registerV1Routes(app) {
+export function registerV1Routes(app: Hono<AppEnv>) {
   app.get('/api/v1/capabilities', async (c) => {
     const site = await getSiteSettings(c.env.DB);
     return c.json({
@@ -247,8 +249,9 @@ export function registerV1Routes(app) {
   });
 
   app.post('/api/v1/uploads', authMiddleware, async (c) => {
-    if (!c.env.FILES) {
-      return v1ErrorResponse('attachments_unavailable', '当前部署没有绑定 R2，无法上传附件', 503);
+    // 与网页端一致：没有 R2 时附件正文落进 D1，只有两者都缺失才算不可用。
+    if (!c.env.FILES && !c.env.DB) {
+      return v1ErrorResponse('attachments_unavailable', '存储服务不可用，无法上传附件', 503);
     }
     const maxFileSize = Number(c.env.MAX_FILE_SIZE || 20971520);
     if (requestBodyTooLarge(c.req.raw, maxFileSize + 1024 * 1024)) {
@@ -261,7 +264,8 @@ export function registerV1Routes(app) {
     const formData = await c.req.formData();
     const file = formData.get('file');
     const clientUploadId = String(formData.get('clientUploadId') || '');
-    if (!(file instanceof File)) {
+    // FormDataEntryValue 含 string，先排除后再收窄为 File。
+    if (!file || typeof file === 'string') {
       return v1ErrorResponse('file_required', '请选择文件');
     }
     if (!isUuid(clientUploadId)) {
@@ -271,7 +275,7 @@ export function registerV1Routes(app) {
       const result = await saveUploadedFile(c.env, c.get('session'), file, { clientUploadId });
       return c.json(result, result.created ? 201 : 200);
     } catch (error) {
-      const message = String(error?.message || '上传失败');
+      const message = String((error as { message?: unknown })?.message || '上传失败');
       if (message.startsWith('文件大小不能超过') || message === '该文件类型不允许上传') {
         return v1ErrorResponse('upload_rejected', message);
       }

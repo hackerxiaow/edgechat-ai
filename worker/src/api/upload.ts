@@ -1,3 +1,5 @@
+import type { Hono } from 'hono';
+import type { AppEnv, SessionUser } from '../types.ts';
 import {
   canAccessFile,
   getUploadedFileByClientId,
@@ -21,7 +23,15 @@ const BLOCKED_MIME_TYPES = new Set([
   'application/xml'
 ]);
 
-function isInlineContentType(contentType) {
+type UploadEnv = Pick<AppEnv['Bindings'], 'DB' | 'FILES' | 'MAX_FILE_SIZE' | 'ALLOWED_FILE_TYPES'>;
+
+interface StoredFileRow {
+  filename: string | null;
+  content_type: string | null;
+  data: ArrayBuffer | Uint8Array | null;
+}
+
+function isInlineContentType(contentType: string | null | undefined): boolean {
   if (!contentType) {
     return false;
   }
@@ -40,7 +50,7 @@ function isInlineContentType(contentType) {
 	return false;
 }
 
-function contentDispositionValue(kind, filename) {
+function contentDispositionValue(kind: string, filename: string): string {
   const safeUtf8 = sanitizeFilename(filename);
   const safeAscii = safeUtf8
     .replace(/[^\x20-\x7E]/g, '')
@@ -50,7 +60,7 @@ function contentDispositionValue(kind, filename) {
   return `${kind}; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(safeUtf8)}`;
 }
 
-function validateUpload(env, file) {
+function validateUpload(env: UploadEnv, file: File): void {
   const maxFileSize = Number(env.MAX_FILE_SIZE || 20971520);
   if (file.size > maxFileSize) {
     throw new Error(`文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`);
@@ -71,7 +81,7 @@ function validateUpload(env, file) {
   }
 }
 
-export function registerUploadRoutes(app) {
+export function registerUploadRoutes(app: Hono<AppEnv>) {
   app.post('/api/upload', async (c) => {
     if (!c.env.FILES && !c.env.DB) {
       return errorResponse('存储服务不可用，无法上传附件', 503);
@@ -84,7 +94,8 @@ export function registerUploadRoutes(app) {
     }
     const formData = await c.req.formData();
     const file = formData.get('file');
-    if (!(file instanceof File)) {
+    // FormDataEntryValue 含 string，先排除后再收窄为 File。
+    if (!file || typeof file === 'string') {
       return errorResponse('请选择文件');
     }
 
@@ -92,7 +103,7 @@ export function registerUploadRoutes(app) {
       const result = await saveUploadedFile(c.env, session, file);
       return c.json({ file: result.file });
     } catch (error) {
-      const message = String(error?.message || '');
+      const message = String((error as { message?: unknown })?.message || '');
       if (message.startsWith('文件大小不能超过') || message === '该文件类型不允许上传') {
         return errorResponse(message);
       }
@@ -112,14 +123,14 @@ export function registerUploadRoutes(app) {
       return new Response('Forbidden', { status: 403 });
     }
     // 优先从 R2 获取，若无 R2 或 R2 无此文件，从 D1 读取
-    let object = c.env.FILES ? await c.env.FILES.get(key) : null;
+    const object = c.env.FILES ? await c.env.FILES.get(key) : null;
     const fileMetadata = await getUploadedFileMetadata(c.env.DB, key);
 
     if (!object) {
       const d1File = await c.env.DB.prepare(
         'SELECT filename, content_type, data FROM uploaded_files WHERE object_key = ? LIMIT 1'
-      ).bind(key).first();
-      if (!d1File || !d1File.data) {
+      ).bind(key).first<StoredFileRow>();
+      if (!d1File?.data) {
         return new Response('Not Found', { status: 404 });
       }
       const headers = new Headers();
@@ -133,7 +144,7 @@ export function registerUploadRoutes(app) {
       return new Response(d1File.data, { headers });
     }
 
-    let decrypted;
+    let decrypted: { bytes: Uint8Array };
     try {
       decrypted = await decryptAttachment(c.env, await object.arrayBuffer(), key);
     } catch (error) {
@@ -171,7 +182,23 @@ export function registerUploadRoutes(app) {
   });
 }
 
-export async function saveUploadedFile(env, session, file, { clientUploadId = null } = {}) {
+export interface SavedUpload {
+  created: boolean;
+  file: {
+    key: string;
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+  };
+}
+
+export async function saveUploadedFile(
+  env: UploadEnv,
+  session: SessionUser,
+  file: File,
+  { clientUploadId = null }: { clientUploadId?: string | null } = {}
+): Promise<SavedUpload> {
   validateUpload(env, file);
   if (clientUploadId) {
     const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);
@@ -211,7 +238,7 @@ export async function saveUploadedFile(env, session, file, { clientUploadId = nu
         console.warn('Failed to delete orphaned upload after metadata error', deleteError);
       }
     }
-    if (clientUploadId && String(error?.message || error).includes('UNIQUE')) {
+    if (clientUploadId && String((error as { message?: unknown })?.message || error).includes('UNIQUE')) {
       const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);
       if (existing) return { file: existing, created: false };
     }
