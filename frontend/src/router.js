@@ -4,6 +4,8 @@ import { isDemoMode } from './runtime.js';
 import store from './store.js';
 import LoginPage from './pages/LoginPage.vue';
 import RegisterPage from './pages/RegisterPage.vue';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.vue';
+import ResetPasswordPage from './pages/ResetPasswordPage.vue';
 import ChatPage from './pages/ChatPage.vue';
 import AdminPage from './pages/AdminPage.vue';
 import AdminDashboardPage from './pages/AdminDashboardPage.vue';
