@@ -1,4 +1,6 @@
-/* Hallmark · macrostructure: Workbench · tone: calm utility
+const fs = require('fs');
+
+let css = `/* Hallmark · macrostructure: Workbench · tone: calm utility
  * 聊天工作区现在已与前台登录页完全打通玻璃拟态设计语言
  */
 :root {
@@ -199,3 +201,7 @@ html.dark .composer-textarea {
   color: var(--text) !important;
   border-color: var(--line-soft) !important;
 }
+`;
+
+fs.writeFileSync('frontend/src/styles/chat-theme.css', css, 'utf8');
+console.log('chat-theme.css rewritten');
