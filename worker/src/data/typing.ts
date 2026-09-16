@@ -1,8 +1,16 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { publicFileUrl } from '../utils.ts';
 
-/** 「正在输入」的存活窗口：超过这个时间未刷新即视为已停止输入。 */
+/** 人类用户的存活窗口：客户端每 2.5 秒刷新一次，超过这个时间未刷新即视为已停止输入。 */
 export const TYPING_TTL_SECONDS = 5;
+
+/**
+ * 外部发送者（AI 机器人）的存活窗口。
+ * 机器人只在开始生成时上报一次、生成结束才清除，而生成可能远超 5 秒；
+ * 用人类那样的短窗口会让指示器在中途提前消失，造成「闪完了消息却还不来」的空档。
+ * 机器人是显式清除的，所以窗口给得宽一些也不会残留。
+ */
+export const EXTERNAL_TYPING_TTL_SECONDS = 90;
 
 export interface TypingUser {
   /** 'user:<id>' 或 'external:<id>'，用于前端去重。 */
@@ -103,7 +111,10 @@ export async function listRoomTypingUsers(
       `SELECT typer_key, display_name, avatar_url
        FROM room_typing
        WHERE channel_id = ?
-         AND updated_at > datetime('now', ?)
+         AND (
+           (typer_key LIKE 'user:%' AND updated_at > datetime('now', ?))
+           OR (typer_key LIKE 'external:%' AND updated_at > datetime('now', ?))
+         )
          AND typer_key != ?
        ORDER BY updated_at DESC
        LIMIT 8`
@@ -111,6 +122,7 @@ export async function listRoomTypingUsers(
     .bind(
       Number(channelId),
       `-${TYPING_TTL_SECONDS} seconds`,
+      `-${EXTERNAL_TYPING_TTL_SECONDS} seconds`,
       excludeUserId ? localTyperKey(excludeUserId) : ''
     )
     .all<{ typer_key: string; display_name: string | null; avatar_url: string | null }>();
