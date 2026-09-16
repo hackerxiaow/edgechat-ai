@@ -915,10 +915,7 @@ onBeforeUnmount(() => {
 				:content="messageContent(msg)"
 				:mentions="msg.mentions"
 				:current-user-id="session?.userId"
-			  /><span
-				v-if="isStreamingMessage(msg)"
-				class="message-stream-caret"
-				aria-hidden="true"
+				:streaming="isStreamingMessage(msg)"
 			  />
               <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
               <span class="message-time">{{ formatBubbleTime(msg.createdAt) }}</span>
@@ -1657,29 +1654,6 @@ onBeforeUnmount(() => {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.15s;
-}
-
-/* 流式显现时的光标 */
-.message-stream-caret {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 2px;
-  background: currentColor;
-  vertical-align: text-bottom;
-  animation: stream-caret-blink 900ms steps(1, end) infinite;
-}
-
-@keyframes stream-caret-blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .message-stream-caret {
-    animation: none;
-    opacity: 0.8;
-  }
 }
 
 .typing-dot:nth-child(4) {

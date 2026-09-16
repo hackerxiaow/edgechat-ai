@@ -7,11 +7,18 @@ const props = defineProps<{
 	content: string;
 	mentions?: MessageMention[];
 	currentUserId?: number;
+	/** 打字机显现中：在正文末尾补一个内联光标。 */
+	streaming?: boolean;
 }>();
 
-const renderedContent = computed(() =>
-	renderMessageMarkdown(props.content, props.mentions || [], props.currentUserId),
-);
+const renderedContent = computed(() => {
+	const html = renderMessageMarkdown(props.content, props.mentions || [], props.currentUserId);
+	// 光标内联在正文末尾，且**始终占位**：它若作为本组件的兄弟节点，块级容器会把它挤到
+	// 下一行（实测气泡高 +23px）；即便内联，显现时凭空出现也会让高度变化约 7px。
+	// 常驻占位、只切换可见性，两种状态下气泡高度完全一致，底部对齐的头像就不会抖。
+	const idle = props.streaming ? '' : ' message-stream-caret--idle';
+	return `${html}<span class="message-stream-caret${idle}" aria-hidden="true"></span>`;
+});
 
 function stopLinkGesture(event: Event) {
 	if ((event.target as Element | null)?.closest("a")) event.stopPropagation();
@@ -35,6 +42,35 @@ function stopLinkGesture(event: Event) {
 	font-size: 15px;
 	line-height: 1.6;
 	overflow-wrap: anywhere;
+}
+
+/* 显现光标：v-html 注入的节点带不上 scoped 属性，需要 :deep。 */
+.message-markdown :deep(.message-stream-caret) {
+	display: inline-block;
+	width: 2px;
+	height: 1.05em;
+	margin-left: 1px;
+	background: currentColor;
+	vertical-align: text-bottom;
+	animation: markdown-caret-blink 900ms steps(1, end) infinite;
+}
+
+/* 未在显现时保留占位但不可见，避免气泡高度在显现开始/结束的瞬间发生变化。 */
+.message-markdown :deep(.message-stream-caret--idle) {
+	visibility: hidden;
+	animation: none;
+}
+
+@keyframes markdown-caret-blink {
+	0%, 50% { opacity: 1; }
+	51%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.message-markdown :deep(.message-stream-caret) {
+		animation: none;
+		opacity: 0.8;
+	}
 }
 
 /* 为气泡右下角的绝对定位时间戳保留稳定空间（HH:MM:SS 比原来的 HH:MM 宽）。 */
