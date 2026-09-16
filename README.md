@@ -149,7 +149,7 @@ EdgeChat 对**新写入的消息正文和新上传的附件**使用 AES-256-GCM 
 
 <br />
 
-GitHub Actions 会管理服务端加密 Secret。首次部署时，如果目标 Pages 项目尚无加密 Secret，工作流会自动生成随机 32 字节 AES 密钥，以独立的版本化 Secret 注入，并记录当前 active key ID。后续普通部署只检查这些 Secret 是否存在，不会重新生成、覆盖或轮换。
+服务端加密密钥由 Pages 项目的 `EDGECHAT_ENCRYPTION_KEYRING` 提供（完整 JSON 密钥环，含 `activeKeyId` 与全部历史 key）。首次部署时若该变量不存在，工作流会生成随机 32 字节 AES 密钥并写入；已配置则原样保留，不会重新生成或覆盖。轮换时把新 key 加进 `keys` 并更新 `activeKeyId` 即可，**不要删除旧 key**，否则对应历史密文无法再解密。
 
 生产环境已经存在的 `EDGECHAT_ENCRYPTION_KEYRING` JSON 密钥环会被原样保留并继续兼容。
 
@@ -190,6 +190,32 @@ GitHub Actions 会管理服务端加密 Secret。首次部署时，如果目标 
 按照文档完成 Cloudflare 授权与仓库配置后，可以手动运行 `Deploy Pages`，也可以通过向 `master` 或 `main` 分支推送代码触发部署。工作流文件为 `.github/workflows/deploy-pages.yml`，它会先跑测试与 D1 迁移，再上传 `frontend/dist`（含 `_worker.js`）。
 
 **[快速开始](https://echat.azora.top/guide/getting-started.html) · [GitHub Actions 部署教程](https://echat.azora.top/guide/actions-deploy.html)**
+
+### 环境变量与后台配置的分工
+
+<details>
+<summary><strong>只需要三个环境变量，其余全部在后台改</strong></summary>
+
+<br />
+
+生产部署的环境变量只有三个，都是为了「让服务能启动」这一件事：
+
+| 变量 | 作用 |
+|---|---|
+| `EDGECHAT_ADMIN_USERNAME` | 引导管理员账号；账号不存在时按它创建 |
+| `EDGECHAT_ADMIN_PASSWORD` | 引导管理员密码；与上面配对使用，缺任一项都不引导 |
+| `EDGECHAT_ENCRYPTION_KEYRING` | 加密密钥环（JSON），缺了无法加解密消息 |
+
+其余配置都在站点后台的「网站设置 → 运行配置」里，改完立即生效、不需要重新部署：
+
+- 单文件上限、允许的文件类型
+- 消息保留天数、回收站保留天数、孤儿附件保留天数
+- 定时清理间隔（Pages 没有 cron，清理挂在请求上惰性执行）
+- 本站域名列表（用于识别历史 `/files/` 链接）
+
+引导逻辑是**幂等且保守**的：管理员账号已存在时不覆盖密码，也不会把同名的普通账号提权；想改密码请到后台用户管理里操作。清理批次与各类预算属于内部保护参数，为了避免误配导致清理停摆或过载，不对外开放。
+
+</details>
 
 ### 纯 D1 单存储说明
 

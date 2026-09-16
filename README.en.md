@@ -149,7 +149,7 @@ The admin console does not provide an entry point for viewing group or direct-me
 
 <br />
 
-GitHub Actions manages the server-side encryption Secrets. On the first deployment, if the target Pages project has no encryption Secret, the workflow automatically generates a random 32-byte AES key, injects it as an independently versioned Secret, and records the current active key ID. Subsequent ordinary deployments only check that these Secrets exist; they do not regenerate, overwrite, or rotate them.
+The server-side encryption key comes from the `EDGECHAT_ENCRYPTION_KEYRING` variable on the Pages project (a complete JSON keyring with `activeKeyId` and every historical key). If it is missing on the first deployment the workflow generates a random 32-byte AES key; if present it is preserved untouched. To rotate, add the new key to `keys` and update `activeKeyId` — **never drop an old key**, or its ciphertext becomes unreadable.
 
 An existing `EDGECHAT_ENCRYPTION_KEYRING` JSON keyring in production is preserved exactly and remains supported.
 
@@ -190,6 +190,27 @@ Using the GitHub Actions workflow included in the repository is recommended for 
 After completing the Cloudflare authorization and repository configuration described in the documentation, you can manually run `Deploy Pages`, or trigger deployment by pushing code to the `master` or `main` branch. The workflow file is `.github/workflows/deploy-pages.yml`; it runs tests and D1 migrations first, then uploads `frontend/dist` (including `_worker.js`).
 
 **[Quick Start](https://echat.azora.top/guide/getting-started.html) · [GitHub Actions Deployment Guide](https://echat.azora.top/guide/actions-deploy.html)**
+
+### Three environment variables, everything else in the admin UI
+
+<details>
+<summary><strong>What stays in env vars and what moved to the database</strong></summary>
+
+<br />
+
+The production deployment has exactly three environment variables, all about getting the service to start:
+
+| Variable | Purpose |
+|---|---|
+| `EDGECHAT_ADMIN_USERNAME` | Bootstrap admin account; created only when it does not exist |
+| `EDGECHAT_ADMIN_PASSWORD` | Bootstrap admin password; both are required for bootstrapping |
+| `EDGECHAT_ENCRYPTION_KEYRING` | Encryption keyring (JSON); without it messages cannot be decrypted |
+
+Everything else lives under **Site settings → Runtime settings** in the admin UI and takes effect immediately, with no redeploy: max file size, allowed file types, message/trash/orphan-upload retention, cleanup interval, and the site origin list.
+
+Bootstrapping is idempotent and conservative: an existing admin is never overwritten, and a same-named regular account is never promoted. Change passwords in the admin user list. Cleanup batch sizes and budgets stay fixed — they are internal safeguards, and misconfiguring them would stall or overload cleanup.
+
+</details>
 
 ### D1-only storage notes
 
