@@ -28,7 +28,7 @@ import {
 	TELEGRAM_BRIDGE_FILE_LIMIT,
 	TELEGRAM_FILE_SKIP_REASON,
 } from "../worker/src/integrations/telegram/files.ts";
-import worker from "../worker/src/index.js";
+import worker from "../worker/src/index.ts";
 
 const keyring = JSON.stringify({
 	activeKeyId: "v1",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import worker from "../worker/src/index.js";
+import worker from "../worker/src/index.ts";
 
 test("个人资料接口清除头像时同步数据库与会话", async () => {
 	let storedSession = {

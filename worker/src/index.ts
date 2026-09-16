@@ -33,7 +33,9 @@ import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
-import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.ts';
+import { runScheduledGc } from './gc.js';
+import { isUserDisabled } from './user-status.ts';
+import type { AppEnv, SessionUser } from './types.ts';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.ts';
 import {
   errorCodeForStatus,
@@ -43,7 +45,7 @@ import {
   v1ErrorResponse
 } from './utils.ts';
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
 app.use('/api/*', async (c, next) => {
   const path = new URL(c.req.url).pathname;
@@ -169,18 +171,25 @@ app.get('/api/auth/session', async (c) => {
      LIMIT 1`
   )
     .bind(session.userId)
-    .all();
+    .all<{
+      display_name: string;
+      avatar_key: string | null;
+      bio: string | null;
+      is_disabled: number;
+      disabled_until: string | null;
+    }>();
 
-  if (!user.results[0] || isUserDisabled(user.results[0])) {
+  const row = user.results[0];
+  if (!row || isUserDisabled(row)) {
     await deleteSession(c.env, session.token);
     return errorResponse('账号已不可用', 401);
   }
 
-  const freshSession = {
+  const freshSession: SessionUser = {
     ...session,
-    displayName: user.results[0].display_name,
-    bio: user.results[0].bio,
-    avatarUrl: user.results[0].avatar_key ? `/files/${encodeURIComponent(user.results[0].avatar_key)}` : ''
+    displayName: row.display_name,
+    bio: row.bio ?? '',
+    avatarUrl: row.avatar_key ? `/files/${encodeURIComponent(row.avatar_key)}` : ''
   };
   await putSession(c.env, freshSession);
 
@@ -210,16 +219,17 @@ app.post('/api/auth/change-password', async (c) => {
      LIMIT 1`
   )
     .bind(session.userId)
-    .all();
+    .all<{ password_hash: string; password_salt: string }>();
 
-  if (!user.results[0]) {
+  const credentials = user.results[0];
+  if (!credentials) {
     return errorResponse('用户不存在', 404);
   }
 
   const valid = await verifyPassword(
     currentPassword,
-    user.results[0].password_hash,
-    user.results[0].password_salt
+    credentials.password_hash,
+    credentials.password_salt
   );
   if (!valid) {
     return errorResponse('当前密码不正确', 400);
@@ -238,7 +248,7 @@ app.post('/api/auth/change-password', async (c) => {
     .bind(hashed.hash, hashed.salt, session.userId)
     .run();
 
-  const nextSession = {
+  const nextSession: SessionUser = {
     ...session,
     sessionVersion: Number(session.sessionVersion || 0) + 1
   };
@@ -322,7 +332,11 @@ app.onError((error, c) => {
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller, env, ctx) {
+  async scheduled(
+    _controller: ScheduledController,
+    env: AppEnv['Bindings'],
+    ctx: ExecutionContext
+  ) {
     ctx.waitUntil(runScheduledGc(env));
   }
 };

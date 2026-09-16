@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import initSqlJs from 'sql.js';
 
-import worker from '../worker/src/index.js';
+import worker from '../worker/src/index.ts';
 import { hashPassword } from '../worker/src/auth.ts';
 import {
   getRoomSyncCursor,

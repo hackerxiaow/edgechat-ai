@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 import { createSession, hashPassword } from "../worker/src/auth.ts";
-import worker from "../worker/src/index.js";
+import worker from "../worker/src/index.ts";
 import { D1_MIGRATIONS } from "../.github/scripts/d1-migration-manifest.mjs";
 import { buildD1MigrationPlan } from "../.github/scripts/d1-migration-plan.mjs";
 import { bioLength, validateBio } from "../shared/user-profile.ts";

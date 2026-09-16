@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { encryptSecretValue } from "../worker/src/encryption.ts";
-import worker from "../worker/src/index.js";
+import worker from "../worker/src/index.ts";
 
 const keyring = JSON.stringify({
 	activeKeyId: "v1",

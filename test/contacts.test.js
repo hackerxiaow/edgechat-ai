@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 import { createSession, hashPassword } from "../worker/src/auth.ts";
-import worker from "../worker/src/index.js";
+import worker from "../worker/src/index.ts";
 import { createD1Adapter, createKvAdapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

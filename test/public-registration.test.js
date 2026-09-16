@@ -11,7 +11,7 @@ const loginPage = readFileSync(
 	"utf8",
 );
 const workerEntry = readFileSync(
-	new URL("../worker/src/index.js", import.meta.url),
+	new URL("../worker/src/index.ts", import.meta.url),
 	"utf8",
 );
 
