@@ -15,6 +15,8 @@ interface GcConfig {
 	internalOperationBudget: number;
 	d1StatementBudget: number;
 	r2OperationBudget: number;
+	/** 惰性触发的最小间隔（分钟）。 */
+	minIntervalMinutes: number;
 	trustedSiteOrigins: string[];
 }
 
@@ -84,9 +86,45 @@ const DEFAULT_ORPHAN_UPLOAD_RETENTION_DAYS = 1;
 const DEFAULT_INTERNAL_OPERATION_BUDGET = 900;
 const DEFAULT_D1_STATEMENT_BUDGET = 1200;
 const DEFAULT_R2_OPERATION_BUDGET = 300;
+const DEFAULT_MIN_INTERVAL_MINUTES = 60;
 const MAX_BOUND_PARAMETERS = 100;
 const MAX_IN_PARAMETERS = 90;
 const MAX_ERROR_LENGTH = 500;
+
+/** 惰性 GC 的认领键：单行状态表，只有它保证跨请求、跨 isolate 的最小间隔。 */
+export const GC_STATE_ID = "scheduled";
+
+/**
+ * 抢锁语句：只有 gc_state 里还没有记录，或上一轮开始时间已经早于最小间隔时才会写入。
+ * 返回 0 行表示本轮由别的请求跑着，调用方直接跳过。
+ */
+export const GC_CLAIM_QUERY = `INSERT INTO gc_state (id, last_started_at, last_error)
+	VALUES (?, CURRENT_TIMESTAMP, '')
+	ON CONFLICT(id) DO UPDATE SET
+	  last_started_at = CURRENT_TIMESTAMP,
+	  last_error = ''
+	WHERE gc_state.last_started_at IS NULL
+	   OR gc_state.last_started_at <= datetime('now', ?)`;
+
+/**
+ * 同一个 isolate 内先用内存窗口挡住重复探测：轮询客户端每 800ms 打一次 /api/*，
+ * 不该每次都去 D1 抢锁。真正的最小间隔仍由 gc_state 保证。
+ */
+const GC_PROBE_WINDOW_MS = 60_000;
+let lastGcProbeAt = 0;
+
+/** 仅测试使用：清掉 isolate 内的探测窗口。 */
+export function resetGcProbeWindow(): void {
+	lastGcProbeAt = 0;
+}
+
+/** 只有 /api/* 请求值得探测一次，静态资产与附件下载不参与。 */
+export function shouldProbeScheduledGc(request: Request, now: number = Date.now()): boolean {
+	if (!new URL(request.url).pathname.startsWith("/api/")) return false;
+	if (lastGcProbeAt !== 0 && now - lastGcProbeAt < GC_PROBE_WINDOW_MS) return false;
+	lastGcProbeAt = now;
+	return true;
+}
 
 export const ORPHAN_UPLOAD_QUERY = `SELECT object_key, created_at
 	FROM uploaded_files
@@ -157,6 +195,10 @@ function getGcConfig(env: GcEnv): GcConfig {
 		r2OperationBudget: toPositiveInteger(
 			env.GC_R2_OPERATION_BUDGET,
 			DEFAULT_R2_OPERATION_BUDGET,
+		),
+		minIntervalMinutes: toPositiveInteger(
+			env.GC_MIN_INTERVAL_MINUTES,
+			DEFAULT_MIN_INTERVAL_MINUTES,
 		),
 		trustedSiteOrigins: String(env.SITE_ORIGINS || "")
 			.split(",")
@@ -770,6 +812,44 @@ export async function cleanupR2Keys(env: GcEnv, keys: string[]) {
 
 	summary.budget = budget.snapshot();
 	return summary;
+}
+
+/** GC 收尾记录；失败只记日志，不影响已经拿到的 GC 结果。 */
+async function recordGcRunFinished(db: D1Database, errorMessage: string): Promise<void> {
+	try {
+		await db
+			.prepare(
+				`UPDATE gc_state
+				 SET last_finished_at = CURRENT_TIMESTAMP, last_error = ?
+				 WHERE id = ?`,
+			)
+			.bind(errorMessage, GC_STATE_ID)
+			.run();
+	} catch (error) {
+		console.warn("gc_state_update_failed", safeErrorMessage(error));
+	}
+}
+
+/**
+ * Cloudflare Pages Functions 没有 Cron Triggers，定时 GC 只能挂在请求路径上：
+ * 先用一条原子 UPSERT 抢占本轮执行权，抢到才真正跑，并由调用方交给 waitUntil 异步完成。
+ * 失败也按同一间隔等待下一轮，避免每次请求都重跑一次已经出错的 GC。
+ */
+export async function runLazyScheduledGc(env: GcEnv): Promise<GcSummary | null> {
+	const config = getGcConfig(env);
+	const claimed = await env.DB.prepare(GC_CLAIM_QUERY)
+		.bind(GC_STATE_ID, `-${config.minIntervalMinutes} minute`)
+		.run();
+	if (resultChanges(claimed) < 1) return null;
+
+	try {
+		const summary = await runScheduledGc(env);
+		await recordGcRunFinished(env.DB, "");
+		return summary;
+	} catch (error) {
+		await recordGcRunFinished(env.DB, safeErrorMessage(error));
+		throw error;
+	}
 }
 
 export const GC_LIMITS = Object.freeze({

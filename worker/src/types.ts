@@ -21,6 +21,8 @@ export interface AppBindings {
   GC_D1_STATEMENT_BUDGET?: string;
   GC_R2_OPERATION_BUDGET?: string;
   R2_DELETE_MAX_RETRY?: string;
+  /** 惰性 GC 的最小间隔（分钟）；Pages 部署没有 Cron Triggers，靠请求路径触发。 */
+  GC_MIN_INTERVAL_MINUTES?: string;
 
   EDGECHAT_ENCRYPTION_KEYRING?: string;
   EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID?: string;

@@ -325,6 +325,15 @@ CREATE TABLE IF NOT EXISTS pending_r2_delete (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Cloudflare Pages Functions 没有 Cron Triggers：定时 GC 由请求路径惰性触发，
+-- 这个单行表用一条原子 UPSERT 认领本轮执行权，避免每个请求都重复跑 GC。
+CREATE TABLE IF NOT EXISTS gc_state (
+  id TEXT PRIMARY KEY,
+  last_started_at TEXT,
+  last_finished_at TEXT,
+  last_error TEXT NOT NULL DEFAULT ''
+);
+
 -- GC 按创建时间分页，并对仍在使用的附件和头像执行点查。
 CREATE INDEX IF NOT EXISTS idx_gc_uploaded_created
 ON uploaded_files(created_at, object_key);

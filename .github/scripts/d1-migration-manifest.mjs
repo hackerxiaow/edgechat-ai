@@ -195,6 +195,11 @@ export const D1_MIGRATIONS = [
 		artifacts: ["table:sessions"],
 	},
 	{
+		id: "2026-09-16-lazy-scheduled-gc",
+		file: "worker/migrations/2026-09-16-lazy-scheduled-gc.sql",
+		artifacts: ["table:gc_state"],
+	},
+	{
 		id: "2026-09-16-uploaded-file-blobs",
 		file: "worker/migrations/2026-09-16-uploaded-file-blobs.sql",
 		artifacts: ["column:uploaded_files.data"],

@@ -8,6 +8,8 @@ ADMIN_USERNAMES = "admin"
 MESSAGE_RETENTION_DAYS = "7"
 MAX_FILE_SIZE = "1048576"
 SITE_ORIGINS = "https://chat.cnz.kdns.fr"
+# Pages 没有 Cron Triggers，定时 GC 靠请求路径惰性触发，这里是两次执行之间的最小间隔。
+GC_MIN_INTERVAL_MINUTES = "60"
 
 [[d1_databases]]
 binding = "DB"

@@ -33,7 +33,7 @@ import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
-import { runScheduledGc } from './gc.ts';
+import { runLazyScheduledGc, runScheduledGc, shouldProbeScheduledGc } from './gc.ts';
 import { isUserDisabled } from './user-status.ts';
 import type { AppEnv, SessionUser } from './types.ts';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.ts';
@@ -330,8 +330,21 @@ app.onError((error, c) => {
   return errorResponse('服务器开小差了', 500);
 });
 
+// Cloudflare Pages Functions 只暴露 fetch，没有 Cron Triggers：
+// 定时 GC 挂在 API 请求上惰性触发，由 gc_state 的原子抢锁保证跨请求的最小间隔。
 export default {
-  fetch: app.fetch,
+  async fetch(request: Request, env: AppEnv['Bindings'], ctx: ExecutionContext) {
+    const response = await app.fetch(request, env, ctx);
+    if (ctx && typeof ctx.waitUntil === 'function' && shouldProbeScheduledGc(request)) {
+      ctx.waitUntil(
+        runLazyScheduledGc(env).catch((error) => {
+          console.error('lazy_scheduled_gc_failed', error);
+        })
+      );
+    }
+    return response;
+  },
+  // Workers 部署仍可用 Cron Triggers 直连同一条 GC。
   async scheduled(
     _controller: ScheduledController,
     env: AppEnv['Bindings'],
