@@ -69,11 +69,16 @@ async function submit(event) {
   loading.value = true;
   error.value = '';
   try {
-    // Android WebView 的自动填充不一定触发 input 事件，提交时以输入框当前值为准。
-    const serverOrigin = form.serverOrigin;
-    const credentials = loginMethod.value === 'code' 
-      ? { method: 'code', email: form.email, code: form.code }
-      : { method: 'password', account: form.account, password: form.password };
+    // Android WebView 的自动填充不一定触发 input 事件，提交时以表单当前值为准。
+    const submitted = new FormData(event.currentTarget);
+    const { serverOrigin, credentials: passwordCredentials } = readLoginSubmission(submitted);
+    const credentials = loginMethod.value === 'code'
+      ? {
+          method: 'code',
+          email: String(submitted.get('email') || '').trim(),
+          code: String(submitted.get('code') || '').trim()
+        }
+      : { method: 'password', account: passwordCredentials.username, password: passwordCredentials.password };
     if (isCapacitorAndroid) {
       await store.configureNativeServer(serverOrigin);
     }
@@ -113,6 +118,23 @@ async function submit(event) {
 
       
       <form class="login-form" @submit.prevent="submit">
+
+        <label v-if="isCapacitorAndroid" class="login-field">
+          <span class="login-label">{{ t('auth.serverOrigin') }}</span>
+          <span class="input-wrapper">
+            <span ref="serverCursor" class="custom-cursor"></span>
+            <input
+              ref="serverInput"
+              v-model.trim="form.serverOrigin"
+              class="login-input"
+              autocomplete="url"
+              inputmode="url"
+              name="serverOrigin"
+              required
+              type="url"
+            />
+          </span>
+        </label>
         
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 8px; justify-content: center;">
           <button type="button" :class="['auth-tab', { active: loginMethod === 'password' }]" @click="loginMethod = 'password'">{{ t('auth.passwordLogin') }}</button>
@@ -123,14 +145,14 @@ async function submit(event) {
           <label class="login-field">
             <span class="login-label">{{ t('auth.accountOrEmail') }}</span>
             <span class="input-wrapper">
-              <input v-model.trim="form.account" class="login-input" autocomplete="username" required type="text" />
+              <input v-model.trim="form.account" class="login-input" autocomplete="username" name="username" required type="text" />
             </span>
           </label>
 
           <label class="login-field">
             <span class="login-label">{{ t('auth.password') }}</span>
             <span class="input-wrapper">
-              <input v-model="form.password" class="login-input" autocomplete="current-password" required type="password" />
+              <input v-model="form.password" class="login-input" autocomplete="current-password" name="password" required type="password" />
             </span>
           </label>
         </template>
@@ -139,7 +161,7 @@ async function submit(event) {
           <label class="login-field">
             <span class="login-label">{{ t('auth.email') }}</span>
             <div style="display: flex; gap: 8px;">
-              <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" required type="email" />
+              <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" name="email" required type="email" />
               <button type="button" class="login-btn" style="width: auto; margin-top: 0; padding: 0 16px;" :disabled="!form.email || sendingCode || countdown > 0" @click="sendCode">
                 {{ countdown > 0 ? countdown + 's' : t('auth.getVerificationCode') }}
               </button>
@@ -149,7 +171,7 @@ async function submit(event) {
           <label class="login-field">
             <span class="login-label">{{ t('auth.verificationCode') }}</span>
             <span class="input-wrapper">
-              <input v-model.trim="form.code" class="login-input" required type="text" :placeholder="t('auth.codePlaceholder')" />
+              <input v-model.trim="form.code" class="login-input" name="code" required type="text" :placeholder="t('auth.codePlaceholder')" />
             </span>
           </label>
         </template>

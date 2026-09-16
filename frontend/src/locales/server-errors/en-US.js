@@ -14,7 +14,7 @@ const fixedErrorTranslations = new Map([
   ['请填写完整密码', 'Please fill in all password fields'],
   ['用户不存在', 'User not found'],
   ['当前密码不正确', 'Current password is incorrect'],
-  ['显示名称不能为空', 'Display name cannot be empty'],
+  ['昵称不能为空', 'Nickname cannot be empty'],
   ['无效的会话类型', 'Invalid conversation type'],
   ['接口不存在', 'API endpoint not found'],
   ['服务器开小差了', 'Something went wrong on the server'],

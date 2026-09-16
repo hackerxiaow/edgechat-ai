@@ -201,11 +201,13 @@ test('后台视觉令牌匹配参考图并按职责拆分样式文件', () => {
   assert.match(adminStyles, /@import '\.\/admin\/tokens\.css';/);
   assert.match(adminStyles, /@import '\.\/admin\/layout\.css';/);
   assert.match(adminStyles, /@import '\.\/admin\/controls\.css';/);
-  assert.match(adminTokens, /--admin-workspace: #f0f3f8;/);
-  assert.match(adminTokens, /--admin-panel: #ffffff;/);
+  // 后台与前台共用一套视觉语言：工作区透明以露出全局暗纹，面板是半透明玻璃。
+  assert.match(adminTokens, /--admin-workspace: transparent;/);
+  assert.match(adminTokens, /--admin-panel: rgba\(255, 255, 255, 0\.72\);/);
   assert.match(adminTokens, /--admin-ink: #0d1731;/);
   assert.match(adminTokens, /--admin-green-bg: #f1fdfb;/);
   assert.match(adminTokens, /--admin-green: #168c87;/);
+  // 令牌文件只放变量；毛玻璃与渐变属于表现层，必须留在 admin.css。
   assert.doesNotMatch(adminTokens, /backdrop-filter|linear-gradient/);
   assert.doesNotMatch(legacyTokens, /admin-shell|admin-grid--two|admin-metric-grid--wide/);
 });

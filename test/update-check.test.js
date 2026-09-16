@@ -149,23 +149,25 @@ test("前端 Compare 检查不会把当前部署领先误报成可更新", async
 });
 
 test("未提交构建与 GitHub 限流会返回可理解的检查结果", async () => {
+	// update-check 抛出的是 i18n key（测试环境未初始化 i18n，t() 会回退成 key 本身）。
+	// 这里断言 key，并单独校验每个 key 在中文包里都有可读文案。
 	await assert.rejects(
 		checkForUpdates({ build: { ...build, dirty: true }, fetchImpl: async () => null }),
-		/未提交改动/,
+		/updates\.errors\.dirtyBuild/,
 	);
 	await assert.rejects(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({}, 403),
 		}),
-		/GitHub 检查次数暂时受限/,
+		/updates\.errors\.rateLimited/,
 	);
 	await assert.rejects(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({}, 404),
 		}),
-		/尚未同步到代码仓库/,
+		/updates\.errors\.commitNotSynced/,
 	);
 	await assert.rejects(
 		checkForUpdates({
@@ -174,15 +176,29 @@ test("未提交构建与 GitHub 限流会返回可理解的检查结果", async 
 				throw new TypeError("Failed to fetch");
 			},
 		}),
-		/网络连接失败/,
+		/updates\.errors\.network/,
 	);
 	await assert.rejects(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({ status: "identical" }),
 		}),
-		/无法识别的版本信息/,
+		/updates\.errors\.invalidResponse/,
 	);
+
+	const zhLocale = readFileSync(
+		new URL("../frontend/src/locales/zh-CN.js", import.meta.url),
+		"utf8",
+	);
+	for (const key of [
+		"updates.errors.dirtyBuild",
+		"updates.errors.rateLimited",
+		"updates.errors.commitNotSynced",
+		"updates.errors.network",
+		"updates.errors.invalidResponse",
+	]) {
+		assert.match(zhLocale, new RegExp(`'${key}':\\s*'[^']+'`), `${key} 缺少中文文案`);
+	}
 });
 
 test("更新状态只挂载在管理员路由保护的网站设置页", () => {

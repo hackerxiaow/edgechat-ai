@@ -264,7 +264,7 @@ export async function requestDemo(path, options = {}) {
   if (method === 'PATCH' && pathname === '/me/profile') {
     const user = findDemoUser(demoState.session.userId);
     if (Object.hasOwn(body, 'displayName') && (typeof body.displayName !== 'string' || !body.displayName.trim())) {
-      fail('显示名称不能为空');
+      fail('昵称不能为空');
     }
     let bio;
     if (Object.hasOwn(body, 'bio')) {

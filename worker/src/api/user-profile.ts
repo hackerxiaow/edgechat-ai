@@ -25,7 +25,7 @@ export function registerUserProfileRoutes(app: Hono<AppEnv>) {
 		const binds: (string | null)[] = [];
 		if (Object.hasOwn(payload, "displayName")) {
 			if (typeof payload.displayName !== "string" || !payload.displayName.trim()) {
-				return errorResponse("显示名称不能为空");
+				return errorResponse("昵称不能为空");
 			}
 			updates.push("display_name = ?");
 			binds.push(payload.displayName.trim());
