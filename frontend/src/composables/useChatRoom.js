@@ -89,6 +89,25 @@ export function useChatRoom({
 		}
 	}
 
+	/** 是否贴着底部附近：用户往上翻看历史时不应该被强行拽回底部。 */
+	function isPinnedToBottom(threshold = 140) {
+		const element = messagesEl.value;
+		if (!element) return false;
+		return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
+	}
+
+	/**
+	 * 内容在原位增长（正在输入指示器出现、AI 回复逐字显现）时保持贴底，
+	 * 让上方的消息顺势被顶上去。仅在用户本来就贴底时才生效。
+	 */
+	function scrollToBottomIfPinned() {
+		const element = messagesEl.value;
+		if (!element || !isPinnedToBottom()) return;
+		requestAnimationFrame(() => {
+			element.scrollTop = element.scrollHeight;
+		});
+	}
+
 	function mergeMessages(...collections) {
 		const byId = new Map();
 		for (const collection of collections) {
@@ -557,5 +576,6 @@ export function useChatRoom({
 		uploadAttachment,
 		clearAttachment,
 		loadOlder,
+		scrollToBottomIfPinned,
 	};
 }

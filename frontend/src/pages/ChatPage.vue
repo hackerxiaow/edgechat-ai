@@ -155,7 +155,7 @@ function handleRoomAccessRevoked(room) {
 
 const {
   messages, pinnedMessage, highlightedMessageId, loading, wsStatus, composerText, pendingAttachment, sending,
-  messagesEl, isOwnMessage, typingUsers, reportTyping, streamingMessageIds, finishStreaming,
+  messagesEl, isOwnMessage, typingUsers, reportTyping, streamingMessageIds, finishStreaming, scrollToBottomIfPinned,
 	  loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
 	  pinMessage, unpinMessage, revealPinnedMessage,
 	  revealMessage,
@@ -537,12 +537,22 @@ function beginStreaming(messageId) {
     if (next >= total) {
       stopStreaming(id);
       finishStreaming(id);
+      // 收尾时再贴一次底，避免最后一行落在可视区外
+      nextTick(scrollToBottomIfPinned);
       return;
     }
     revealedLength[id] = next;
+    // 气泡变高期间保持贴底，上方消息随之被顶起
+    scrollToBottomIfPinned();
   }, STREAM_TICK_MS);
   revealTimers.set(id, timer);
 }
+
+// 「正在输入」出现时应占位并把上方消息顶上去：贴底时跟随滚动。
+watch(
+  () => typingUsers.value.length,
+  () => nextTick(scrollToBottomIfPinned)
+);
 
 watch(streamingMessageIds, (ids) => {
   for (const rawId of ids) {
