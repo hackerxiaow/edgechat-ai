@@ -3,7 +3,8 @@
  */
 
 :root {
-  --bg: #f2f7fb;
+  --bg: #d7e1ea;
+  --doodle-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23000000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.08'%3E%3Cpath d='M20,30 h16 a4,4 0 0,1 4,4 v12 a4,4 0 0,1 -4,4 h-4 l-6,6 v-6 h-6 a4,4 0 0,1 -4,-4 v-12 a4,4 0 0,1 4,-4' /%3E%3Cpath d='M120,20 l16,6 l-6,16 l-4,-8 z M126,26 l4,8' /%3E%3Cpath d='M40,90 a6,6 0 0,1 12,0 c0,6 -6,10 -6,10 c0,0 -6,-4 -6,-10' /%3E%3Cpath d='M130,90 l2,6 l6,0 l-5,4 l2,6 l-5,-4 l-5,4 l2,-6 l-5,-4 l6,0 z' /%3E%3Cpath d='M80,40 a6,6 0 0,1 8,-4 a8,8 0 0,1 12,4 a6,6 0 0,1 -4,12 h-12 a6,6 0 0,1 -4,-12' /%3E%3Cpath d='M70,120 h12 v8 a6,6 0 0,1 -12,0 z M82,122 a4,4 0 0,1 0,6 M74,115 v3 M78,115 v3' /%3E%3Cpath d='M25,135 v12 M33,133 v12 M22,138 h14 M20,142 h14' /%3E%3Cpath d='M130,145 c0,-8 8,-8 8,-8 c0,8 -8,8 -8,8 M130,145 l4,-4' /%3E%3Crect x='70' y='75' width='16' height='10' rx='3' /%3E%3Cpath d='M73,80 h4 M75,78 v4 M81,80 h1 M83,80 h1' /%3E%3Cpath d='M10,60 v6 M7,63 h6' /%3E%3Cpath d='M150,60 l3,3 M153,60 l-3,3' /%3E%3C/g%3E%3C/svg%3E");
   --surface-0: rgba(255, 255, 255, 0.5);
   --surface-1: rgba(255, 255, 255, 0.4);
   --surface-2: rgba(255, 255, 255, 0.85);
@@ -43,7 +44,8 @@
 
 html[data-theme="dark"],
 html.dark {
-  --bg: #0a1420;
+  --bg: #0e1621;
+  --doodle-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.05'%3E%3Cpath d='M20,30 h16 a4,4 0 0,1 4,4 v12 a4,4 0 0,1 -4,4 h-4 l-6,6 v-6 h-6 a4,4 0 0,1 -4,-4 v-12 a4,4 0 0,1 4,-4' /%3E%3Cpath d='M120,20 l16,6 l-6,16 l-4,-8 z M126,26 l4,8' /%3E%3Cpath d='M40,90 a6,6 0 0,1 12,0 c0,6 -6,10 -6,10 c0,0 -6,-4 -6,-10' /%3E%3Cpath d='M130,90 l2,6 l6,0 l-5,4 l2,6 l-5,-4 l-5,4 l2,-6 l-5,-4 l6,0 z' /%3E%3Cpath d='M80,40 a6,6 0 0,1 8,-4 a8,8 0 0,1 12,4 a6,6 0 0,1 -4,12 h-12 a6,6 0 0,1 -4,-12' /%3E%3Cpath d='M70,120 h12 v8 a6,6 0 0,1 -12,0 z M82,122 a4,4 0 0,1 0,6 M74,115 v3 M78,115 v3' /%3E%3Cpath d='M25,135 v12 M33,133 v12 M22,138 h14 M20,142 h14' /%3E%3Cpath d='M130,145 c0,-8 8,-8 8,-8 c0,8 -8,8 -8,8 M130,145 l4,-4' /%3E%3Crect x='70' y='75' width='16' height='10' rx='3' /%3E%3Cpath d='M73,80 h4 M75,78 v4 M81,80 h1 M83,80 h1' /%3E%3Cpath d='M10,60 v6 M7,63 h6' /%3E%3Cpath d='M150,60 l3,3 M153,60 l-3,3' /%3E%3C/g%3E%3C/svg%3E");
   --surface-0: rgba(20, 32, 46, 0.5);
   --surface-1: rgba(20, 32, 46, 0.35);
   --surface-2: rgba(20, 32, 46, 0.85);
