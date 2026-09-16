@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEncryptionKeyring } from '../../worker/src/encryption.js';
+import { loadEncryptionKeyring } from '../../worker/src/encryption.ts';
 
 const API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 const KEYRING_SECRET_NAME = 'EDGECHAT_ENCRYPTION_KEYRING';
@@ -41,6 +41,36 @@ async function listWorkerSecrets({ accountId, apiToken, workerName }) {
   return Array.isArray(payload?.result) ? payload.result : [];
 }
 
+/**
+ * Pages 的密钥挂在项目上，通过项目详情的 deployment_configs.production.env_vars 读取；
+ * secret_text 才是密钥，plain_text 是普通变量。
+ */
+async function listPagesSecrets({ accountId, apiToken, projectName }) {
+  const response = await fetch(
+    `${API_BASE_URL}/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(projectName)}`,
+    { headers: { Authorization: `Bearer ${apiToken}` } }
+  );
+  const payload = await response.json().catch(() => null);
+  if (response.status === 404) return [];
+  if (!response.ok || payload?.success === false) {
+    throw new Error(apiError(payload, `Cloudflare API returned ${response.status}`));
+  }
+  const envVars = payload?.result?.deployment_configs?.production?.env_vars || {};
+  return Object.entries(envVars)
+    .filter(([, config]) => config?.type === 'secret_text')
+    .map(([name]) => ({ name }));
+}
+
+function listSecrets({ target, accountId, apiToken, targetName }) {
+  if (target === 'pages') {
+    return listPagesSecrets({ accountId, apiToken, projectName: targetName });
+  }
+  if (target === 'worker') {
+    return listWorkerSecrets({ accountId, apiToken, workerName: targetName });
+  }
+  throw new Error(`Unsupported deployment target: ${target}`);
+}
+
 export function createKeyring() {
   return JSON.stringify({
     activeKeyId: 'v1',
@@ -64,16 +94,20 @@ function writeSecretsFile(secretsFile, secrets) {
   writeFileSync(secretsFile, JSON.stringify(secrets), { mode: 0o600 });
 }
 
-export async function prepareWorkerEncryptionSecret({
+export async function prepareEncryptionSecret({
+  target = 'worker',
+  targetName,
   accountId,
   apiToken,
   workerName = 'cfchat',
-  secretsFile = '.tmp/worker-secrets.json',
+  projectName = 'edgechat',
+  secretsFile = '.tmp/encryption-secrets.json',
   suppliedKeyring = '',
   applySuppliedKeyring = false,
   rotateEncryptionKey = false
 } = {}) {
-  const secrets = await listWorkerSecrets({ accountId, apiToken, workerName });
+  const name = targetName || (target === 'pages' ? projectName : workerName);
+  const secrets = await listSecrets({ target, accountId, apiToken, targetName: name });
   const secretNames = new Set(secrets.map((secret) => secret?.name).filter(Boolean));
   const automaticKeyVersions = [...secretNames]
     .map((name) => AUTO_KEY_SECRET_PATTERN.exec(name))
@@ -90,7 +124,7 @@ export async function prepareWorkerEncryptionSecret({
 
   if (!applySuppliedKeyring && !rotateEncryptionKey && encryptionConfigured) {
     setOutput('action', 'preserved');
-    console.log(`Encryption secrets already exist on ${workerName}; preserving them.`);
+    console.log(`Encryption secrets already exist on ${name} (${target}); preserving them.`);
     return { action: 'preserved' };
   }
 
@@ -129,11 +163,13 @@ export async function prepareWorkerEncryptionSecret({
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  prepareWorkerEncryptionSecret({
+  prepareEncryptionSecret({
+    target: process.env.EDGECHAT_DEPLOY_TARGET || 'worker',
     accountId: requireEnv('CLOUDFLARE_ACCOUNT_ID'),
     apiToken: requireEnv('CLOUDFLARE_API_TOKEN'),
     workerName: process.env.EDGECHAT_WORKER_NAME || 'cfchat',
-    secretsFile: process.env.EDGECHAT_SECRETS_FILE || '.tmp/worker-secrets.json',
+    projectName: process.env.EDGECHAT_PAGES_PROJECT_NAME || 'edgechat',
+    secretsFile: process.env.EDGECHAT_SECRETS_FILE || '.tmp/encryption-secrets.json',
     suppliedKeyring: process.env.EDGECHAT_ENCRYPTION_KEYRING || '',
     applySuppliedKeyring: process.env.EDGECHAT_APPLY_ENCRYPTION_KEYRING === 'true',
     rotateEncryptionKey: process.env.EDGECHAT_ROTATE_ENCRYPTION_KEY === 'true'

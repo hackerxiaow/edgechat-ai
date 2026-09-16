@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const workflow = readFileSync(
-	new URL("../.github/workflows/deploy-worker.yml", import.meta.url),
+	new URL("../.github/workflows/deploy-pages.yml", import.meta.url),
 	"utf8",
 ).replaceAll("\r\n", "\n");
 
@@ -27,11 +27,10 @@ test("Cloudflare 生产凭据只注入实际调用 Cloudflare 的步骤", () => 
 
 	for (const name of [
 		"Checkout",
-			"Setup Node.js",
-			"Install dependencies",
-			"Run tests",
-			"Build frontend assets",
-		"Generate wrangler config for CI",
+		"Setup Node.js",
+		"Install dependencies",
+		"Run tests",
+		"Build Pages bundle",
 		"Generate admin bootstrap SQL (optional)",
 	]) {
 		assert.doesNotMatch(getStep(name), /CLOUDFLARE_(?:API_TOKEN|ACCOUNT_ID)/);
@@ -40,11 +39,13 @@ test("Cloudflare 生产凭据只注入实际调用 Cloudflare 的步骤", () => 
 	for (const name of [
 		"Ensure Cloudflare resources",
 		"Initialize D1 schema (first creation only)",
-			"Prepare D1 migrations",
-			"Apply D1 migrations",
-			"Ensure admin user (optional)",
-			"Prepare Worker encryption secret",
-			"Deploy worker",
+		"Prepare D1 migrations",
+		"Apply D1 migrations",
+		"Verify D1 schema contract",
+		"Ensure admin user (optional)",
+		"Prepare Pages encryption secret",
+		"Apply Pages encryption secret",
+		"Deploy Pages",
 	]) {
 		const step = getStep(name);
 		assert.match(step, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
@@ -54,15 +55,22 @@ test("Cloudflare 生产凭据只注入实际调用 Cloudflare 的步骤", () => 
 
 test("生产部署在创建或修改云资源前运行完整测试", () => {
 	const testsStart = workflow.indexOf("      - name: Run tests\n");
+	const buildStart = workflow.indexOf("      - name: Build Pages bundle\n");
 	const resourcesStart = workflow.indexOf("      - name: Ensure Cloudflare resources\n");
 	assert.notEqual(testsStart, -1);
+	assert.notEqual(buildStart, -1);
+	assert.equal(testsStart < buildStart, true);
 	assert.equal(testsStart < resourcesStart, true);
 	assert.match(getStep("Run tests"), /run: npm test/);
+	// Pages 的 _worker.js 与静态资产一起上传，必须先构建再发布。
+	assert.match(getStep("Build Pages bundle"), /run: npm run build:pages/);
+	assert.equal(buildStart < workflow.indexOf("      - name: Deploy Pages\n"), true);
 });
 
 test("首次部署自动创建密钥，普通部署保留密钥，手动轮换才允许更新", () => {
-	const prepareStep = getStep("Prepare Worker encryption secret");
-	assert.match(prepareStep, /prepare-worker-encryption-secret\.mjs/);
+	const prepareStep = getStep("Prepare Pages encryption secret");
+	assert.match(prepareStep, /prepare-encryption-secret\.mjs/);
+	assert.match(prepareStep, /EDGECHAT_DEPLOY_TARGET: pages/);
 	assert.match(
 		prepareStep,
 		/EDGECHAT_ENCRYPTION_KEYRING: \$\{\{ secrets\.EDGECHAT_ENCRYPTION_KEYRING \}\}/,
@@ -72,43 +80,35 @@ test("首次部署自动创建密钥，普通部署保留密钥，手动轮换�
 	assert.match(workflow, /apply_encryption_keyring:/);
 	assert.match(workflow, /rotate_encryption_key:/);
 
-	const deployStep = getStep("Deploy worker");
-	assert.match(deployStep, /if \[\[ -f \.tmp\/worker-secrets\.json \]\]/);
-	assert.match(deployStep, /wrangler deploy --config wrangler\.ci\.toml --secrets-file/);
-	assert.match(deployStep, /wrangler deploy --config wrangler\.ci\.toml/);
+	const applyStep = getStep("Apply Pages encryption secret");
+	assert.match(applyStep, /wrangler pages secret bulk \.tmp\/pages-secrets\.json/);
+	assert.match(applyStep, /if: hashFiles\('\.tmp\/pages-secrets\.json'\) != ''/);
+
+	assert.match(getStep("Remove temporary secret files"), /rm -f \.tmp\/pages-secrets\.json/);
+	assert.match(getStep("Remove temporary secret files"), /if: always\(\)/);
 });
 
-test("资源确认脚本仅复用配置的 KV 标题，避免隐式共享会话存储", () => {
+test("Pages 部署不再声明 KV、R2 或 Durable Object 绑定", () => {
+	const pagesConfig = readFileSync(
+		new URL("../wrangler.pages.toml", import.meta.url),
+		"utf8",
+	);
+	assert.match(pagesConfig, /pages_build_output_dir = "frontend\/dist"/);
+	assert.match(pagesConfig, /binding = "DB"/);
+	assert.doesNotMatch(
+		pagesConfig,
+		/kv_namespaces|r2_buckets|durable_objects|\[triggers\]|main =/,
+	);
+
+	// 资源脚本只准备 D1 与 Pages 项目；KV/R2 的创建路径必须已经删除。
 	const script = readFileSync(
 		new URL("../.github/scripts/ensure-cloudflare-resources.mjs", import.meta.url),
 		"utf8",
 	).replaceAll("\r\n", "\n");
+	assert.doesNotMatch(script, /kv\/namespaces|r2\/buckets|ensureKvNamespace|ensureR2Bucket/);
+	assert.match(script, /ensurePagesProject/);
 
-	assert.doesNotMatch(script, /PRODUCTION_KV_NAMESPACE_TITLE/);
-	assert.match(
-		script,
-		/namespace\.title === kvNamespaceTitle && namespace\.id/,
-	);
-	assert.match(script, /setOutput\("kv_namespace_title", kv\.title\);/);
-
-	const resourceStep = getStep("Ensure Cloudflare resources");
-	assert.match(
-		resourceStep,
-		/EDGECHAT_KV_NAMESPACE_TITLE: \$\{\{ vars\.EDGECHAT_KV_NAMESPACE_TITLE \|\| 'cfchat-sessions' \}\}/,
-	);
-});
-
-test("R2 未开通时工作流移除 FILES binding，已开通时保留目标 bucket", () => {
-	const configStep = getStep("Generate wrangler config for CI");
-	assert.match(
-		configStep,
-		/R2_AVAILABLE: \$\{\{ steps\.ensure_resources\.outputs\.r2_available \}\}/,
-	);
-	assert.match(
-		configStep,
-		/R2_BUCKET_NAME: \$\{\{ steps\.ensure_resources\.outputs\.r2_bucket_name \}\}/,
-	);
-	assert.match(configStep, /if \[\[ "\$R2_AVAILABLE" == "true" \]\]/);
-	assert.match(configStep, /bucket_name = \\"\$\{R2_BUCKET_NAME\}\\"/);
-	assert.match(configStep, /\^\\\[\\\[r2_buckets\\\]\\\]\$\/,\/\^\$\/d/);
+	assert.doesNotMatch(workflow, /wrangler\.ci\.toml|wrangler\.example\.toml|--secrets-file/);
+	assert.match(workflow, /--config wrangler\.pages\.toml/);
+	assert.match(workflow, /wrangler pages deploy frontend\/dist/);
 });

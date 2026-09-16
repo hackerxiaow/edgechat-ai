@@ -71,7 +71,7 @@ Take a look at the interface before deciding whether to deploy.
 
 The demo site reuses the production project's Vue pages, routes, state management, and real-time messaging logic. However, its API, WebSocket, file uploads, and Telegram relay are simulated in browser memory; it is not a multi-user chat room connected to a real backend.
 
-Refresh the page or click “Reset Demo Data” in the upper-right corner to restore the initial state. Demo actions do not access the production Worker or write to D1, KV, or R2.
+Refresh the page or click “Reset Demo Data” in the upper-right corner to restore the initial state. Demo actions do not access the production deployment or write to D1.
 
 ## Why EdgeChat
 
@@ -112,7 +112,7 @@ This suits teams and communities that already have Telegram groups but also need
 - Real-time messages, paginated message history, voice messages, and file sharing.
 - Message replies, quote navigation, @ mentions, and reply reminders.
 - Block and unblock direct-message contacts; while blocked, neither party can continue sending DMs.
-- Optional scheduled hard deletion of expired messages.
+- Optional hard deletion of expired messages: Pages has no cron triggers, so cleanup runs lazily from the request path.
 
 ### 🎨 Everyday Experience
 
@@ -149,7 +149,7 @@ The admin console does not provide an entry point for viewing group or direct-me
 
 <br />
 
-GitHub Actions manages the server-side encryption Worker Secrets. On the first deployment, if the target Worker has no encryption Secret, the workflow automatically generates a random 32-byte AES key, injects it as an independently versioned Secret, and records the current active key ID. Subsequent ordinary deployments only check that these Secrets exist; they do not regenerate, overwrite, or rotate them.
+GitHub Actions manages the server-side encryption Secrets. On the first deployment, if the target Pages project has no encryption Secret, the workflow automatically generates a random 32-byte AES key, injects it as an independently versioned Secret, and records the current active key ID. Subsequent ordinary deployments only check that these Secrets exist; they do not regenerate, overwrite, or rotate them.
 
 An existing `EDGECHAT_ENCRYPTION_KEYRING` JSON keyring in production is preserved exactly and remains supported.
 
@@ -161,7 +161,7 @@ To specify a key manually, create a GitHub Repository Secret named `EDGECHAT_ENC
 
 The first deployment adopts this value directly.
 
-To enable automatic incremental rotation for an existing Worker, manually run `Deploy Worker` and check `rotate_encryption_key`. The workflow adds only one versioned key Secret and switches the active key ID to the new version; all old Secrets and the old JSON keyring remain unchanged. New messages use the new key, while old ciphertext continues to be decrypted with the key ID in its own envelope.
+To enable automatic incremental rotation, manually run `Deploy Pages` and check `rotate_encryption_key`. The workflow adds only one versioned key Secret and switches the active key ID to the new version; all old Secrets and the old JSON keyring remain unchanged. New messages use the new key, while old ciphertext continues to be decrypted with the key ID in its own envelope.
 
 `apply_encryption_keyring` is a fallback manual override entry point. When using it, the Repository Secret must contain the complete JSON keyring. `keys` must retain every old key ID still referenced by historical ciphertext, then add the new key and update `activeKeyId`.
 
@@ -174,11 +174,10 @@ To enable automatic incremental rotation for an existing Worker, manually run `D
 | Area | Technology |
 |---|---|
 | Frontend | Vue 3, Vue Router, Vite |
-| Backend | Cloudflare Workers / Pages Functions, Hono |
+| Backend | Cloudflare Pages Functions, Hono |
 | Real-time communication | Cursor polling over D1 `message_events` (no long-lived sockets) |
-| Database | Cloudflare D1 (messages, sessions and attachment bodies) |
-| Optional fallbacks | KV sessions, R2 file storage (kept for older deployments, not required) |
-| Build and deployment | Wrangler, GitHub Actions |
+| Database | Cloudflare D1 (messages, sessions and attachment bodies; the only store) |
+| Build and deployment | Wrangler Pages, GitHub Actions |
 
 See [TECHNICAL.md](TECHNICAL.md) for more implementation details.
 
@@ -188,9 +187,25 @@ See [TECHNICAL.md](TECHNICAL.md) for more implementation details.
 
 Using the GitHub Actions workflow included in the repository is recommended for deployment and subsequent updates.
 
-After completing the Cloudflare authorization and repository configuration described in the documentation, you can manually run `Deploy Worker`, or trigger deployment by pushing code to the `master` or `main` branch. The workflow file is `.github/workflows/deploy-worker.yml`.
+After completing the Cloudflare authorization and repository configuration described in the documentation, you can manually run `Deploy Pages`, or trigger deployment by pushing code to the `master` or `main` branch. The workflow file is `.github/workflows/deploy-pages.yml`; it runs tests and D1 migrations first, then uploads `frontend/dist` (including `_worker.js`).
 
 **[Quick Start](https://echat.azora.top/guide/getting-started.html) · [GitHub Actions Deployment Guide](https://echat.azora.top/guide/actions-deploy.html)**
+
+### D1-only storage notes
+
+<details>
+<summary><strong>Boundaries and configuration of the Pages + D1 setup</strong></summary>
+
+<br />
+
+The production deployment has a single store: Cloudflare D1. Messages, web sessions (the `sessions` table) and attachment bodies (`uploaded_files.data`) live in the same database. There is no KV session fallback, and neither R2 nor Durable Objects are bound.
+
+- **Attachment size**: bodies are written into a single D1 row as AES-256-GCM envelopes. D1 caps a row/`BLOB` at 2MB, so `MAX_FILE_SIZE` is 1MiB in `wrangler.pages.toml`. Raising it close to 2MB makes writes fail, and oversized uploads now return an explicit business error before the insert.
+- **Scheduled cleanup**: Pages Functions only exposes `fetch` and has no cron triggers, so message retention, expired sessions and orphaned attachments are cleaned lazily from the request path (`GC_MIN_INTERVAL_MINUTES`, 60 minutes by default). The `gc_state` table claims each run with a single atomic UPSERT; concurrent requests simply skip.
+- **Real-time**: there are no long-lived WebSocket connections; `/api/ws` and `/api/v1/realtime/ws` return 501 and clients poll the `message_events` cursor.
+- **Legacy Worker deployment**: if you previously deployed the Worker with KV/R2 and cron triggers, the Pages project is a separate target. Disable or delete the old Worker, KV namespace and R2 bucket yourself so two versions do not serve production at once.
+
+</details>
 
 ### Manual Deployment and Docker
 
@@ -294,7 +309,7 @@ Edgechat/
 ├─ capacitor/            # Web UI-based Android client
 ├─ android/              # Temporarily retained native Android client
 ├─ .github/workflows/    # Automated deployment and CI
-├─ wrangler.toml
+├─ wrangler.pages.toml   # Pages production config (D1 binding and variables)
 ├─ wrangler.demo.toml
 ├─ package.json
 ├─ README.md

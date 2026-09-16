@@ -99,11 +99,11 @@ docker compose logs --tail=50
 
 Docker 仅用于本地开发和测试。
 
-生产环境请部署到 Cloudflare Workers：
+生产环境请部署到 Cloudflare Pages + D1：
 
 ```bash
-# 配置 wrangler.toml
-# 然后部署
+# 在 wrangler.pages.toml 中配置 D1 binding 与变量
+# 然后构建并发布（npm run deploy 等同于 npm run deploy:pages）
 npm run deploy
 ```
 

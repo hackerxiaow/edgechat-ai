@@ -324,14 +324,14 @@ test("R2 引用迁移会替换已发布触发器，升级库与新装库使用�
 	fresh.close();
 });
 
-test("部署工作流每次发布都在 Worker 之前准备并执行 D1 迁移", () => {
+test("部署工作流每次发布都在 Pages 之前准备并执行 D1 迁移", () => {
 	const workflow = readFileSync(
-		new URL("../.github/workflows/deploy-worker.yml", import.meta.url),
+		new URL("../.github/workflows/deploy-pages.yml", import.meta.url),
 		"utf8",
 	).replaceAll("\r\n", "\n");
 	const prepareIndex = workflow.indexOf("      - name: Prepare D1 migrations\n");
 	const applyIndex = workflow.indexOf("      - name: Apply D1 migrations\n");
-	const deployIndex = workflow.indexOf("      - name: Deploy worker\n");
+	const deployIndex = workflow.indexOf("      - name: Deploy Pages\n");
 
 	assert.ok(prepareIndex > 0);
 	assert.ok(applyIndex > prepareIndex);
@@ -345,10 +345,11 @@ test("部署工作流每次发布都在 Worker 之前准备并执行 D1 迁移",
 });
 
 test("CI Wrangler 配置保留管理员变量且不再声明 Durable Object", () => {
-	const config = readFileSync(new URL("../wrangler.example.toml", import.meta.url), "utf8");
+	const config = readFileSync(new URL("../wrangler.pages.toml", import.meta.url), "utf8");
 
 	assert.match(config, /ADMIN_USERNAMES = "admin"/);
-	// 纯 D1 部署不再需要 Durable Objects；残留绑定会让 wrangler 找不到已删除的类。
+	// 纯 D1 部署不再需要 KV/R2/Durable Objects；残留绑定会让 wrangler 找不到已删除的资源。
 	assert.doesNotMatch(config, /durable_objects/);
 	assert.doesNotMatch(config, /class_name = "ChannelRoom"/);
+	assert.doesNotMatch(config, /kv_namespaces|r2_buckets/);
 });

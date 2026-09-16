@@ -11,6 +11,16 @@ import { validateSession } from '../session.ts';
 import { errorResponse, requestBodyTooLarge } from '../utils.ts';
 
 const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;
+/** D1 单行（含 BLOB）上限 2,000,000 字节；信封加密的头部还要再占用几十字节。 */
+const D1_MAX_ROW_BYTES = 2_000_000;
+const ATTACHMENT_ENVELOPE_OVERHEAD_BYTES = 1024;
+const OVERSIZED_ROW_MESSAGE = '该附件超过 D1 单行上限，请改用更小的文件';
+/** 这些校验错误可以原样返回给用户，其余异常都当作服务端故障。 */
+const REJECTABLE_UPLOAD_MESSAGES = [
+  '文件大小不能超过',
+  '该文件类型不允许上传',
+  OVERSIZED_ROW_MESSAGE
+];
 const BLOCKED_MIME_TYPES = new Set([
   'text/html',
   'application/xhtml+xml',
@@ -64,6 +74,11 @@ function validateUpload(env: UploadEnv, file: File): void {
     throw new Error(`文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`);
   }
 
+  // 正文直接落进 uploaded_files.data，超行会被 D1 拒绝；这里先给出可读的业务错误。
+  if (file.size + ATTACHMENT_ENVELOPE_OVERHEAD_BYTES > D1_MAX_ROW_BYTES) {
+    throw new Error(OVERSIZED_ROW_MESSAGE);
+  }
+
   const contentType = normalizeContentType(file.type);
   if (BLOCKED_MIME_TYPES.has(contentType)) {
     throw new Error('该文件类型不允许上传');
@@ -102,7 +117,7 @@ export function registerUploadRoutes(app: Hono<AppEnv>) {
       return c.json({ file: result.file });
     } catch (error) {
       const message = String((error as { message?: unknown })?.message || '');
-      if (message.startsWith('文件大小不能超过') || message === '该文件类型不允许上传') {
+      if (REJECTABLE_UPLOAD_MESSAGES.some((prefix) => message.startsWith(prefix))) {
         return errorResponse(message);
       }
       throw error;

@@ -70,6 +70,36 @@ test('attachment upload reports when the deployment has no storage binding', asy
   });
 });
 
+test('attachment upload rejects bodies that cannot fit a single D1 row', async () => {
+  const app = new Hono();
+  app.use('/api/*', async (c, next) => {
+    c.set('session', { userId: 42 });
+    return next();
+  });
+  registerUploadRoutes(app);
+
+  // MAX_FILE_SIZE 被放大到超过 D1 单行 2MB 上限时，必须在落库前给出业务错误。
+  const formData = new FormData();
+  formData.set(
+    'file',
+    new File([new Uint8Array(2_000_000)], 'huge.bin', { type: 'application/octet-stream' })
+  );
+  const response = await app.request(
+    'https://edgechat.test/api/upload',
+    { method: 'POST', body: formData },
+    {
+      DB: fileDb({ accessible: true }),
+      MAX_FILE_SIZE: '20971520',
+      ALLOWED_FILE_TYPES: ''
+    }
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: '该附件超过 D1 单行上限，请改用更小的文件'
+  });
+});
+
 test('authorized attachment download decrypts bytes and caches privately', async () => {
   const objectKey = '42/example.bin';
   const plaintext = Uint8Array.from([1, 2, 3, 4]);

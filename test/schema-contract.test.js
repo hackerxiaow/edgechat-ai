@@ -146,9 +146,13 @@ test("demo maintenance report uses the generated manifest and matches the produc
   assert.equal(report.checks.find((check) => check.id === "schema").schema.status, "ok");
 });
 
-test("Deploy Worker verifies D1 after apply and before worker deploy", () => {
-  const workflow = readFileSync(new URL("../.github/workflows/deploy-worker.yml", import.meta.url), "utf8");
+test("Deploy Pages verifies D1 after apply and before the Pages upload", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/deploy-pages.yml", import.meta.url), "utf8");
   assert.ok(workflow.indexOf("name: Apply D1 migrations") < workflow.indexOf("name: Verify D1 schema contract"));
-  assert.ok(workflow.indexOf("name: Verify D1 schema contract") < workflow.indexOf("name: Deploy worker"));
+  // 工作流自身也叫 Deploy Pages，这里必须匹配步骤标记，避免命中文件开头的 name。
+  assert.ok(
+    workflow.indexOf("name: Verify D1 schema contract") <
+      workflow.indexOf("      - name: Deploy Pages\n")
+  );
   assert.match(workflow, /prepare-d1-migrations\.mjs --verify/);
 });

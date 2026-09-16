@@ -71,7 +71,7 @@ EdgeChat 面向开发者、Cloudflare 用户及自托管社区，目前 GitHub �
 
 演示站复用正式项目的 Vue 页面、路由、状态管理和实时消息逻辑，但 API、WebSocket、文件上传与 Telegram 回流均在浏览器内存中模拟，不是连接真实后端的多人聊天室。
 
-刷新页面或点击右上角「重置演示数据」即可恢复初始状态。演示操作不会访问正式 Worker，也不会写入 D1、KV 或 R2。
+刷新页面或点击右上角「重置演示数据」即可恢复初始状态。演示操作不会访问正式部署，也不会写入 D1。
 
 ## 为什么是 EdgeChat
 
@@ -112,7 +112,7 @@ EdgeChat 面向这样一种需求：**想拥有一个自己的聊天空间，又
 - 实时消息、历史消息分页、语音消息与文件分享。
 - 消息回复、引用跳转、@ 提及与回复提醒。
 - 私信联系人拉黑与解除拉黑；拉黑期间双方均无法继续发送私信。
-- 支持定时硬删除过期消息。
+- 支持定时硬删除过期消息：Pages 不支持定时触发器，清理任务由请求路径惰性触发。
 
 ### 🎨 日常使用体验
 
@@ -149,7 +149,7 @@ EdgeChat 对**新写入的消息正文和新上传的附件**使用 AES-256-GCM 
 
 <br />
 
-GitHub Actions 会管理服务端加密 Worker Secrets。首次部署时，如果目标 Worker 尚无加密 Secret，工作流会自动生成随机 32 字节 AES 密钥，以独立的版本化 Secret 注入，并记录当前 active key ID。后续普通部署只检查这些 Secret 是否存在，不会重新生成、覆盖或轮换。
+GitHub Actions 会管理服务端加密 Secret。首次部署时，如果目标 Pages 项目尚无加密 Secret，工作流会自动生成随机 32 字节 AES 密钥，以独立的版本化 Secret 注入，并记录当前 active key ID。后续普通部署只检查这些 Secret 是否存在，不会重新生成、覆盖或轮换。
 
 生产环境已经存在的 `EDGECHAT_ENCRYPTION_KEYRING` JSON 密钥环会被原样保留并继续兼容。
 
@@ -161,7 +161,7 @@ GitHub Actions 会管理服务端加密 Worker Secrets。首次部署时，如�
 
 首次部署会直接采用该值。
 
-已有 Worker 需要自动增量轮换时，手动运行 `Deploy Worker` 并勾选 `rotate_encryption_key`。工作流只新增一个版本化密钥 Secret，并把 active key ID 切换到新版本；所有旧 Secret 和旧 JSON 密钥环都保持不变。新消息使用新密钥，旧密文继续使用各自信封中的 key ID 解密。
+需要自动增量轮换时，手动运行 `Deploy Pages` 并勾选 `rotate_encryption_key`。工作流只新增一个版本化密钥 Secret，并把 active key ID 切换到新版本；所有旧 Secret 和旧 JSON 密钥环都保持不变。新消息使用新密钥，旧密文继续使用各自信封中的 key ID 解密。
 
 `apply_encryption_keyring` 是备用的手动覆盖入口。使用时，Repository Secret 中必须是完整 JSON 密钥环，`keys` 需要保留所有仍被历史密文引用的旧 key ID，再增加新 key 并更新 `activeKeyId`。
 
@@ -174,11 +174,10 @@ GitHub Actions 会管理服务端加密 Worker Secrets。首次部署时，如�
 | 部分 | 技术 |
 |---|---|
 | 前端 | Vue 3、Vue Router、Vite |
-| 后端 | Cloudflare Workers / Pages Functions、Hono |
+| 后端 | Cloudflare Pages Functions、Hono |
 | 实时通信 | 同步游标轮询（D1 `message_events`，无长连接） |
-| 数据库 | Cloudflare D1（消息、会话与附件正文） |
-| 可选回退 | KV 会话、R2 文件存储（旧部署保留，非必需） |
-| 构建与部署 | Wrangler、GitHub Actions |
+| 数据库 | Cloudflare D1（消息、会话与附件正文，唯一存储） |
+| 构建与部署 | Wrangler Pages、GitHub Actions |
 
 更多实现说明见 [docs/api](docs/api)。
 
@@ -188,9 +187,25 @@ GitHub Actions 会管理服务端加密 Worker Secrets。首次部署时，如�
 
 推荐使用仓库内置的 GitHub Actions 工作流进行部署和后续更新。
 
-按照文档完成 Cloudflare 授权与仓库配置后，可以手动运行 `Deploy Worker`，也可以通过向 `master` 或 `main` 分支推送代码触发部署。工作流文件为 `.github/workflows/deploy-worker.yml`。
+按照文档完成 Cloudflare 授权与仓库配置后，可以手动运行 `Deploy Pages`，也可以通过向 `master` 或 `main` 分支推送代码触发部署。工作流文件为 `.github/workflows/deploy-pages.yml`，它会先跑测试与 D1 迁移，再上传 `frontend/dist`（含 `_worker.js`）。
 
 **[快速开始](https://echat.azora.top/guide/getting-started.html) · [GitHub Actions 部署教程](https://echat.azora.top/guide/actions-deploy.html)**
+
+### 纯 D1 单存储说明
+
+<details>
+<summary><strong>Pages + D1 的边界与配置</strong></summary>
+
+<br />
+
+生产部署只有一个存储：Cloudflare D1。消息、网页会话（`sessions` 表）与附件正文（`uploaded_files.data`）都在同一个库里，没有 KV 会话回退，也不绑定 R2 或 Durable Objects。
+
+- **附件大小**：正文以 AES-256-GCM 信封加密后写进 D1 的单行。D1 的单行/`BLOB` 上限是 2MB，因此 `wrangler.pages.toml` 中 `MAX_FILE_SIZE` 设为 1MiB；调高到接近 2MB 会让写入失败，超过上限的上传会在落库前返回明确的业务错误。
+- **定时清理**：Pages Functions 只支持 `fetch`，没有 Cron Triggers，所以消息保留期、过期会话与孤儿附件由请求路径惰性触发清理（`GC_MIN_INTERVAL_MINUTES`，默认 60 分钟）。`gc_state` 表用一条原子 UPSERT 认领本轮执行权，重复请求只会跳过。
+- **实时性**：没有 WebSocket 长连接，`/api/ws` 与 `/api/v1/realtime/ws` 返回 501；客户端按 `message_events` 游标轮询。
+- **历史 Worker 部署**：如果之前部署过带 KV/R2 与 Cron 的 Worker，Pages 项目是独立目标，需要自己在 Cloudflare 控制台停用或删除旧 Worker、KV 命名空间与 R2 桶，避免两份代码同时对外服务。
+
+</details>
 
 ### 手动部署与 Docker
 
@@ -294,7 +309,7 @@ Edgechat/
 ├─ capacitor/            # 基于 Web UI 的 Android 客户端
 ├─ android/              # 暂时保留的原生 Android 客户端
 ├─ .github/workflows/    # 自动部署与 CI
-├─ wrangler.toml
+├─ wrangler.pages.toml   # Pages 生产配置（D1 绑定与变量）
 ├─ wrangler.demo.toml
 ├─ package.json
 ├─ README.md

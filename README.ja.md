@@ -71,7 +71,7 @@ EdgeChat は開発者、Cloudflare ユーザー、セルフホストコミュニ
 
 デモサイトは正式プロジェクトの Vue ページ、ルーティング、状態管理、リアルタイムメッセージ処理を再利用しています。ただし API、WebSocket、ファイルアップロード、Telegram からの転送はすべてブラウザー内のメモリ上でシミュレートされており、実際のバックエンドに接続するマルチユーザーチャットではありません。
 
-ページを更新するか、右上の「デモデータをリセット」をクリックすると初期状態に戻ります。デモでの操作が正式 Worker にアクセスしたり、D1、KV、R2 に書き込んだりすることはありません。
+ページを更新するか、右上の「デモデータをリセット」をクリックすると初期状態に戻ります。デモでの操作が正式なデプロイにアクセスしたり、D1 に書き込んだりすることはありません。
 
 ## EdgeChat を選ぶ理由
 
@@ -161,7 +161,7 @@ GitHub Actions はサーバーサイド暗号化の Worker Secrets を管理し�
 
 初回デプロイではこの値がそのまま採用されます。
 
-既存 Worker で自動的に増分ローテーションするには、`Deploy Worker` を手動実行し、`rotate_encryption_key` にチェックを入れます。ワークフローはバージョン付きの鍵 Secret を 1 つだけ追加し、active key ID を新しいバージョンへ切り替えます。すべての旧 Secret と旧 JSON 鍵リングは変更されません。新しいメッセージには新しい鍵を使用し、旧暗号文は各エンベロープの key ID に対応する鍵で復号します。
+自動的な増分ローテーションを行うには、`Deploy Pages` を手動実行し、`rotate_encryption_key` にチェックを入れます。ワークフローはバージョン付きの鍵 Secret を 1 つだけ追加し、active key ID を新しいバージョンへ切り替えます。すべての旧 Secret と旧 JSON 鍵リングは変更されません。新しいメッセージには新しい鍵を使用し、旧暗号文は各エンベロープの key ID に対応する鍵で復号します。
 
 `apply_encryption_keyring` は手動で上書きするための予備の入口です。使用時は Repository Secret に完全な JSON 鍵リングを指定し、`keys` に履歴の暗号文から引き続き参照されるすべての旧 key ID を残したうえで、新しい鍵を追加し `activeKeyId` を更新する必要があります。
 
@@ -177,7 +177,7 @@ GitHub Actions はサーバーサイド暗号化の Worker Secrets を管理し�
 | バックエンド | Cloudflare Workers / Pages Functions、Hono |
 | リアルタイム通信 | D1 `message_events` のカーソルポーリング（常時接続なし） |
 | データベース | Cloudflare D1（メッセージ、セッション、添付本文） |
-| 任意のフォールバック | KV セッション、R2 ファイルストレージ（旧デプロイ向け、必須ではない） |
+| ストレージ | Cloudflare D1（メッセージ・セッション・添付本文。唯一のストア） |
 | ビルドとデプロイ | Wrangler、GitHub Actions |
 
 実装の詳細は [TECHNICAL.md](TECHNICAL.md) を参照してください。
@@ -188,9 +188,25 @@ GitHub Actions はサーバーサイド暗号化の Worker Secrets を管理し�
 
 デプロイとその後の更新には、リポジトリに組み込まれた GitHub Actions ワークフローの利用を推奨します。
 
-ドキュメントに従って Cloudflare の認証とリポジトリ設定を完了すると、`Deploy Worker` を手動実行できます。また、`master` または `main` ブランチにコードをプッシュしてデプロイをトリガーすることもできます。ワークフローファイルは `.github/workflows/deploy-worker.yml` です。
+ドキュメントに従って Cloudflare の認証とリポジトリ設定を完了すると、`Deploy Pages` を手動実行できます。また、`master` または `main` ブランチにコードをプッシュしてデプロイをトリガーすることもできます。ワークフローファイルは `.github/workflows/deploy-pages.yml` で、テストと D1 マイグレーションを実行してから `frontend/dist`（`_worker.js` を含む）をアップロードします。
 
 **[クイックスタート](https://echat.azora.top/guide/getting-started.html) · [GitHub Actions デプロイチュートリアル](https://echat.azora.top/guide/actions-deploy.html)**
+
+### D1 単一ストレージの注意点
+
+<details>
+<summary><strong>Pages + D1 構成の境界と設定</strong></summary>
+
+<br />
+
+本番デプロイのストアは Cloudflare D1 だけです。メッセージ、Web セッション（`sessions` テーブル）、添付本文（`uploaded_files.data`）が同じデータベースに入ります。KV セッションのフォールバックはなく、R2 も Durable Objects もバインドしていません。
+
+- **添付サイズ**：本文は AES-256-GCM のエンベロープとして D1 の 1 行に書き込みます。D1 の行/`BLOB` 上限は 2MB のため、`wrangler.pages.toml` の `MAX_FILE_SIZE` は 1MiB です。2MB 近くまで上げると書き込みが失敗し、上限を超えるアップロードは挿入前に明示的な業務エラーを返します。
+- **定期クリーンアップ**：Pages Functions は `fetch` のみで Cron Triggers がないため、メッセージ保持期間・期限切れセッション・孤立添付はリクエスト経路から遅延実行でクリーンアップします（`GC_MIN_INTERVAL_MINUTES`、既定 60 分）。`gc_state` テーブルが 1 本の原子的な UPSERT で実行権を取得し、重複リクエストはスキップします。
+- **リアルタイム性**：WebSocket の常時接続はなく、`/api/ws` と `/api/v1/realtime/ws` は 501 を返します。クライアントは `message_events` のカーソルをポーリングします。
+- **旧 Worker デプロイ**：KV/R2 と Cron 付きの Worker を以前デプロイしていた場合、Pages プロジェクトは別のターゲットです。旧 Worker、KV ネームスペース、R2 バケットは自身で停止・削除してください。
+
+</details>
 
 ### 手動デプロイと Docker
 
@@ -294,7 +310,7 @@ Edgechat/
 ├─ capacitor/            # Web UI ベースの Android クライアント
 ├─ android/              # 一時的に保持されるネイティブ Android クライアント
 ├─ .github/workflows/    # 自動デプロイと CI
-├─ wrangler.toml
+├─ wrangler.pages.toml   # Pages 本番設定（D1 バインディングと変数）
 ├─ wrangler.demo.toml
 ├─ package.json
 ├─ README.md

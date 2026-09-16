@@ -7,12 +7,12 @@ const workflow = readFileSync(
   'utf8'
 );
 const productionWorkflow = readFileSync(
-  new URL('../.github/workflows/deploy-worker.yml', import.meta.url),
+  new URL('../.github/workflows/deploy-pages.yml', import.meta.url),
   'utf8'
 );
 const wrangler = readFileSync(new URL('../wrangler.demo.toml', import.meta.url), 'utf8');
 const productionWrangler = readFileSync(
-  new URL('../wrangler.example.toml', import.meta.url),
+  new URL('../wrangler.pages.toml', import.meta.url),
   'utf8'
 );
 const productionVite = readFileSync(
@@ -34,7 +34,7 @@ test('demo workflow is manual-only and uses dedicated Cloudflare secrets', () =>
   assert.match(workflow, /secrets\.DEMO_CLOUDFLARE_ACCOUNT_ID/);
   assert.match(workflow, /secrets\.DEMO_CLOUDFLARE_API_TOKEN/);
   assert.doesNotMatch(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/);
-  assert.doesNotMatch(workflow, /ensure-cloudflare-resources|prepare-d1-migrations|prepare-worker-encryption-secret/);
+  assert.doesNotMatch(workflow, /ensure-cloudflare-resources|prepare-d1-migrations|prepare-encryption-secret/);
 });
 
 test('demo Wrangler config serves only its isolated static build', () => {
@@ -48,20 +48,20 @@ test('demo Wrangler config serves only its isolated static build', () => {
 });
 
 test('production Action cannot build or deploy demo assets', () => {
-  assert.match(productionWorkflow, /run: npm run build\s/);
+  assert.match(productionWorkflow, /run: npm run build:pages\s/);
   assert.doesNotMatch(
     productionWorkflow,
     /build:demo|wrangler\.demo\.toml|edgechat-demo|DEMO_CLOUDFLARE/
   );
   assert.equal(packageJson.scripts.build, 'npm run build:frontend');
-  assert.equal(packageJson.scripts.deploy, 'npm run build && wrangler deploy');
+  assert.equal(packageJson.scripts.deploy, 'npm run deploy:pages');
   assert.match(productionVite, /outDir: resolve\(dirname, 'dist'\)/);
   assert.match(productionVite, /'globalThis\.__EDGECHAT_DEMO__': 'false'/);
   assert.match(demoVite, /'globalThis\.__EDGECHAT_DEMO__': 'true'/);
   assert.match(appSource, /globalThis\.__EDGECHAT_DEMO__/);
   assert.doesNotMatch(appSource, /import \{ isDemoMode \} from '\.\/runtime\.js'/);
   assert.doesNotMatch(productionVite, /demo-dist|src\/demo|vite\.demo/);
-  assert.match(productionWrangler, /name = "cfchat"/);
-  assert.match(productionWrangler, /directory = "\.\/frontend\/dist"/);
+  assert.match(productionWrangler, /name = "edgechat"/);
+  assert.match(productionWrangler, /pages_build_output_dir = "frontend\/dist"/);
   assert.doesNotMatch(productionWrangler, /demo-dist|edgechat-demo/);
 });

@@ -1,3 +1,5 @@
+# Cloudflare Pages 生产配置：静态资产在 frontend/dist，接口与附件由 _worker.js 处理。
+# 迁移、后台任务与密钥都由 .github/workflows/deploy-pages.yml 走同一条 D1 路径。
 name = "edgechat"
 pages_build_output_dir = "frontend/dist"
 compatibility_date = "2026-04-05"
@@ -6,12 +8,26 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ADMIN_USERNAMES = "admin"
 MESSAGE_RETENTION_DAYS = "7"
-MAX_FILE_SIZE = "1048576"
-SITE_ORIGINS = "https://chat.cnz.kdns.fr"
-# Pages 没有 Cron Triggers，定时 GC 靠请求路径惰性触发，这里是两次执行之间的最小间隔。
+SOFT_DELETE_RETENTION_DAYS = "60"
+ORPHAN_UPLOAD_RETENTION_DAYS = "1"
+# 单次调用的 D1 内部操作与语句预算；失败写回也计入同一预算。
+GC_BATCH_SIZE = "90"
+GC_MAX_BATCHES_PER_RUN = "20"
+GC_INTERNAL_OPERATION_BUDGET = "900"
+GC_D1_STATEMENT_BUDGET = "1200"
+# 附件删除预算（历史上对应 R2 对象操作），限制一次 GC 尝试删除的附件条数。
+GC_R2_OPERATION_BUDGET = "300"
+R2_DELETE_MAX_RETRY = "8"
+# Pages 没有 Cron Triggers，定时 GC 由请求路径惰性触发，这里是两次执行之间的最小间隔。
 GC_MIN_INTERVAL_MINUTES = "60"
+# 逗号分隔的本站 origin，用于识别升级前保存的完整 /files/ 图标 URL；自定义域名应全部列出。
+SITE_ORIGINS = "https://chat.cnz.kdns.fr"
+ALLOWED_FILE_TYPES = "image/,video/,audio/,application/pdf,text/"
+# 附件正文存在 D1 的 uploaded_files.data 里，必须留在 D1 单行 2MB 上限之内。
+MAX_FILE_SIZE = "1048576"
 
 [[d1_databases]]
 binding = "DB"
+# Legacy D1 resource name kept intentionally; do not rename without a data migration plan.
 database_name = "cfchat-db"
 database_id = "0d012571-bc6f-4cf2-90fe-e480a14369b3"

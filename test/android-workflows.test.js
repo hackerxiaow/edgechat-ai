@@ -5,7 +5,7 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8").replaceAll("\r\n", "\n");
 const ci = read("../.github/workflows/android-ci.yml");
 const release = read("../.github/workflows/android-release.yml");
-const worker = read("../.github/workflows/deploy-worker.yml");
+const worker = read("../.github/workflows/deploy-pages.yml");
 const demo = read("../.github/workflows/deploy-demo.yml");
 
 test("Android CI validates the wrapper and builds a tested debug APK", () => {
@@ -40,7 +40,7 @@ test("Android release signs and publishes the primary Capacitor client", () => {
 	assert.match(release, /gh release create/);
 });
 
-test("Worker ignores Android-only paths and JavaScript workflows use Node 24", () => {
+test("Pages 部署忽略仅 Android 使用的路径，JavaScript 工作流统一使用 Node 24", () => {
 	assert.match(worker, /paths:/);
 	assert.doesNotMatch(worker, /android\/\*\*/);
 	for (const workflow of [worker, demo, ci, release]) {
