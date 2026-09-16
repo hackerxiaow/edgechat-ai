@@ -31,7 +31,7 @@
     "deploy": "npm run build && wrangler deploy",
     "deploy:demo": "npm run build:demo && wrangler deploy --config wrangler.demo.toml",
     "d1:apply": "wrangler d1 execute cfchat-db --file ./worker/schema.sql",
-    "build:pages": "npm run build:frontend && ./node_modules/wrangler/node_modules/.bin/esbuild worker/src/index.js --bundle --format=esm --platform=neutral --target=es2022 --outfile=frontend/dist/_worker.js \"--external:node:*\" \"--external:cloudflare:*\" \"--external:__STATIC_CONTENT_MANIFEST\"",
+    "build:pages": "npm run build:frontend && ./node_modules/wrangler/node_modules/.bin/esbuild worker/src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=frontend/dist/_worker.js \"--external:node:*\" \"--external:cloudflare:*\" \"--external:__STATIC_CONTENT_MANIFEST\"",
     "deploy:pages": "npm run build:pages && wrangler pages deploy frontend/dist --project-name edgechat --config wrangler.pages.toml"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 # Legacy Worker service name kept to avoid creating a new production Worker during rename cleanup.
 name = "cfchat"
-main = "worker/src/index.js"
+main = "worker/src/index.ts"
 compatibility_date = "2026-04-05"
 compatibility_flags = ["nodejs_compat"]
 
