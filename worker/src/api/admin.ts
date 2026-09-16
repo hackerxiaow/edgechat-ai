@@ -98,7 +98,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
         softDeleteRetentionDays: payload.softDeleteRetentionDays,
         orphanUploadRetentionDays: payload.orphanUploadRetentionDays,
         gcIntervalMinutes: payload.gcIntervalMinutes,
-        siteOrigins: payload.siteOrigins
+        siteOrigins: payload.siteOrigins,
+        allowOpenRegistration: payload.allowOpenRegistration,
+        smtpRelayUrl: payload.smtpRelayUrl,
+        smtpApiKey: payload.smtpApiKey
       });
       return c.json({ site });
     } catch (error) {

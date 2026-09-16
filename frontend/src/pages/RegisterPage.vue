@@ -126,8 +126,8 @@ onMounted(() => {
     <div class="login-card">
       <div class="login-card-header" style="display: flex; gap: 8px;">
         <button type="button" class="theme-toggle-btn" @click="toggleTheme" :title="isDark ? t('theme.light') : t('theme.dark')">
-          <Moon v-if="isDark" :size="21" />
-          <Sun v-else :size="21" />
+          <Sun v-if="isDark" :size="21" />
+          <Moon v-else :size="21" />
         </button>
         <LanguageSwitch />
       </div>

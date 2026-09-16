@@ -1633,7 +1633,8 @@ onBeforeUnmount(() => {
 @media (max-width: 960px) {
   .chat-layout {
     min-height: 0;
-    background: var(--chat-paper);
+    /* 保持透明，让全局的 Telegram 暗纹背景透出来。 */
+    background: transparent;
   }
 
   .right-sidebar {

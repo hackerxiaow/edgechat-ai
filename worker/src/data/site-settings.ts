@@ -38,6 +38,9 @@ export interface UpdateSiteSettingsInput {
 	orphanUploadRetentionDays?: unknown;
 	gcIntervalMinutes?: unknown;
 	siteOrigins?: unknown;
+	allowOpenRegistration?: unknown;
+	smtpRelayUrl?: unknown;
+	smtpApiKey?: unknown;
 }
 
 interface SiteSettingRow {
@@ -78,6 +81,9 @@ export const RUNTIME_SETTING_KEYS = {
 	orphanUploadRetentionDays: "orphan_upload_retention_days",
 	gcIntervalMinutes: "gc_interval_minutes",
 	siteOrigins: "site_origins",
+	allowOpenRegistration: "allow_open_registration",
+	smtpRelayUrl: "smtp_relay_url",
+	smtpApiKey: "smtp_api_key",
 } as const;
 
 function toPositiveInteger(value: unknown, fallback: number, { min = 1, max = 3650 } = {}): number {
@@ -259,6 +265,21 @@ export async function updateSiteSettings(
 	if (input.siteOrigins !== undefined) {
 		statements.push(
 			upsert(db, RUNTIME_SETTING_KEYS.siteOrigins, parseOrigins(input.siteOrigins, []).join(",")),
+		);
+	}
+	if (input.allowOpenRegistration !== undefined) {
+		statements.push(
+			upsert(db, RUNTIME_SETTING_KEYS.allowOpenRegistration, input.allowOpenRegistration ? "1" : "0"),
+		);
+	}
+	if (input.smtpRelayUrl !== undefined) {
+		statements.push(
+			upsert(db, RUNTIME_SETTING_KEYS.smtpRelayUrl, String(input.smtpRelayUrl || "").trim()),
+		);
+	}
+	if (input.smtpApiKey !== undefined) {
+		statements.push(
+			upsert(db, RUNTIME_SETTING_KEYS.smtpApiKey, String(input.smtpApiKey || "").trim()),
 		);
 	}
 

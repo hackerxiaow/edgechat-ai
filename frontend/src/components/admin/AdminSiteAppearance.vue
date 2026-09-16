@@ -204,6 +204,33 @@ onMounted(loadSiteSettings);
         <small>{{ t('site.runtime.siteOriginsHint') }}</small>
       </label>
 
+      <label class="field field--checkbox">
+        <input v-model="siteForm.allowOpenRegistration" type="checkbox" />
+        <span>{{ t('site.runtime.allowOpenRegistration') }}</span>
+        <small>{{ t('site.runtime.allowOpenRegistrationHint') }}</small>
+      </label>
+
+      <label class="field">
+        <span>{{ t('site.runtime.smtpRelayUrl') }}</span>
+        <input
+          v-model.trim="siteForm.smtpRelayUrl"
+          type="url"
+          placeholder="https://your-mail-relay.example.com/send"
+        />
+        <small>{{ t('site.runtime.smtpRelayUrlHint') }}</small>
+      </label>
+
+      <label class="field">
+        <span>{{ t('site.runtime.smtpApiKey') }}</span>
+        <input
+          v-model.trim="siteForm.smtpApiKey"
+          type="password"
+          autocomplete="new-password"
+          :placeholder="t('site.runtime.smtpApiKeyPlaceholder')"
+        />
+        <small>{{ t('site.runtime.smtpApiKeyHint') }}</small>
+      </label>
+
       <p class="admin-site-runtime__note">{{ t('site.runtime.fixedNote') }}</p>
     </div>
 

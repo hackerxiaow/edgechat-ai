@@ -2,7 +2,7 @@
  * 聊天工作区现在已与前台登录页完全打通玻璃拟态设计语言
  */
 :root {
-  --chat-paper: var(--surface-2);
+  --chat-paper: rgba(255, 255, 255, 0.66);
   --chat-canvas: transparent;
   --chat-rail: var(--surface-1);
   --chat-hover: var(--surface-0);
@@ -40,7 +40,7 @@
 html[data-theme="dark"],
 html.dark,
 [data-theme="dark"] {
-  --chat-paper: var(--surface-2) !important;
+  --chat-paper: rgba(20, 32, 46, 0.7) !important;
   --chat-canvas: transparent !important;
   --chat-rail: var(--surface-1) !important;
   --chat-hover: var(--surface-0) !important;
@@ -86,8 +86,8 @@ html.dark body {
 .room-dialog,
 .add-conversation-dialog {
   background: var(--surface-2) !important;
-  backdrop-filter: var(--blur-lg) !important;
   -webkit-backdrop-filter: var(--blur-lg) !important;
+  backdrop-filter: var(--blur-lg) !important;
   border: 1px solid var(--line-soft) !important;
   color: var(--text) !important;
 }
@@ -132,9 +132,9 @@ html.dark .chat-layout {
 .sidebar-header,
 .chat-header,
 .composer-form {
-  background-color: var(--surface-2) !important;
-  backdrop-filter: var(--blur-md) !important;
+  background-color: var(--chat-paper) !important;
   -webkit-backdrop-filter: var(--blur-md) !important;
+  backdrop-filter: var(--blur-md) !important;
   border-color: var(--line-soft) !important;
   color: var(--text) !important;
 }
@@ -149,9 +149,9 @@ html[data-theme="dark"] .chat-header,
 html.dark .chat-header,
 html[data-theme="dark"] .composer-form,
 html.dark .composer-form {
-  background-color: var(--surface-2) !important;
-  backdrop-filter: var(--blur-md) !important;
+  background-color: var(--chat-paper) !important;
   -webkit-backdrop-filter: var(--blur-md) !important;
+  backdrop-filter: var(--blur-md) !important;
   border-color: var(--line-soft) !important;
   color: var(--text) !important;
 }
@@ -160,8 +160,8 @@ html.dark .composer-form {
 .chat-bubble {
   background-color: var(--surface-2) !important;
   color: var(--text) !important;
-  backdrop-filter: var(--blur-md) !important;
   -webkit-backdrop-filter: var(--blur-md) !important;
+  backdrop-filter: var(--blur-md) !important;
   border: 1px solid var(--line-soft) !important;
   box-shadow: var(--shadow-sm) !important;
 }
@@ -198,4 +198,26 @@ html.dark .composer-textarea {
   background-color: var(--surface-0) !important;
   color: var(--text) !important;
   border-color: var(--line-soft) !important;
+}
+
+
+/* 聊天页实际使用的气泡类名是 .message-bubble（.chat-bubble 仅历史遗留） */
+.message-bubble {
+  background: var(--chat-paper) !important;
+  color: var(--chat-ink) !important;
+  -webkit-backdrop-filter: var(--blur-md) !important;
+  backdrop-filter: var(--blur-md) !important;
+  border: 1px solid var(--line-soft) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.message-row--own .message-bubble {
+  background: var(--cool) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.message-row--own .message-bubble .message-time,
+.message-row--own .message-bubble .message-sender-name {
+  color: rgba(255, 255, 255, 0.85) !important;
 }

@@ -1,20 +1,20 @@
 :root {
-  --admin-workspace: #f0f3f8;
-  --admin-panel: #ffffff;
-  --admin-subtle: #f9fafc;
-  --admin-active: #f3f4f6;
-  --admin-border: #e8ebf0;
-  --admin-border-strong: #d8dde4;
-  --admin-text: #20232c;
-  --admin-muted: #6f7480;
-  --admin-faint: #9aa1ad;
+  --admin-workspace: transparent;
+  --admin-panel: rgba(255, 255, 255, 0.72);
+  --admin-subtle: rgba(255, 255, 255, 0.5);
+  --admin-active: rgba(255, 255, 255, 0.6);
+  --admin-border: var(--line-soft, rgba(9, 30, 66, 0.08));
+  --admin-border-strong: rgba(9, 30, 66, 0.16);
+  --admin-text: var(--text, #20232c);
+  --admin-muted: var(--text-soft, #6f7480);
+  --admin-faint: var(--text-faint, #9aa1ad);
   --admin-ink: #0d1731;
   --admin-ink-hover: #18233f;
-  --admin-brand: #176bc0;
+  --admin-brand: var(--cool, #176bc0);
   --admin-green-bg: #f1fdfb;
   --admin-green: #168c87;
   --admin-green-hover: #0e726e;
-  --admin-focus: #168c87;
+  --admin-focus: var(--cool, #168c87);
   --admin-danger: #b42318;
   --admin-danger-bg: #fff2f0;
   --admin-warning: #946200;
@@ -25,7 +25,7 @@
   --admin-shadow-raised: 0 8px 24px rgba(13, 23, 49, 0.055);
   --admin-font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
   --admin-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  --admin-sidebar-width: 296px;
+  --admin-sidebar-width: 236px;
   --admin-topbar-height: 64px;
   --admin-radius-panel: 8px;
   --admin-radius-control: 6px;
@@ -48,4 +48,34 @@ body {
 .admin-page {
   font-family: var(--admin-font);
   color: var(--admin-text);
+}
+
+
+/* 暗色模式：与前台登录页共用同一套全局令牌，保证一体化观感。 */
+html[data-theme='dark'],
+html.dark {
+  --admin-workspace: transparent;
+  --admin-panel: rgba(20, 32, 46, 0.72);
+  --admin-subtle: rgba(20, 32, 46, 0.5);
+  --admin-active: rgba(255, 255, 255, 0.08);
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-border-strong: rgba(255, 255, 255, 0.18);
+  --admin-text: #e8f0f9;
+  --admin-muted: #93a8bd;
+  --admin-faint: #74889c;
+  --admin-ink: #e8f0f9;
+  --admin-ink-hover: #ffffff;
+  --admin-brand: #4a8ed0;
+  --admin-green-bg: rgba(99, 189, 146, 0.12);
+  --admin-green: #63bd92;
+  --admin-green-hover: #7fd0a8;
+  --admin-focus: #4a8ed0;
+  --admin-danger: #ef8880;
+  --admin-danger-bg: rgba(239, 136, 128, 0.12);
+  --admin-warning: #e0b34d;
+  --admin-warning-bg: rgba(224, 179, 77, 0.12);
+  --admin-success: #63bd92;
+  --admin-success-bg: rgba(99, 189, 146, 0.12);
+  --admin-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --admin-shadow-raised: 0 12px 36px rgba(0, 0, 0, 0.5);
 }

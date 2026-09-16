@@ -10,3 +10,61 @@
 @import './admin/tables.css';
 @import './admin/storage.css';
 @import './admin/user-ban-dialog.css';
+
+/* ================================================
+   玻璃拟态统一层：与前台登录页共用一套视觉语言
+   （覆盖 admin/tokens.css 与 ui.css 里的写死色值）
+   ================================================ */
+
+/* 后台根容器透明，露出 base.css 的 Telegram 暗纹背景 */
+.admin-page {
+  background: transparent;
+}
+
+/* 结构性面板统一毛玻璃 */
+.admin-sidebar,
+.admin-topbar,
+.admin-section,
+.admin-panel,
+.ui-surface {
+  background: var(--admin-panel);
+  -webkit-backdrop-filter: var(--blur-md, blur(12px)) saturate(120%);
+  backdrop-filter: var(--blur-md, blur(12px)) saturate(120%);
+  border-color: var(--admin-border);
+}
+
+.ui-surface--soft,
+.ui-surface--solid,
+.ui-surface--strong {
+  background: var(--admin-panel);
+  border-color: var(--admin-border);
+}
+
+.ui-surface--strong {
+  box-shadow: var(--admin-shadow-raised);
+}
+
+/* 表格、抽屉等次级容器保持轻量玻璃，避免层层叠加导致发灰 */
+.admin-table-wrap,
+.admin-table,
+.admin-drawer,
+.admin-modal {
+  background: var(--admin-subtle);
+  border-color: var(--admin-border);
+}
+
+html[data-theme='dark'] .admin-table th,
+html.dark .admin-table th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme='dark'] input,
+html[data-theme='dark'] select,
+html[data-theme='dark'] textarea,
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background: rgba(9, 18, 28, 0.55);
+  border-color: var(--admin-border);
+  color: var(--admin-text);
+}

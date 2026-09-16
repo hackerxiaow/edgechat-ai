@@ -464,3 +464,27 @@ select.ui-input:focus {
 .ui-dot--neutral {
   background: rgba(31, 37, 33, 0.36);
 }
+
+/* 复选项字段：让 checkbox 与说明文字排成一行可读的布局 */
+.field--checkbox {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.field--checkbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--cool, #176bc0);
+  cursor: pointer;
+}
+
+.field--checkbox span {
+  font-weight: 600;
+}
+
+.field--checkbox small {
+  grid-column: 2;
+  color: var(--text-soft, #6f7480);
+  line-height: 1.5;
+}
