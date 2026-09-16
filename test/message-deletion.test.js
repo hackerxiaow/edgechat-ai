@@ -40,6 +40,10 @@ test("消息软删除限定消息与房间，并保留记录供后续清理", as
 test("消息删除统一完成权限校验、持久化与实时删除 packet", async () => {
 	const calls = [];
 	const remove = createMessageDeletion({
+		async getDeletionTarget(db, messageId) {
+			calls.push({ type: "target", db, messageId });
+			return { channel_id: 4, sender_id: 9, source: "local" };
+		},
 		async authorize(db, principal, kind, roomId) {
 			calls.push({ type: "authorize", db, principal, kind, roomId });
 			return { ok: true };
@@ -57,6 +61,7 @@ test("消息删除统一完成权限校验、持久化与实时删除 packet", a
 	);
 
 	assert.deepEqual(calls, [
+		{ type: "target", db, messageId: 9 },
 		{
 			type: "authorize",
 			db,
@@ -80,7 +85,7 @@ test("消息删除后会回收不再引用的附件", async () => {
 			return { ok: true };
 		},
 		async getDeletionTarget() {
-			return { attachment_key: "7/voice.webm" };
+			return { channel_id: 4, attachment_key: "7/voice.webm" };
 		},
 		async persistDeletion() {
 			return true;
@@ -103,6 +108,9 @@ test("消息删除后会回收不再引用的附件", async () => {
 
 test("消息删除向客户端收敛无权限、无效参数与重复删除错误", async () => {
 	const denied = createMessageDeletion({
+		async getDeletionTarget() {
+			return { channel_id: 4, sender_id: 9 };
+		},
 		async authorize() {
 			return { ok: false };
 		},
@@ -117,6 +125,9 @@ test("消息删除向客户端收敛无权限、无效参数与重复删除错�
 	);
 
 	const missing = createMessageDeletion({
+		async getDeletionTarget() {
+			return { channel_id: 4, sender_id: 9 };
+		},
 		async authorize() {
 			return { ok: true };
 		},

@@ -19,9 +19,17 @@ import {
 } from '../worker/src/mobile-session.js';
 import { issueRealtimeTicket, consumeRealtimeTicket } from '../worker/src/realtime-tickets.js';
 import { validateSession } from '../worker/src/session.js';
-import { createD1Adapter, createKvAdapter } from './support/d1.js';
+import { createD1Adapter } from './support/d1.js';
 
 const SQL = await initSqlJs();
+
+// 会话已从 KV 迁到 D1 的 sessions 表；测试统一从这里读取会话快照。
+async function readSession(env, token) {
+  const row = await env.DB.prepare('SELECT data FROM sessions WHERE token = ? LIMIT 1')
+    .bind(token)
+    .first();
+  return row ? JSON.parse(row.data) : null;
+}
 
 function encodedKey(seed = 1) {
   return Buffer.from(Uint8Array.from({ length: 32 }, (_, index) => seed + index)).toString(
@@ -37,7 +45,6 @@ function createEnvironment() {
     database,
     env: {
       DB: createD1Adapter(database),
-      SESSIONS: createKvAdapter(),
       EDGECHAT_ENCRYPTION_KEYRING: JSON.stringify({
         activeKeyId: 'test-v1',
         keys: { 'test-v1': encodedKey() }
@@ -106,7 +113,7 @@ test('设备会话轮换 refresh token，注销后立即拒绝现有 access toke
   );
   assert.equal((await validateSession(env, second.accessToken)).ok, true);
 
-  const stored = JSON.parse(await env.SESSIONS.get(second.accessToken));
+  const stored = await readSession(env, second.accessToken);
   await revokeMobileDeviceSession(env, stored);
   assert.equal((await validateSession(env, second.accessToken)).ok, false);
 });
@@ -119,7 +126,7 @@ test('实时票据绑定移动会话并且只能消费一次', async () => {
     name: 'Ticket device',
     appVersion: '1.0.0'
   });
-  const session = JSON.parse(await env.SESSIONS.get(login.accessToken));
+  const session = await readSession(env, login.accessToken);
   const issued = await issueRealtimeTicket(env, session, {
     scope: 'room',
     roomKind: 'public',

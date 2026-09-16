@@ -122,8 +122,20 @@ export async function externalSenderExists(db, source, senderId) {
 	return Boolean(results[0]);
 }
 
+// 加密层对认证失败保持抛错；这里逐条降级，避免单条坏消息让整个房间返回 500。
+const UNDECRYPTABLE_PLACEHOLDER = '（该消息无法解密）';
+
+async function decryptMessageContentSafely(env, value, context) {
+	try {
+		return await decryptMessageContent(env, value, context);
+	} catch (error) {
+		console.error('Failed to decrypt message content', { error, channelId: context.channelId });
+		return UNDECRYPTABLE_PLACEHOLDER;
+	}
+}
+
 async function mapDecryptedMessage(env, row) {
-	const content = await decryptMessageContent(env, row.content, {
+	const content = await decryptMessageContentSafely(env, row.content, {
 		channelId: row.channel_id,
 		senderId: row.sender_id ?? 0,
 		senderContext:
@@ -135,7 +147,7 @@ async function mapDecryptedMessage(env, row) {
 		if (!row.reply_message_id || row.reply_deleted_at) {
 			replyTo = { id: replyId, deleted: true };
 		} else {
-			const replyContent = await decryptMessageContent(env, row.reply_content, {
+			const replyContent = await decryptMessageContentSafely(env, row.reply_content, {
 				channelId: row.channel_id,
 				senderId: row.reply_sender_id ?? 0,
 				senderContext:

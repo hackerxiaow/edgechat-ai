@@ -122,6 +122,7 @@ test("房间置顶状态从历史与实时事件同步，并发送管理动作",
 test("网页发送回复字段，并在原消息删除后保留已删除引用状态", async () => {
 	const activeRoom = ref({ id: 2, kind: "private" });
 	const sockets = [];
+	const sentCalls = [];
 	const room = useChatRoom({
 		activeRoom,
 		session: ref({ userId: 7 }),
@@ -141,6 +142,20 @@ test("网页发送回复字段，并在原消息删除后保留已删除引用�
 				};
 			},
 			async markRoomRead() {},
+			// 发送已从 WebSocket 帧改为 REST 调用，这里记录调用参数并回传服务端消息。
+			async sendRoomMessage(kind, id, payload) {
+				sentCalls.push({ kind, id, payload });
+				return {
+					message: {
+						id: 11,
+						content: payload.content,
+						clientMessageId: payload.clientMessageId,
+						sender: { id: 7, kind: "local" },
+						replyToMessageId: 10,
+						replyTo: { id: 10, deleted: false, content: "原消息" },
+					},
+				};
+			},
 		},
 		openRoomConnection(params) {
 			const handlers = { onStatus: params.onStatus, onMessage: params.onMessage };
@@ -154,13 +169,21 @@ test("网页发送回复字段，并在原消息删除后保留已删除引用�
 	await room.activateRoom();
 	room.composerText.value = "回复正文";
 	assert.equal(await room.sendMessage([], 10), true);
-	assert.deepEqual(sockets[0].sentFrames.at(-1), {
-		type: "send",
-		content: "回复正文",
-		attachment: null,
-		mentionUserIds: [],
-		replyMessageId: 10,
-	});
+
+	const sent = sentCalls.at(-1);
+	assert.equal(sent.kind, "private");
+	assert.equal(sent.id, 2);
+	assert.match(sent.payload.clientMessageId, /^[0-9a-f-]{36}$/);
+	assert.deepEqual(
+		{ ...sent.payload, clientMessageId: undefined },
+		{
+			clientMessageId: undefined,
+			content: "回复正文",
+			attachment: null,
+			mentionUserIds: [],
+			replyMessageId: 10,
+		},
+	);
 
 	sockets[0].emitMessage({ type: "message_deleted", messageId: 10 });
 	assert.deepEqual(room.messages.value[0].replyTo, { id: 10, deleted: true });

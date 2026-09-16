@@ -16,6 +16,15 @@ export function createD1Adapter(database) {
         statement.free();
         return { results };
       },
+      // 与真实 D1 对齐：无结果返回 null；传入列名时直接返回该列的值。
+      async first(column) {
+        const statement = database.prepare(sql);
+        statement.bind(bindings);
+        const row = statement.step() ? statement.getAsObject() : null;
+        statement.free();
+        if (!row) return null;
+        return column === undefined ? row : row[column];
+      },
       async run() {
         const statement = database.prepare(sql);
         statement.run(bindings);

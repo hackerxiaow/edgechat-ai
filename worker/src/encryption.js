@@ -104,17 +104,11 @@ function addKey(keys, keyId, encodedKey) {
   });
 }
 
-const DEFAULT_STATIC_KEYRING = JSON.stringify({
-  activeKeyId: 'v1',
-  keys: {
-    v1: 'eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg='
-  }
-});
-
 export function loadEncryptionKeyring(source) {
   const keyringSource = getKeyringSource(source);
   if (!keyringSource.legacyRaw && keyringSource.generatedKeys.length === 0) {
-    keyringSource.legacyRaw = DEFAULT_STATIC_KEYRING;
+    // 绝不回退到内置密钥：那会让未配置密钥的部署用公开密钥加密，比明文更危险。
+    throw new Error('EDGECHAT_ENCRYPTION_KEYRING is required');
   }
   if (keyringSource.cacheKey === cachedRawKeyring && cachedKeyring) {
     return cachedKeyring;
@@ -260,8 +254,12 @@ export async function decryptMessageContent(
     );
     return decoder.decode(plaintext);
   } catch (error) {
-    // 解密失败时优雅回退，防止单个历史消息解密失败导致整房间所有历史记录全部崩溃返回 500
-    return content.startsWith('edgechat:enc:') ? '（历史加密消息）' : content;
+    // 认证失败必须上抛：静默降级会把密钥配错与密文篡改都掩盖成「读不出来」。
+    // 单条消息的可读性由调用方（消息投影层）逐条降级，不由加密层吞掉。
+    if (error instanceof Error && error.message.startsWith('Encryption key is unavailable:')) {
+      throw error;
+    }
+    throw new Error('Encrypted message authentication failed');
   }
 }
 

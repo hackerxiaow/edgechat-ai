@@ -232,8 +232,19 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
   content_type TEXT NOT NULL DEFAULT '',
   size INTEGER NOT NULL DEFAULT 0,
   client_upload_id TEXT,
+  -- 没有 R2 绑定的部署把附件正文直接落进 D1；有 R2 时保持 NULL。
+  data BLOB,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_user_id) REFERENCES users(id)
+);
+
+-- 网页会话在无 KV 的部署里存进 D1；token 为不透明随机串，data 为会话快照 JSON。
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS device_sessions (

@@ -86,14 +86,33 @@ test("real auth and admin middleware return 401, 403, and allow admins", async (
   const app = new Hono();
   app.use("/api/admin/*", authMiddleware, adminMiddleware);
   registerMaintenanceRoutes(app);
-  const db = { prepare: () => ({ bind: () => ({ all: async () => ({ results: [{ username: "u", is_disabled: 0, deleted_at: null, session_version: 0, is_admin: 0 }] }) }) }) };
-  const env = { DB: db, SESSIONS: { get: async () => null } };
-  assert.equal((await app.request("/api/admin/maintenance", {}, env)).status, 401);
+  // 会话已从 KV 迁到 D1 的 sessions 表，夹具按 D1 建模。
+  const dbFor = (isAdmin, session) => ({
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            async all() {
+              return { results: [{ username: "u", is_disabled: 0, deleted_at: null, session_version: 0, is_admin: isAdmin }] };
+            },
+            async first() {
+              return sql.includes("FROM sessions") && session
+                ? { data: JSON.stringify(session), expires_at: Math.floor(Date.now() / 1000) + 3600 }
+                : null;
+            },
+            async run() {
+              return { meta: { changes: 1 } };
+            }
+          };
+        }
+      };
+    }
+  });
   const session = { userId: 1, isAdmin: false, sessionVersion: 0 };
-  const authorizedEnv = { ...env, SESSIONS: { get: async () => JSON.stringify(session), put: async () => {} , delete: async () => {} } };
+  assert.equal((await app.request("/api/admin/maintenance", {}, { DB: dbFor(0, null) })).status, 401);
+  const authorizedEnv = { DB: dbFor(0, session) };
   assert.equal((await app.request("/api/admin/maintenance", { headers: { Authorization: "Bearer token" } }, authorizedEnv)).status, 403);
-  const adminDb = { prepare: () => ({ bind: () => ({ all: async () => ({ results: [{ username: "u", is_disabled: 0, deleted_at: null, session_version: 0, is_admin: 1 }] }) }) }) };
-  const adminEnv = { DB: adminDb, SESSIONS: { get: async () => JSON.stringify({ ...session, isAdmin: true }), put: async () => {} , delete: async () => {} } };
+  const adminEnv = { DB: dbFor(1, { ...session, isAdmin: true }) };
   const response = await app.request("/api/admin/maintenance", { headers: { Authorization: "Bearer token" } }, adminEnv);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "private, no-store");

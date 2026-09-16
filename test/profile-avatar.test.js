@@ -14,15 +14,8 @@ test("个人资料接口清除头像时同步数据库与会话", async () => {
 		sessionVersion: 0,
 	};
 	let update;
+	// 会话已迁到 D1 的 sessions 表：读走 first()，写走 INSERT INTO sessions 的 run()。
 	const env = {
-		SESSIONS: {
-			async get() {
-				return JSON.stringify(storedSession);
-			},
-			async put(_token, value) {
-				storedSession = JSON.parse(value);
-			},
-		},
 		DB: {
 			prepare(sql) {
 				return {
@@ -45,7 +38,20 @@ test("个人资料接口清除头像时同步数据库与会话", async () => {
 								}
 								throw new Error(`Unexpected query: ${sql}`);
 							},
+							async first() {
+								if (sql.includes("FROM sessions")) {
+									return {
+										data: JSON.stringify(storedSession),
+										expires_at: Math.floor(Date.now() / 1000) + 3600,
+									};
+								}
+								throw new Error(`Unexpected query: ${sql}`);
+							},
 							async run() {
+								if (sql.includes("INSERT INTO sessions")) {
+									storedSession = JSON.parse(binds[2]);
+									return { meta: { changes: 1 } };
+								}
 								update = { sql, binds };
 								return { success: true };
 							},
