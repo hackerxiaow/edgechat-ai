@@ -123,3 +123,89 @@ html[data-theme="dark"] .add-conversation-choice:hover,
 html.dark .add-conversation-choice:hover {
   background: #2a3942 !important;
 }
+
+
+/* 保证暗黑模式全局所有背景、文字与卡片生效 */
+html[data-theme="dark"],
+html.dark,
+[data-theme="dark"] {
+  --chat-paper: #1e2428 !important;
+  --chat-canvas: #111b21 !important;
+  --chat-rail: #111b21 !important;
+  --chat-hover: #202c33 !important;
+  --chat-selected: #2a3942 !important;
+  --chat-pressed: #374248 !important;
+  --chat-outgoing: #005c4b !important;
+  --chat-ink: #e9edef !important;
+  --chat-muted: #8696a0 !important;
+  --chat-subtle: #667781 !important;
+  --chat-line: #222d34 !important;
+  --chat-accent: #00a884 !important;
+  --chat-accent-hover: #008f6f !important;
+  --chat-accent-pressed: #007a5e !important;
+  --chat-danger: #ea4335 !important;
+  --chat-danger-soft: #3c2020 !important;
+  --chat-disabled: #2a3942 !important;
+  --chat-online: #00a884 !important;
+  --chat-scrollbar: rgba(255, 255, 255, 0.16) !important;
+  --chat-scrim: rgba(0, 0, 0, 0.7) !important;
+  --chat-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  --chat-shadow-panel: 0 12px 36px rgba(0, 0, 0, 0.7) !important;
+  
+  --surface-primary: #1e2428 !important;
+  --surface-secondary: #111b21 !important;
+  --surface-hover: #202c33 !important;
+  --surface-active: #2a3942 !important;
+  --surface-search: #202c33 !important;
+  --text-primary: #e9edef !important;
+  --text-secondary: #8696a0 !important;
+  --text-muted: #667781 !important;
+  --border-light: #222d34 !important;
+  --border-medium: #2a3942 !important;
+  color-scheme: dark !important;
+}
+
+html[data-theme="dark"] body,
+html.dark body {
+  background-color: #111b21 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .chat-layout,
+html.dark .chat-layout {
+  background-color: #111b21 !important;
+}
+
+html[data-theme="dark"] .left-sidebar,
+html.dark .left-sidebar,
+html[data-theme="dark"] .right-sidebar,
+html.dark .right-sidebar,
+html[data-theme="dark"] .sidebar-header,
+html.dark .sidebar-header,
+html[data-theme="dark"] .chat-header,
+html.dark .chat-header,
+html[data-theme="dark"] .composer-form,
+html.dark .composer-form {
+  background-color: #111b21 !important;
+  border-color: #222d34 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .chat-bubble,
+html.dark .chat-bubble {
+  background-color: #1e2428 !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .chat-bubble--own,
+html.dark .chat-bubble--own {
+  background-color: #005c4b !important;
+  color: #e9edef !important;
+}
+
+html[data-theme="dark"] .composer-textarea,
+html.dark .composer-textarea {
+  background-color: #202c33 !important;
+  color: #e9edef !important;
+  border-color: #222d34 !important;
+}
