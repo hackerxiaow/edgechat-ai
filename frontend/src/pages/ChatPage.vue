@@ -1,6 +1,6 @@
 <script setup>
 import { ArrowLeft, Ban, Bell, BellOff, ContactRound, Menu, MessageCircle, Settings, UsersRound } from '@lucide/vue';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '../composables/useTheme.js';
 import { usePresence } from '../composables/usePresence.js';
@@ -155,7 +155,7 @@ function handleRoomAccessRevoked(room) {
 
 const {
   messages, pinnedMessage, highlightedMessageId, loading, wsStatus, composerText, pendingAttachment, sending,
-  messagesEl, isOwnMessage, typingUsers, reportTyping,
+  messagesEl, isOwnMessage, typingUsers, reportTyping, streamingMessageIds, finishStreaming,
 	  loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
 	  pinMessage, unpinMessage, revealPinnedMessage,
 	  revealMessage,
@@ -492,6 +492,57 @@ onMounted(() => {
     openNativeRoom();
   });
 });
+/**
+ * AI 回复的打字机显现：只对「刚通过同步游标到达」的消息生效
+ * （历史消息与自己的消息直接完整显示，与 Telegram 观感一致）。
+ */
+const revealedLength = reactive({});
+const revealTimers = new Map();
+const STREAM_DURATION_MS = 1800;
+const STREAM_TICK_MS = 30;
+
+watch(streamingMessageIds, (ids) => {
+  for (const rawId of ids) {
+    const id = Number(rawId);
+    if (revealTimers.has(id)) continue;
+    const target = messages.value.find((item) => Number(item.id) === id);
+    const total = String(target?.content || '').length;
+    if (!total) {
+      finishStreaming(id);
+      continue;
+    }
+    revealedLength[id] = 0;
+    const perTick = Math.max(1, Math.ceil(total / (STREAM_DURATION_MS / STREAM_TICK_MS)));
+    const timer = setInterval(() => {
+      const next = (revealedLength[id] || 0) + perTick;
+      if (next >= total) {
+        revealedLength[id] = total;
+        clearInterval(timer);
+        revealTimers.delete(id);
+        finishStreaming(id);
+        return;
+      }
+      revealedLength[id] = next;
+    }, STREAM_TICK_MS);
+    revealTimers.set(id, timer);
+  }
+});
+
+onBeforeUnmount(() => {
+  for (const timer of revealTimers.values()) clearInterval(timer);
+  revealTimers.clear();
+});
+
+function isStreamingMessage(message) {
+  return revealedLength[message.id] !== undefined;
+}
+
+function messageContent(message) {
+  const shown = revealedLength[message.id];
+  if (shown === undefined) return message.content;
+  return String(message.content || '').slice(0, shown);
+}
+
 const typingLabel = computed(() => {
   const names = typingUsers.value.map((user) => user.displayName).filter(Boolean);
   if (!names.length) return t('chat.typing');
@@ -828,6 +879,7 @@ onBeforeUnmount(() => {
 				class="message-stream-caret"
 				aria-hidden="true"
 			  />
+              <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
               <span class="message-time">{{ formatBubbleTime(msg.createdAt) }}</span>
             </div>
           </article>

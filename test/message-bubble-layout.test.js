@@ -83,6 +83,34 @@ test("双方消息都在气泡旁显示圆形发送者头像", () => {
 	assert.match(avatar, /border-radius:\s*50%;/);
 });
 
+test("消息气泡包含全部必要子元素（防误删）", () => {
+	// 曾经的回归：行号式补丁误删了 <MessageAttachment>，图片消息变成空气泡。
+	for (const fragment of [
+		"class=\"profile-avatar-trigger message-avatar-trigger\"",
+		"<MessageReplyPreview",
+		"<MessageMarkdown",
+		"<MessageAttachment v-if=\"msg.attachment\"",
+		"class=\"message-time\"",
+	]) {
+		assert.ok(chatPage.includes(fragment), `气泡模板缺少 ${fragment}`);
+	}
+});
+
+test("模板里用到的消息辅助函数都已在脚本中定义", () => {
+	// 曾经的回归：模板改成调用 messageContent(msg)，但定义它的补丁脚本在写入前中断，
+	// 导致进入任何有消息的会话都抛 TypeError 并整页空白。这里做静态兜底：
+	// 模板里以 name(msg) 形式调用的标识符，必须在脚本中有绑定（函数、const 或解构）。
+	const script = chatPage.slice(0, chatPage.indexOf("<template>"));
+	for (const name of ["messageContent", "isStreamingMessage", "isOwnMessage"]) {
+		if (!chatPage.includes(`${name}(msg)`)) continue;
+		const bound =
+			new RegExp(`function\\s+${name}\\s*\\(`).test(script) ||
+			new RegExp(`(?:const|let|var)\\s+${name}\\b`).test(script) ||
+			new RegExp(`[{,]\\s*${name}\\s*[,}]`).test(script);
+		assert.ok(bound, `模板调用了 ${name}，但脚本里没有绑定`);
+	}
+});
+
 test("远程头像加载失败时显示姓名缩写", () => {
 	assert.match(avatarComponent, /const showImage = computed/);
 	assert.match(avatarComponent, /failedSrc\.value !== props\.src/);
