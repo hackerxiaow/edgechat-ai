@@ -116,7 +116,6 @@ test("惰性 GC 停摆超过容忍窗口时报 gc 失败，从未跑过则不算
 		probe({
 			DB: createD1Adapter(stale),
 			EDGECHAT_ENCRYPTION_KEYRING: validKeyring,
-			GC_MIN_INTERVAL_MINUTES: "60",
 		}),
 	);
 	assert.equal(staleResponse.status, 503);
@@ -139,11 +138,14 @@ test("容忍窗口随最小间隔放大，避免低频部署误报", async () =>
 	database.run(
 		"INSERT INTO gc_state (id, last_started_at) VALUES ('scheduled', datetime('now', '-3 day'))",
 	);
+	// 清理间隔现在由后台配置（site_settings）：每天一次的话，三天前的记录仍在容忍窗口内。
+	database.run(
+		`INSERT INTO site_settings (setting_key, setting_value) VALUES ('gc_interval_minutes', '1440')
+		 ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value`,
+	);
 	const env = {
 		DB: createD1Adapter(database),
 		EDGECHAT_ENCRYPTION_KEYRING: validKeyring,
-		// 每天一次的话，三天前的记录仍在容忍窗口内。
-		GC_MIN_INTERVAL_MINUTES: "1440",
 	};
 	const { result: response } = await captureConsoleError(() => probe(env));
 

@@ -344,12 +344,18 @@ test("部署工作流每次发布都在 Pages 之前准备并执行 D1 迁移", 
 	assert.match(workflow, /\.tmp\/edgechat-d1-migrations\.sql/);
 });
 
-test("CI Wrangler 配置保留管理员变量且不再声明 Durable Object", () => {
+test("Pages 配置只保留 D1 绑定，业务配置已全部移到 site_settings", () => {
 	const config = readFileSync(new URL("../wrangler.pages.toml", import.meta.url), "utf8");
 
-	assert.match(config, /ADMIN_USERNAMES = "admin"/);
+	assert.match(config, /binding = "DB"/);
 	// 纯 D1 部署不再需要 KV/R2/Durable Objects；残留绑定会让 wrangler 找不到已删除的资源。
 	assert.doesNotMatch(config, /durable_objects/);
 	assert.doesNotMatch(config, /class_name = "ChannelRoom"/);
 	assert.doesNotMatch(config, /kv_namespaces|r2_buckets/);
+	// 上传限制、保留期、清理间隔等改由后台设置页维护，配置文件里不该再有这些变量。
+	assert.doesNotMatch(config, /\[vars\]/);
+	assert.doesNotMatch(
+		config,
+		/ADMIN_USERNAMES|MAX_FILE_SIZE|MESSAGE_RETENTION_DAYS|SITE_ORIGINS|GC_|ALLOWED_FILE_TYPES/,
+	);
 });

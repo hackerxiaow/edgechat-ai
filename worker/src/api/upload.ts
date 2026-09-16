@@ -5,12 +5,14 @@ import {
   getUploadedFileByClientId,
   recordUploadedFile
 } from '../data/uploaded-files.ts';
+import { getRuntimeSettings, type RuntimeSettings } from '../data/site-settings.ts';
 import { decryptAttachment, encryptAttachment } from '../encryption.ts';
 import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.ts';
 import { validateSession } from '../session.ts';
 import { errorResponse, requestBodyTooLarge } from '../utils.ts';
 
-const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;
+/** 上传请求体的额外开销（multipart 边界、其它字段），与上限一起用于提前拒绝超大请求。 */
+export const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;
 /** D1 单行（含 BLOB）上限 2,000,000 字节；信封加密的头部还要再占用几十字节。 */
 const D1_MAX_ROW_BYTES = 2_000_000;
 const ATTACHMENT_ENVELOPE_OVERHEAD_BYTES = 1024;
@@ -31,7 +33,8 @@ const BLOCKED_MIME_TYPES = new Set([
   'application/xml'
 ]);
 
-type UploadEnv = Pick<AppEnv['Bindings'], 'DB' | 'MAX_FILE_SIZE' | 'ALLOWED_FILE_TYPES'>;
+/** 上传只需要 D1：大小与类型限制来自 site_settings。 */
+type UploadEnv = Pick<AppEnv['Bindings'], 'DB'>;
 
 interface StoredFileRow {
   filename: string | null;
@@ -68,10 +71,13 @@ function contentDispositionValue(kind: string, filename: string): string {
   return `${kind}; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(safeUtf8)}`;
 }
 
-function validateUpload(env: UploadEnv, file: File): void {
-  const maxFileSize = Number(env.MAX_FILE_SIZE || 20971520);
-  if (file.size > maxFileSize) {
-    throw new Error(`文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`);
+function maxFileSizeMessage(maxFileSize: number): string {
+  return `文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`;
+}
+
+function validateUpload(settings: RuntimeSettings, file: File): void {
+  if (file.size > settings.maxFileSize) {
+    throw new Error(maxFileSizeMessage(settings.maxFileSize));
   }
 
   // 正文直接落进 uploaded_files.data，超行会被 D1 拒绝；这里先给出可读的业务错误。
@@ -84,11 +90,7 @@ function validateUpload(env: UploadEnv, file: File): void {
     throw new Error('该文件类型不允许上传');
   }
 
-  const allowed = String(env.ALLOWED_FILE_TYPES || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
+  const allowed = settings.allowedFileTypes;
   if (allowed.length && !allowed.some((prefix) => contentType.startsWith(prefix))) {
     throw new Error('该文件类型不允许上传');
   }
@@ -101,9 +103,9 @@ export function registerUploadRoutes(app: Hono<AppEnv>) {
     }
 
     const session = c.get('session');
-    const maxFileSize = Number(c.env.MAX_FILE_SIZE || 20971520);
-    if (requestBodyTooLarge(c.req.raw, maxFileSize + UPLOAD_BODY_OVERHEAD_BYTES)) {
-      return errorResponse(`文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`, 413);
+    const settings = await getRuntimeSettings(c.env.DB);
+    if (requestBodyTooLarge(c.req.raw, settings.maxFileSize + UPLOAD_BODY_OVERHEAD_BYTES)) {
+      return errorResponse(maxFileSizeMessage(settings.maxFileSize), 413);
     }
     const formData = await c.req.formData();
     const file = formData.get('file');
@@ -113,7 +115,7 @@ export function registerUploadRoutes(app: Hono<AppEnv>) {
     }
 
     try {
-      const result = await saveUploadedFile(c.env, session, file);
+      const result = await saveUploadedFile(c.env, session, file, { settings });
       return c.json({ file: result.file });
     } catch (error) {
       const message = String((error as { message?: unknown })?.message || '');
@@ -181,9 +183,14 @@ export async function saveUploadedFile(
   env: UploadEnv,
   session: SessionUser,
   file: File,
-  { clientUploadId = null }: { clientUploadId?: string | null } = {}
+  {
+    clientUploadId = null,
+    settings
+  }: { clientUploadId?: string | null; settings?: RuntimeSettings } = {}
 ): Promise<SavedUpload> {
-  validateUpload(env, file);
+  // 调用方已经读过设置时直接复用，避免一次上传打两遍 site_settings。
+  const resolved = settings || (await getRuntimeSettings(env.DB));
+  validateUpload(resolved, file);
   if (clientUploadId) {
     const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);
     if (existing) return { file: existing, created: false };

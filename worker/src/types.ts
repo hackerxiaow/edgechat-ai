@@ -7,22 +7,13 @@ export interface AppBindings {
   /** Pages 静态资产绑定。 */
   ASSETS?: Fetcher;
 
-  ADMIN_USERNAMES?: string;
-  ALLOWED_FILE_TYPES?: string;
-  MAX_FILE_SIZE?: string;
-  MESSAGE_RETENTION_DAYS?: string;
-  SOFT_DELETE_RETENTION_DAYS?: string;
-  ORPHAN_UPLOAD_RETENTION_DAYS?: string;
-  SITE_ORIGINS?: string;
-
-  GC_BATCH_SIZE?: string;
-  GC_MAX_BATCHES_PER_RUN?: string;
-  GC_INTERNAL_OPERATION_BUDGET?: string;
-  GC_D1_STATEMENT_BUDGET?: string;
-  GC_R2_OPERATION_BUDGET?: string;
-  R2_DELETE_MAX_RETRY?: string;
-  /** 惰性 GC 的最小间隔（分钟）；Pages 部署没有 Cron Triggers，靠请求路径触发。 */
-  GC_MIN_INTERVAL_MINUTES?: string;
+  /**
+   * 引导管理员：账号不存在时按这两个变量创建，已存在则跳过。
+   * 其余业务配置（上传限制、保留期、站点域名等）都在 site_settings 表里，
+   * 由后台设置页维护，不再走环境变量。
+   */
+  EDGECHAT_ADMIN_USERNAME?: string;
+  EDGECHAT_ADMIN_PASSWORD?: string;
 
   EDGECHAT_ENCRYPTION_KEYRING?: string;
   EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID?: string;

@@ -1,13 +1,13 @@
 import type { Context, Hono } from 'hono';
 import type { AppEnv } from '../types.ts';
 import { verifyPassword } from '../auth.ts';
-import { saveUploadedFile } from './upload.ts';
+import { saveUploadedFile, UPLOAD_BODY_OVERHEAD_BYTES } from './upload.ts';
 import {
   getRoomSyncCursor,
   listMessages,
   listRoomMessageEvents
 } from '../data/messages.ts';
-import { getSiteSettings } from '../data/site-settings.ts';
+import { getRuntimeSettings } from '../data/site-settings.ts';
 import { getUserByUsername } from '../data/users.ts';
 import { submitClientRoomAction } from '../room-actions.ts';
 import { ApiError } from '../errors.ts';
@@ -80,13 +80,13 @@ async function convertLegacyError(response: Response): Promise<Response> {
 
 export function registerV1Routes(app: Hono<AppEnv>) {
   app.get('/api/v1/capabilities', async (c) => {
-    const site = await getSiteSettings(c.env.DB);
+    const settings = await getRuntimeSettings(c.env.DB);
     return c.json({
       apiVersion: 1,
-      site,
+      site: { siteName: settings.siteName, siteIconUrl: settings.siteIconUrl },
       limits: {
-        maxUploadBytes: Number(c.env.MAX_FILE_SIZE || 20971520),
-        messageRetentionDays: Number(c.env.MESSAGE_RETENTION_DAYS || 7)
+        maxUploadBytes: settings.maxFileSize,
+        messageRetentionDays: settings.messageRetentionDays
       },
       features: {
         deviceSessions: true,
@@ -263,11 +263,11 @@ export function registerV1Routes(app: Hono<AppEnv>) {
     if (!c.env.DB) {
       return v1ErrorResponse('attachments_unavailable', '存储服务不可用，无法上传附件', 503);
     }
-    const maxFileSize = Number(c.env.MAX_FILE_SIZE || 20971520);
-    if (requestBodyTooLarge(c.req.raw, maxFileSize + 1024 * 1024)) {
+    const settings = await getRuntimeSettings(c.env.DB);
+    if (requestBodyTooLarge(c.req.raw, settings.maxFileSize + UPLOAD_BODY_OVERHEAD_BYTES)) {
       return v1ErrorResponse(
         'payload_too_large',
-        `文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`,
+        `文件大小不能超过 ${Math.round(settings.maxFileSize / 1024 / 1024)}MB`,
         413
       );
     }
@@ -282,7 +282,10 @@ export function registerV1Routes(app: Hono<AppEnv>) {
       return v1ErrorResponse('client_upload_id_invalid', 'clientUploadId 必须是 UUID');
     }
     try {
-      const result = await saveUploadedFile(c.env, c.get('session'), file, { clientUploadId });
+      const result = await saveUploadedFile(c.env, c.get('session'), file, {
+        clientUploadId,
+        settings
+      });
       return c.json(result, result.created ? 201 : 200);
     } catch (error) {
       const message = String((error as { message?: unknown })?.message || '上传失败');

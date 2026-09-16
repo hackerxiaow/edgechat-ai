@@ -24,6 +24,15 @@ function scalar(database, sql) {
 	return Number(database.exec(sql)[0]?.values?.[0]?.[0] || 0);
 }
 
+/** 清理间隔现在由后台配置（site_settings），测试直接写库。 */
+function setGcInterval(database, minutes) {
+	database.run(
+		`INSERT INTO site_settings (setting_key, setting_value) VALUES ('gc_interval_minutes', ?)
+		 ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value`,
+		[String(minutes)],
+	);
+}
+
 /** 只让指定语句失败，其余照常执行，用来验证 GC 出错后的收尾行为。 */
 function failingOn(database, fragment) {
 	const db = createD1Adapter(database);
@@ -52,7 +61,8 @@ function failingOn(database, fragment) {
 
 test("Pages 部署没有 Cron Triggers，首次请求抢占并记录本轮开始与结束时间", async () => {
 	const database = createDatabase();
-	const env = { DB: createD1Adapter(database), GC_MIN_INTERVAL_MINUTES: 30 };
+	setGcInterval(database, 30);
+	const env = { DB: createD1Adapter(database) };
 
 	const summary = await runLazyScheduledGc(env);
 	assert.ok(summary, "首次探测应当抢到执行权");
@@ -72,7 +82,8 @@ test("Pages 部署没有 Cron Triggers，首次请求抢占并记录本轮开始
 
 test("最小间隔内的重复探测直接跳过，超过间隔后才重新执行", async () => {
 	const database = createDatabase();
-	const env = { DB: createD1Adapter(database), GC_MIN_INTERVAL_MINUTES: 30 };
+	setGcInterval(database, 30);
+	const env = { DB: createD1Adapter(database) };
 
 	assert.ok(await runLazyScheduledGc(env));
 	assert.equal(await runLazyScheduledGc(env), null, "同一间隔内不应重复执行");
@@ -88,9 +99,9 @@ test("最小间隔内的重复探测直接跳过，超过间隔后才重新执�
 
 test("惰性 GC 失败会写回错误并按同一间隔等待，不会每个请求都重跑", async () => {
 	const database = createDatabase();
+	setGcInterval(database, 30);
 	const env = {
 		DB: failingOn(database, "DELETE FROM realtime_tickets"),
-		GC_MIN_INTERVAL_MINUTES: 30,
 	};
 
 	await assert.rejects(runLazyScheduledGc(env), /simulated gc outage/);

@@ -10,7 +10,11 @@ import {
   MAX_INVITE_USES,
   revokeRegistrationInvite
 } from '../data/registration-invites.ts';
-import { getSiteSettings, updateSiteSettings } from '../data/site-settings.ts';
+import {
+  getRuntimeSettings,
+  getSiteSettings,
+  updateSiteSettings
+} from '../data/site-settings.ts';
 import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
 import { listAdminUsers, listStorageOwners, type StorageOwner } from '../data/users.ts';
 import { ApiError } from '../errors.ts';
@@ -70,24 +74,31 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
   });
 
   app.get('/api/admin/site-settings', async (c) => {
-    const site = await getSiteSettings(c.env.DB);
+    const site = await getRuntimeSettings(c.env.DB);
     return c.json({ site });
   });
 
   app.patch('/api/admin/site-settings', async (c) => {
     const payload = await parseJsonRequest(c.req.raw);
     const siteName = String(payload.siteName || '').trim();
-    const siteIconUrl = String(payload.siteIconUrl || '').trim();
 
     if (!siteName) {
       return errorResponse('站点名称不能为空');
     }
 
     try {
+      // 业务配置全部落 site_settings；未出现在入参里的字段保持原值。
       const site = await updateSiteSettings(c.env.DB, {
         siteName,
-        siteIconUrl,
-        siteOrigin: new URL(c.req.url).origin
+        siteIconUrl: String(payload.siteIconUrl || '').trim(),
+        siteOrigin: new URL(c.req.url).origin,
+        maxFileSize: payload.maxFileSize,
+        allowedFileTypes: payload.allowedFileTypes,
+        messageRetentionDays: payload.messageRetentionDays,
+        softDeleteRetentionDays: payload.softDeleteRetentionDays,
+        orphanUploadRetentionDays: payload.orphanUploadRetentionDays,
+        gcIntervalMinutes: payload.gcIntervalMinutes,
+        siteOrigins: payload.siteOrigins
       });
       return c.json({ site });
     } catch (error) {

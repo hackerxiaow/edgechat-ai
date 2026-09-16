@@ -8,7 +8,7 @@ import { authMiddleware, adminMiddleware } from "../worker/src/middleware.ts";
 const okDb = { prepare: () => ({ all: async () => ({ results: [{ ok: 1 }] }) }) };
 
 test("environment exposes presence only, never secret values", () => {
-  const result = inspectEnvironment({ EDGECHAT_ENCRYPTION_KEYRING: "super-secret", ADMIN_USERNAMES: "admin" });
+  const result = inspectEnvironment({ EDGECHAT_ENCRYPTION_KEYRING: "super-secret", EDGECHAT_ADMIN_USERNAME: "admin" });
   assert.equal(JSON.stringify(result).includes("super-secret"), false);
   assert.equal(result.find((x) => x.required).present, true);
 });

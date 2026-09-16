@@ -1,5 +1,6 @@
 import { loadEncryptionKeyring } from "./encryption.ts";
-import { DEFAULT_GC_MIN_INTERVAL_MINUTES, GC_STATE_ID } from "./gc.ts";
+import { getRuntimeSettings } from "./data/site-settings.ts";
+import { GC_STATE_ID } from "./gc.ts";
 import type { AppBindings } from "./types.ts";
 
 /** 缺少任何一张都会被判定为「迁移没跑完」。 */
@@ -18,12 +19,6 @@ export interface DeploymentHealth {
  */
 export function gcStaleAfterMinutes(minIntervalMinutes: number): number {
 	return Math.max(minIntervalMinutes, 1) * 6;
-}
-
-function resolveMinIntervalMinutes(env: AppBindings): number {
-	const parsed = Number(env.GC_MIN_INTERVAL_MINUTES);
-	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_GC_MIN_INTERVAL_MINUTES;
-	return Math.floor(parsed);
 }
 
 async function checkDatabase(db: D1Database): Promise<void> {
@@ -70,11 +65,16 @@ async function checkScheduledGc(db: D1Database, staleAfterMinutes: number): Prom
  * 只回传失败的检查 id，错误内容只进 Worker 日志，避免匿名探测拿到内部细节。
  */
 export async function checkDeploymentHealth(env: AppBindings): Promise<DeploymentHealth> {
+	// 清理间隔来自 site_settings，读不到就按默认值判断，不让配置本身成为故障源。
+	const intervalMinutes = await getRuntimeSettings(env.DB)
+		.then((settings) => settings.gcIntervalMinutes)
+		.catch(() => 60);
+
 	const checks: Array<[HealthCheckId, () => Promise<void> | void]> = [
 		["d1", () => checkDatabase(env.DB)],
 		["schema", () => checkSchema(env.DB)],
 		["crypto", () => checkEncryptionKey(env)],
-		["gc", () => checkScheduledGc(env.DB, gcStaleAfterMinutes(resolveMinIntervalMinutes(env)))],
+		["gc", () => checkScheduledGc(env.DB, gcStaleAfterMinutes(intervalMinutes))],
 	];
 
 	const failed: HealthCheckId[] = [];

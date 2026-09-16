@@ -89,21 +89,15 @@ function toSessionVersion(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function parseAdminUsernames(env: Pick<AppBindings, 'ADMIN_USERNAMES'>): string[] {
-  return String(env.ADMIN_USERNAMES || '')
-    .split(',')
-    .map((username) => username.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-// 仅用于注册环节的用户名占用检查，防止有人注册出跟管理员同名(忽略大小写)的账号用于钓鱼/混淆。
+// 仅用于注册环节的用户名占用检查，防止有人注册出跟引导管理员同名(忽略大小写)的账号用于钓鱼/混淆。
 // 不再作为权限判定依据。
 export function isConfiguredAdminUsername(
-  env: Pick<AppBindings, 'ADMIN_USERNAMES'>,
+  env: Pick<AppBindings, 'EDGECHAT_ADMIN_USERNAME'>,
   username: unknown,
 ): boolean {
+  const configured = String(env.EDGECHAT_ADMIN_USERNAME || '').trim().toLowerCase();
   const normalizedUsername = String(username || '').trim().toLowerCase();
-  return Boolean(normalizedUsername) && parseAdminUsernames(env).includes(normalizedUsername);
+  return Boolean(configured) && normalizedUsername === configured;
 }
 
 // 权限判定唯一依据：数据库中的 is_admin 字段，不再比对用户名。

@@ -205,10 +205,9 @@ test("R2 删除后 D1 完成批次失败时保留任务并写入退避", async (
 	};
 
 	const deleted = [];
+	// 批次与预算属于内部保护参数、不再可配：这里只有一条待删任务，行为与定量批次一致。
 	const summary = await runScheduledGc({
 		DB: withDeleteBehaviour(measured.db, { deleted }),
-		GC_BATCH_SIZE: 1,
-		GC_MAX_BATCHES_PER_RUN: 1,
 	});
 
 	assert.deepEqual(deleted, ["1/completion-failure"]);
@@ -439,7 +438,7 @@ test("有效本地文件、文本消息、头像清空与可信外部附件保�
 	assert.equal(scalar(database, "SELECT COUNT(*) FROM messages"), 3);
 });
 
-test("GC 在共享预算内轮转多个步骤，失败后保留任务并可在下次续跑", async () => {
+test("GC 在同一轮里轮转多个步骤，失败的任务保留并可下次续跑", async () => {
 	const database = createDatabase();
 	const userId = insertUser(database, "budget-owner");
 	const channelId = scalar(database, "SELECT id FROM channels WHERE name = 'general'");
@@ -459,34 +458,30 @@ test("GC 在共享预算内轮转多个步骤，失败后保留任务并可在�
 	}
 
 	const measured = createMeasuredD1(database);
-	const env = {
-		DB: withDeleteBehaviour(measured.db, { fail: true }),
-		GC_BATCH_SIZE: 500,
-		GC_MAX_BATCHES_PER_RUN: 20,
-		GC_INTERNAL_OPERATION_BUDGET: 45,
-		GC_D1_STATEMENT_BUDGET: 60,
-		GC_R2_OPERATION_BUDGET: 8,
-	};
+	// 全部删除都失败，用来验证失败任务留在队列、且不影响同一轮里的其它步骤。
+	const env = { DB: withDeleteBehaviour(measured.db, { fail: true }) };
+
 	const first = await runScheduledGc(env);
-	assert.ok(first.expiredMessagesDeleted > 0);
-	assert.ok(first.invitesDeleted > 0);
-	assert.ok(first.orphanUploadsQueued > 0);
-	assert.equal(first.r2DeleteFailed, 8);
-	assert.equal(first.budget.exhausted, true);
-	assert.ok(first.budget.internalOperations <= 45);
-	assert.ok(first.budget.d1Statements <= 60);
-	assert.ok(first.budget.r2Operations <= 8);
+	assert.ok(first.expiredMessagesDeleted > 0, "过期消息应在同一轮里被清理");
+	assert.ok(first.invitesDeleted > 0, "过期邀请应在同一轮里被清理");
+	assert.ok(first.orphanUploadsQueued > 0, "孤儿附件应被排队");
+	assert.ok(first.r2DeleteFailed > 0, "删除失败的任务要留在队列里");
+	// 预算与计量必须逐条对齐，否则说明有的 D1 调用没被记账。
 	assert.equal(first.budget.d1ApiCalls, measured.metrics.apiCalls);
 	assert.equal(first.budget.d1Statements, measured.metrics.statements);
-	assert.ok(measured.metrics.maxBindings <= 90);
+	assert.ok(measured.metrics.maxBindings <= 90, "绑定参数不能超过 D1 的 100 上限");
+	assert.ok(first.budget.internalOperations <= first.budget.limits.internalOperations);
+	assert.ok(first.budget.d1Statements <= first.budget.limits.d1Statements);
 
+	const pendingBefore = scalar(database, "SELECT COUNT(*) FROM pending_r2_delete");
+	assert.ok(pendingBefore > 0, "失败任务必须持久化，不能丢");
 	const remainingBefore = scalar(database, "SELECT COUNT(*) FROM uploaded_files");
 	const second = await runScheduledGc(env);
+	// 退避中的任务不该被立刻重试，但要留在队列里等下一个重试窗口。
+	assert.equal(second.retryQueueFetched, 0, "退避中的任务不应被立即重试");
 	assert.ok(
-		second.expiredMessagesDeleted > 0 ||
-			second.invitesDeleted > 0 ||
-			second.orphanUploadsQueued > 0 ||
-			second.retryQueueFailed > 0,
+		scalar(database, "SELECT COUNT(*) FROM pending_r2_delete") > 0,
+		"失败任务仍在队列里等待续跑",
 	);
 	assert.ok(scalar(database, "SELECT COUNT(*) FROM uploaded_files") <= remainingBefore);
 });

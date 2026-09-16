@@ -31,7 +31,6 @@ test("Cloudflare 生产凭据只注入实际调用 Cloudflare 的步骤", () => 
 		"Install dependencies",
 		"Run tests",
 		"Build Pages bundle",
-		"Generate admin bootstrap SQL (optional)",
 	]) {
 		assert.doesNotMatch(getStep(name), /CLOUDFLARE_(?:API_TOKEN|ACCOUNT_ID)/);
 	}
@@ -42,7 +41,6 @@ test("Cloudflare 生产凭据只注入实际调用 Cloudflare 的步骤", () => 
 		"Prepare D1 migrations",
 		"Apply D1 migrations",
 		"Verify D1 schema contract",
-		"Ensure admin user (optional)",
 		"Prepare Pages encryption secret",
 		"Apply Pages encryption secret",
 		"Deploy Pages",

@@ -1,8 +1,9 @@
 import { hardDeleteChannels } from "./data/channel-deletion.ts";
+import { getRuntimeSettings, type RuntimeSettings } from "./data/site-settings.ts";
 import { classifyStoredSiteIcon } from "./site-icon.ts";
 import type { AppBindings } from "./types.ts";
 
-/** GC 只依赖 D1，其余读取自 env 字符串变量。 */
+/** GC 只依赖 D1；保留期等业务配置来自 site_settings，其余是内部保护参数。 */
 type GcEnv = Pick<AppBindings, "DB"> & Record<string, unknown>;
 
 interface GcConfig {
@@ -77,18 +78,12 @@ interface GcSummary {
 type GcRow = Record<string, unknown>;
 
 
-const DEFAULT_MESSAGE_RETENTION_DAYS = 7;
-const DEFAULT_SOFT_DELETE_RETENTION_DAYS = 60;
 const DEFAULT_BATCH_SIZE = 90;
 const DEFAULT_MAX_BATCHES_PER_RUN = 20;
 const DEFAULT_R2_DELETE_MAX_RETRY = 8;
-const DEFAULT_ORPHAN_UPLOAD_RETENTION_DAYS = 1;
 const DEFAULT_INTERNAL_OPERATION_BUDGET = 900;
 const DEFAULT_D1_STATEMENT_BUDGET = 1200;
 const DEFAULT_R2_OPERATION_BUDGET = 300;
-const DEFAULT_MIN_INTERVAL_MINUTES = 60;
-/** 惰性 GC 的默认最小间隔（分钟），健康检查据此判断清理是否停摆。 */
-export const DEFAULT_GC_MIN_INTERVAL_MINUTES = DEFAULT_MIN_INTERVAL_MINUTES;
 const MAX_BOUND_PARAMETERS = 100;
 const MAX_IN_PARAMETERS = 90;
 const MAX_ERROR_LENGTH = 500;
@@ -154,58 +149,23 @@ export const ORPHAN_UPLOAD_QUERY = `SELECT object_key, created_at
 	ORDER BY created_at ASC, object_key ASC
 	LIMIT ?`;
 
-function toPositiveInteger(value: unknown, fallback: number): number {
-	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-	return Math.floor(parsed);
-}
-
-function getGcConfig(env: GcEnv): GcConfig {
+/**
+ * 业务侧配置（保留期、清理间隔、本站 origin）来自 site_settings；
+ * 批次与预算属于内部保护参数，调错会让清理停摆或过载，因此固定用代码默认值。
+ */
+function getGcConfig(settings: RuntimeSettings): GcConfig {
 	return {
-		messageRetentionDays: toPositiveInteger(
-			env.MESSAGE_RETENTION_DAYS,
-			DEFAULT_MESSAGE_RETENTION_DAYS,
-		),
-		softDeleteRetentionDays: toPositiveInteger(
-			env.SOFT_DELETE_RETENTION_DAYS,
-			DEFAULT_SOFT_DELETE_RETENTION_DAYS,
-		),
-		batchSize: Math.min(
-			toPositiveInteger(env.GC_BATCH_SIZE, DEFAULT_BATCH_SIZE),
-			MAX_IN_PARAMETERS,
-		),
-		maxBatchesPerRun: toPositiveInteger(
-			env.GC_MAX_BATCHES_PER_RUN,
-			DEFAULT_MAX_BATCHES_PER_RUN,
-		),
-		r2DeleteMaxRetry: toPositiveInteger(
-			env.R2_DELETE_MAX_RETRY,
-			DEFAULT_R2_DELETE_MAX_RETRY,
-		),
-		orphanUploadRetentionDays: toPositiveInteger(
-			env.ORPHAN_UPLOAD_RETENTION_DAYS,
-			DEFAULT_ORPHAN_UPLOAD_RETENTION_DAYS,
-		),
-		internalOperationBudget: toPositiveInteger(
-			env.GC_INTERNAL_OPERATION_BUDGET,
-			DEFAULT_INTERNAL_OPERATION_BUDGET,
-		),
-		d1StatementBudget: toPositiveInteger(
-			env.GC_D1_STATEMENT_BUDGET,
-			DEFAULT_D1_STATEMENT_BUDGET,
-		),
-		r2OperationBudget: toPositiveInteger(
-			env.GC_R2_OPERATION_BUDGET,
-			DEFAULT_R2_OPERATION_BUDGET,
-		),
-		minIntervalMinutes: toPositiveInteger(
-			env.GC_MIN_INTERVAL_MINUTES,
-			DEFAULT_MIN_INTERVAL_MINUTES,
-		),
-		trustedSiteOrigins: String(env.SITE_ORIGINS || "")
-			.split(",")
-			.map((value) => value.trim())
-			.filter(Boolean),
+		messageRetentionDays: settings.messageRetentionDays,
+		softDeleteRetentionDays: settings.softDeleteRetentionDays,
+		orphanUploadRetentionDays: settings.orphanUploadRetentionDays,
+		minIntervalMinutes: settings.gcIntervalMinutes,
+		trustedSiteOrigins: settings.siteOrigins,
+		batchSize: Math.min(DEFAULT_BATCH_SIZE, MAX_IN_PARAMETERS),
+		maxBatchesPerRun: DEFAULT_MAX_BATCHES_PER_RUN,
+		r2DeleteMaxRetry: DEFAULT_R2_DELETE_MAX_RETRY,
+		internalOperationBudget: DEFAULT_INTERNAL_OPERATION_BUDGET,
+		d1StatementBudget: DEFAULT_D1_STATEMENT_BUDGET,
+		r2OperationBudget: DEFAULT_R2_OPERATION_BUDGET,
 	};
 }
 
@@ -734,9 +694,16 @@ async function runOrphanedUploadsStep(env: GcEnv, config: GcConfig, summary: GcS
 }
 
 export async function runScheduledGc(env: GcEnv) {
-	const config = getGcConfig(env);
+	return runScheduledGcWithSettings(env, await getRuntimeSettings(env.DB));
+}
+
+/** 配置由调用方读出后传进来，一轮 GC 里不重复查设置。 */
+async function runScheduledGcWithSettings(env: GcEnv, settings: RuntimeSettings) {
+	const config = getGcConfig(settings);
 	const budget = createExecutionBudget(config);
 	const summary = createSummary();
+	// 读取 site_settings 同样是一次真实 D1 调用，补记进预算，保证预算与调用逐条对齐。
+	budget.spend({ d1ApiCalls: 1, d1Statements: 1 });
 	const siteIconKey = await loadSiteIconGuard(env.DB, config, budget);
 	const steps = [
 		runMobileProtocolCleanupStep,
@@ -784,9 +751,11 @@ export async function runScheduledGc(env: GcEnv) {
 }
 
 export async function cleanupR2Keys(env: GcEnv, keys: string[]) {
-	const config = getGcConfig(env);
+	const config = getGcConfig(await getRuntimeSettings(env.DB));
 	const budget = createExecutionBudget(config);
 	const summary = createSummary();
+	// 与 runScheduledGc 一致：读设置那次 D1 调用也计入预算。
+	budget.spend({ d1ApiCalls: 1, d1Statements: 1 });
 	const siteIconKey = await loadSiteIconGuard(env.DB, config, budget);
 
 	for (let offset = 0; offset < keys.length; offset += MAX_IN_PARAMETERS) {
@@ -838,14 +807,14 @@ async function recordGcRunFinished(db: D1Database, errorMessage: string): Promis
  * 失败也按同一间隔等待下一轮，避免每次请求都重跑一次已经出错的 GC。
  */
 export async function runLazyScheduledGc(env: GcEnv): Promise<GcSummary | null> {
-	const config = getGcConfig(env);
+	const settings = await getRuntimeSettings(env.DB);
 	const claimed = await env.DB.prepare(GC_CLAIM_QUERY)
-		.bind(GC_STATE_ID, `-${config.minIntervalMinutes} minute`)
+		.bind(GC_STATE_ID, `-${settings.gcIntervalMinutes} minute`)
 		.run();
 	if (resultChanges(claimed) < 1) return null;
 
 	try {
-		const summary = await runScheduledGc(env);
+		const summary = await runScheduledGcWithSettings(env, settings);
 		await recordGcRunFinished(env.DB, "");
 		return summary;
 	} catch (error) {

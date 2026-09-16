@@ -1,32 +1,14 @@
-# Cloudflare Pages 生产配置：D1 绑定与部署变量的唯一来源。
+# Cloudflare Pages 生产配置：只需要 D1 绑定。
+# 业务配置（上传限制、数据保留、清理间隔、站点域名）全部存在 site_settings 表里，
+# 由站点后台的「网站设置 → 运行配置」维护；环境变量只有三个引导项：
+#   EDGECHAT_ADMIN_USERNAME / EDGECHAT_ADMIN_PASSWORD / EDGECHAT_ENCRYPTION_KEYRING
+#
 # 注意：`wrangler pages deploy` 不接受自定义配置路径（--config 会直接报错），
-# 所以部署命令只传目录与 --project-name；需要这份配置的是 `wrangler d1 execute`
-# 之类的命令，它们允许 --config。变量本身以 Cloudflare 项目上的设置为准。
+# 所以部署命令只传目录与 --project-name；需要这份配置的是 `wrangler d1 execute` 之类的命令。
 name = "edgechat"
 pages_build_output_dir = "frontend/dist"
 compatibility_date = "2026-04-05"
 compatibility_flags = ["nodejs_compat"]
-
-[vars]
-ADMIN_USERNAMES = "admin"
-MESSAGE_RETENTION_DAYS = "7"
-SOFT_DELETE_RETENTION_DAYS = "60"
-ORPHAN_UPLOAD_RETENTION_DAYS = "1"
-# 单次调用的 D1 内部操作与语句预算；失败写回也计入同一预算。
-GC_BATCH_SIZE = "90"
-GC_MAX_BATCHES_PER_RUN = "20"
-GC_INTERNAL_OPERATION_BUDGET = "900"
-GC_D1_STATEMENT_BUDGET = "1200"
-# 附件删除预算（历史上对应 R2 对象操作），限制一次 GC 尝试删除的附件条数。
-GC_R2_OPERATION_BUDGET = "300"
-R2_DELETE_MAX_RETRY = "8"
-# Pages 没有 Cron Triggers，定时 GC 由请求路径惰性触发，这里是两次执行之间的最小间隔。
-GC_MIN_INTERVAL_MINUTES = "60"
-# 逗号分隔的本站 origin，用于识别升级前保存的完整 /files/ 图标 URL；自定义域名应全部列出。
-SITE_ORIGINS = "https://chat.cnz.kdns.fr"
-ALLOWED_FILE_TYPES = "image/,video/,audio/,application/pdf,text/"
-# 附件正文存在 D1 的 uploaded_files.data 里，必须留在 D1 单行 2MB 上限之内。
-MAX_FILE_SIZE = "1048576"
 
 [[d1_databases]]
 binding = "DB"

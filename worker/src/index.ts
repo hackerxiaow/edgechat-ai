@@ -15,7 +15,8 @@ import {
   createUserWithRegistrationInvite,
   getAvailableRegistrationInvite
 } from './data/registration-invites.ts';
-import { getSiteSettings } from './data/site-settings.ts';
+import { getSiteSettings, getRuntimeSettings } from './data/site-settings.ts';
+import { ensureBootstrapAdmin } from './data/bootstrap-admin.ts';
 import { getUserByUsername, listActiveUsers } from './data/users.ts';
 import { ApiError } from './errors.ts';
 import { adminMiddleware, authMiddleware } from './middleware.ts';
@@ -25,7 +26,7 @@ import { registerChannelRoutes } from './api/channels.ts';
 import { registerContactRoutes } from './api/contacts.ts';
 import { registerDmRoutes } from './api/dm.ts';
 import { registerMessageRoutes } from './api/messages.ts';
-import { registerUploadRoutes } from './api/upload.ts';
+import { registerUploadRoutes, UPLOAD_BODY_OVERHEAD_BYTES } from './api/upload.ts';
 import { registerUserBlockRoutes } from './api/user-blocks.ts';
 import { registerUserProfileRoutes } from './api/user-profile.ts';
 import { registerV1Routes } from './api/v1.ts';
@@ -50,11 +51,13 @@ const app = new Hono<AppEnv>();
 
 app.use('/api/*', async (c, next) => {
   const path = new URL(c.req.url).pathname;
-  const uploadLimit = Number(c.env.MAX_FILE_SIZE || 20971520) + 1024 * 1024;
-  const maxBytes = ['/api/upload', '/api/v1/uploads'].includes(path) ? uploadLimit : undefined;
-  if (requestBodyTooLarge(c.req.raw, maxBytes)) {
-    // 提前拒绝超大请求体，避免 Worker 在 JSON 解析前消耗过多内存。
-    return errorResponse('请求体过大', 413);
+  // 上传上限来自 site_settings；只有这两个路径需要提前读设置，其余请求不受影响。
+  if (['/api/upload', '/api/v1/uploads'].includes(path) && c.env.DB) {
+    const settings = await getRuntimeSettings(c.env.DB);
+    if (requestBodyTooLarge(c.req.raw, settings.maxFileSize + UPLOAD_BODY_OVERHEAD_BYTES)) {
+      // 提前拒绝超大请求体，避免 Worker 在 JSON 解析前消耗过多内存。
+      return errorResponse('请求体过大', 413);
+    }
   }
 
   await next();
@@ -77,8 +80,16 @@ app.get('/api/health', async (c) => {
 });
 
 app.get('/api/site', async (c) => {
-  const site = await getSiteSettings(c.env.DB);
-  return c.json({ site });
+  // 公开接口：站点标识 + 客户端上传前需要知道的限制。
+  const settings = await getRuntimeSettings(c.env.DB);
+  return c.json({
+    site: {
+      siteName: settings.siteName,
+      siteIconUrl: settings.siteIconUrl,
+      maxFileSize: settings.maxFileSize,
+      allowedFileTypes: settings.allowedFileTypes
+    }
+  });
 });
 
 registerTelegramPublicRoutes(app);
@@ -148,6 +159,11 @@ app.post('/api/auth/login', async (c) => {
   if (!username || !password) {
     return errorResponse('请输入用户名和密码');
   }
+
+  // 首次部署的引导：账号不存在时按环境变量创建管理员；失败不阻断登录。
+  await ensureBootstrapAdmin(c.env).catch((error) => {
+    console.error('bootstrap_admin_failed', error);
+  });
 
   const user = await getUserByUsername(c.env.DB, username);
   if (!user || isUserDisabled(user)) {

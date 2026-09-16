@@ -12,33 +12,40 @@ const keyring = JSON.stringify({
 });
 
 function fileDb({
-  accessible,
+  accessible = true,
   metadata = true,
   data = null,
   filename = '报告.bin',
   contentType = 'application/octet-stream',
   onDataRead = null
-}) {
+} = {}) {
   return {
     prepare(sql) {
+      // 与真实 D1 一致：顶层与 bind 之后都能直接执行语句。
+      const statement = {
+        async all() {
+          if (sql.includes('SELECT filename, content_type, size')) {
+            return metadata
+              ? { results: [{ filename, content_type: contentType, size: 4 }] }
+              : { results: [] };
+          }
+          // site_settings 查询：返回空表即视为全部使用默认配置。
+          if (sql.includes('FROM site_settings')) {
+            return { results: [] };
+          }
+          return { results: accessible ? [{ found: 1 }] : [] };
+        },
+        // D1 单存储：附件正文存在 uploaded_files.data，下载走 first()。
+        async first() {
+          if (!sql.includes('SELECT filename, content_type, data')) return null;
+          onDataRead?.();
+          return data ? { filename, content_type: contentType, data } : null;
+        }
+      };
       return {
+        ...statement,
         bind() {
-          return {
-            async all() {
-              if (sql.includes('SELECT filename, content_type, size')) {
-                return metadata
-                  ? { results: [{ filename, content_type: contentType, size: 4 }] }
-                  : { results: [] };
-              }
-              return { results: accessible ? [{ found: 1 }] : [] };
-            },
-            // D1 单存储：附件正文存在 uploaded_files.data，下载走 first()。
-            async first() {
-              if (!sql.includes('SELECT filename, content_type, data')) return null;
-              onDataRead?.();
-              return data ? { filename, content_type: contentType, data } : null;
-            }
-          };
+          return statement;
         }
       };
     }
@@ -70,7 +77,7 @@ test('attachment upload reports when the deployment has no storage binding', asy
   });
 });
 
-test('attachment upload rejects bodies that cannot fit a single D1 row', async () => {
+test('attachment upload rejects files larger than the configured limit', async () => {
   const app = new Hono();
   app.use('/api/*', async (c, next) => {
     c.set('session', { userId: 42 });
@@ -78,7 +85,7 @@ test('attachment upload rejects bodies that cannot fit a single D1 row', async (
   });
   registerUploadRoutes(app);
 
-  // MAX_FILE_SIZE 被放大到超过 D1 单行 2MB 上限时，必须在落库前给出业务错误。
+  // 上限来自 site_settings（默认 1MiB，且被 D1 单行上限约束），超限必须在落库前拒绝。
   const formData = new FormData();
   formData.set(
     'file',
@@ -87,16 +94,12 @@ test('attachment upload rejects bodies that cannot fit a single D1 row', async (
   const response = await app.request(
     'https://edgechat.test/api/upload',
     { method: 'POST', body: formData },
-    {
-      DB: fileDb({ accessible: true }),
-      MAX_FILE_SIZE: '20971520',
-      ALLOWED_FILE_TYPES: ''
-    }
+    { DB: fileDb({ accessible: true }) }
   );
 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {
-    error: '该附件超过 D1 单行上限，请改用更小的文件'
+    error: '文件大小不能超过 1MB'
   });
 });
 

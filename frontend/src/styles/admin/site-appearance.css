@@ -73,3 +73,42 @@
     flex-direction: column;
   }
 }
+
+/* 运行配置区块：数据保留、上传限制与清理节奏，全部存在 site_settings 里。 */
+.admin-site-runtime {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--admin-border, rgba(128, 128, 128, 0.22));
+}
+
+.admin-site-runtime .panel-title {
+  margin: 0;
+}
+
+.admin-site-runtime__hint,
+.admin-site-runtime__note {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.admin-site-runtime__note {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.6rem;
+  background: var(--admin-surface-soft, rgba(128, 128, 128, 0.08));
+}
+
+.admin-site-runtime__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-site-runtime .field small {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}

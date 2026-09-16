@@ -44,7 +44,8 @@ export function inspectEnvironment(env: MaintenanceEnv) {
     (present('EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID') && Object.keys(env).some((key) => /^EDGECHAT_ENCRYPTION_KEY_\d+$/.test(key) && present(key)));
   return [
     { name: 'EDGECHAT_ENCRYPTION_KEYRING / EDGECHAT_ENCRYPTION_ACTIVE_KEY_ID + EDGECHAT_ENCRYPTION_KEY_N', required: true, present: encryptionPresent },
-    ...['ADMIN_USERNAMES', 'MESSAGE_RETENTION_DAYS', 'SOFT_DELETE_RETENTION_DAYS', 'MAX_FILE_SIZE', 'ALLOWED_FILE_TYPES'].map((name) => ({ name, required: false, present: present(name) }))
+    // 其余业务配置都在 site_settings 表里由后台维护，这里只看两个引导变量是否就绪。
+    ...['EDGECHAT_ADMIN_USERNAME', 'EDGECHAT_ADMIN_PASSWORD'].map((name) => ({ name, required: false, present: present(name) }))
   ];
 }
 

@@ -131,10 +131,11 @@ test("可信 origin 已配置时，外域 /files/ URL 不会保护同名本地�
 	external.database.run(
 		"UPDATE site_settings SET setting_value = 'https://cdn.example/files/1%2Ficon.png' WHERE setting_key = 'site_icon_url'",
 	);
-	await runScheduledGc({
-		DB: external.db,
-		SITE_ORIGINS: "https://chat.example",
-	});
+	external.database.run(
+		`INSERT INTO site_settings (setting_key, setting_value) VALUES ('site_origins', 'https://chat.example')
+		 ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value`,
+	);
+	await runScheduledGc({ DB: external.db });
 	assert.equal(countUploadedFiles(external.database, "1/icon.png"), 0);
 });
 

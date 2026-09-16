@@ -5,10 +5,36 @@ export interface SiteSettings {
 	siteIconUrl: string;
 }
 
+/**
+ * 运行时配置：原先散落在环境变量里，现在除三个引导变量
+ * （管理员账号、管理员密码、加密密钥）外全部落到 site_settings 表，
+ * 由后台设置页维护。不设任何环境变量也能按这里的默认值运行。
+ */
+export interface RuntimeSettings extends SiteSettings {
+	/** 单文件上限（字节）。 */
+	maxFileSize: number;
+	/** 允许的 MIME 前缀；空数组表示不限制。 */
+	allowedFileTypes: string[];
+	messageRetentionDays: number;
+	softDeleteRetentionDays: number;
+	orphanUploadRetentionDays: number;
+	/** 惰性 GC 的最小间隔（分钟）。 */
+	gcIntervalMinutes: number;
+	/** 本站 origin 列表，用于识别升级前保存的完整 /files/ 图标 URL。 */
+	siteOrigins: string[];
+}
+
 export interface UpdateSiteSettingsInput {
 	siteName?: string;
 	siteIconUrl?: string;
 	siteOrigin?: string;
+	maxFileSize?: unknown;
+	allowedFileTypes?: unknown;
+	messageRetentionDays?: unknown;
+	softDeleteRetentionDays?: unknown;
+	orphanUploadRetentionDays?: unknown;
+	gcIntervalMinutes?: unknown;
+	siteOrigins?: unknown;
 }
 
 interface SiteSettingRow {
@@ -16,53 +42,219 @@ interface SiteSettingRow {
 	setting_value: string;
 }
 
-export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
+/** D1 单行（含 BLOB）上限 2,000,000 字节，留出信封开销后作为上传上限的天花板。 */
+export const MAX_UPLOAD_CEILING_BYTES = 1_900_000;
+export const MIN_UPLOAD_BYTES = 65_536;
+export const MAX_ALLOWED_FILE_TYPES = 20;
+export const MAX_SITE_ORIGINS = 10;
+
+export const RUNTIME_SETTING_DEFAULTS: RuntimeSettings = {
+	siteName: "Edgechat",
+	siteIconUrl: "",
+	// 默认 1MiB：附件正文直接落 D1 单行，必须留在 2MB 上限之内。
+	maxFileSize: 1_048_576,
+	allowedFileTypes: ["image/", "video/", "audio/", "application/pdf", "text/"],
+	messageRetentionDays: 7,
+	softDeleteRetentionDays: 60,
+	orphanUploadRetentionDays: 1,
+	gcIntervalMinutes: 60,
+	siteOrigins: [],
+};
+
+/** 设置项在表里的键名，导出给后台表单复用，避免两处写死字符串。 */
+export const RUNTIME_SETTING_KEYS = {
+	siteName: "site_name",
+	siteIconUrl: "site_icon_url",
+	maxFileSize: "max_file_size",
+	allowedFileTypes: "allowed_file_types",
+	messageRetentionDays: "message_retention_days",
+	softDeleteRetentionDays: "soft_delete_retention_days",
+	orphanUploadRetentionDays: "orphan_upload_retention_days",
+	gcIntervalMinutes: "gc_interval_minutes",
+	siteOrigins: "site_origins",
+} as const;
+
+function toPositiveInteger(value: unknown, fallback: number, { min = 1, max = 3650 } = {}): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+	const rounded = Math.floor(parsed);
+	if (rounded < min || rounded > max) return fallback;
+	return rounded;
+}
+
+function parseCommaList(raw: unknown, fallback: string[]): string[] {
+	if (raw === undefined || raw === null) return fallback;
+	return String(raw)
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean);
+}
+
+function parseOrigins(raw: unknown, fallback: string[]): string[] {
+	if (raw === undefined || raw === null) return fallback;
+	return parseCommaList(raw, fallback)
+		.map((origin) => origin.replace(/\/+$/, ""))
+		.filter((origin) => /^https?:\/\/[^\s,]+$/i.test(origin))
+		.slice(0, MAX_SITE_ORIGINS);
+}
+
+/** 一次 SELECT 读出全部设置并合并默认值；未配置或值非法都回退默认。 */
+export async function getRuntimeSettings(db: D1Database): Promise<RuntimeSettings> {
 	const { results } = await db
 		.prepare("SELECT setting_key, setting_value FROM site_settings")
 		.all<SiteSettingRow>();
 	const map: Record<string, string> = Object.fromEntries(
 		results.map((row) => [row.setting_key, row.setting_value]),
 	);
+	const defaults = RUNTIME_SETTING_DEFAULTS;
+
 	return {
-		siteName: String(map.site_name || "Edgechat"),
+		siteName: String(map.site_name || "").trim() || defaults.siteName,
 		siteIconUrl: siteIconUrlFromStored(map.site_icon_url),
+		maxFileSize: toPositiveInteger(map.max_file_size, defaults.maxFileSize, {
+			min: MIN_UPLOAD_BYTES,
+			max: MAX_UPLOAD_CEILING_BYTES,
+		}),
+		allowedFileTypes:
+			map.allowed_file_types === undefined || map.allowed_file_types === ""
+				? defaults.allowedFileTypes
+				: parseCommaList(map.allowed_file_types, defaults.allowedFileTypes),
+		messageRetentionDays: toPositiveInteger(
+			map.message_retention_days,
+			defaults.messageRetentionDays,
+		),
+		softDeleteRetentionDays: toPositiveInteger(
+			map.soft_delete_retention_days,
+			defaults.softDeleteRetentionDays,
+		),
+		orphanUploadRetentionDays: toPositiveInteger(
+			map.orphan_upload_retention_days,
+			defaults.orphanUploadRetentionDays,
+		),
+		gcIntervalMinutes: toPositiveInteger(map.gc_interval_minutes, defaults.gcIntervalMinutes, {
+			min: 5,
+			max: 10_080,
+		}),
+		siteOrigins: parseOrigins(map.site_origins, defaults.siteOrigins),
 	};
 }
 
+export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
+	const settings = await getRuntimeSettings(db);
+	return { siteName: settings.siteName, siteIconUrl: settings.siteIconUrl };
+}
+
+function upsert(db: D1Database, key: string, value: string): D1PreparedStatement {
+	return db
+		.prepare(
+			`INSERT INTO site_settings (setting_key, setting_value, updated_at)
+			 VALUES (?, ?, CURRENT_TIMESTAMP)
+			 ON CONFLICT(setting_key) DO UPDATE
+			 SET setting_value = excluded.setting_value,
+			     updated_at = CURRENT_TIMESTAMP`,
+		)
+		.bind(key, value);
+}
+
+/** 校验并写回设置项；未出现在入参里的字段保持原值。 */
 export async function updateSiteSettings(
 	db: D1Database,
-	{ siteName, siteIconUrl, siteOrigin = "" }: UpdateSiteSettingsInput,
-): Promise<SiteSettings> {
+	input: UpdateSiteSettingsInput,
+): Promise<RuntimeSettings> {
+	const { siteName, siteIconUrl, siteOrigin = "" } = input;
 	const statements: D1PreparedStatement[] = [];
+	const defaults = RUNTIME_SETTING_DEFAULTS;
+
 	if (siteName !== undefined) {
 		statements.push(
-			db
-				.prepare(
-					`INSERT INTO site_settings (setting_key, setting_value, updated_at)
-					 VALUES ('site_name', ?, CURRENT_TIMESTAMP)
-					 ON CONFLICT(setting_key) DO UPDATE
-					 SET setting_value = excluded.setting_value,
-					     updated_at = CURRENT_TIMESTAMP`,
-				)
-				.bind(String(siteName || "Edgechat").trim() || "Edgechat"),
+			upsert(db, RUNTIME_SETTING_KEYS.siteName, String(siteName || "").trim() || defaults.siteName),
 		);
 	}
 	if (siteIconUrl !== undefined) {
-		const storedIcon = normalizeSiteIconForStorage(siteIconUrl, [siteOrigin]);
 		statements.push(
-			db
-				.prepare(
-					`INSERT INTO site_settings (setting_key, setting_value, updated_at)
-					 VALUES ('site_icon_url', ?, CURRENT_TIMESTAMP)
-					 ON CONFLICT(setting_key) DO UPDATE
-					 SET setting_value = excluded.setting_value,
-					     updated_at = CURRENT_TIMESTAMP`,
-				)
-				.bind(storedIcon),
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.siteIconUrl,
+				normalizeSiteIconForStorage(siteIconUrl, [siteOrigin]),
+			),
 		);
 	}
+	if (input.maxFileSize !== undefined) {
+		statements.push(
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.maxFileSize,
+				String(
+					toPositiveInteger(input.maxFileSize, defaults.maxFileSize, {
+						min: MIN_UPLOAD_BYTES,
+						max: MAX_UPLOAD_CEILING_BYTES,
+					}),
+				),
+			),
+		);
+	}
+	if (input.allowedFileTypes !== undefined) {
+		const types = parseCommaList(input.allowedFileTypes, [])
+			.slice(0, MAX_ALLOWED_FILE_TYPES)
+			.join(",");
+		statements.push(upsert(db, RUNTIME_SETTING_KEYS.allowedFileTypes, types));
+	}
+	if (input.messageRetentionDays !== undefined) {
+		statements.push(
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.messageRetentionDays,
+				String(toPositiveInteger(input.messageRetentionDays, defaults.messageRetentionDays)),
+			),
+		);
+	}
+	if (input.softDeleteRetentionDays !== undefined) {
+		statements.push(
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.softDeleteRetentionDays,
+				String(
+					toPositiveInteger(input.softDeleteRetentionDays, defaults.softDeleteRetentionDays),
+				),
+			),
+		);
+	}
+	if (input.orphanUploadRetentionDays !== undefined) {
+		statements.push(
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.orphanUploadRetentionDays,
+				String(
+					toPositiveInteger(
+						input.orphanUploadRetentionDays,
+						defaults.orphanUploadRetentionDays,
+					),
+				),
+			),
+		);
+	}
+	if (input.gcIntervalMinutes !== undefined) {
+		statements.push(
+			upsert(
+				db,
+				RUNTIME_SETTING_KEYS.gcIntervalMinutes,
+				String(
+					toPositiveInteger(input.gcIntervalMinutes, defaults.gcIntervalMinutes, {
+						min: 5,
+						max: 10_080,
+					}),
+				),
+			),
+		);
+	}
+	if (input.siteOrigins !== undefined) {
+		statements.push(
+			upsert(db, RUNTIME_SETTING_KEYS.siteOrigins, parseOrigins(input.siteOrigins, []).join(",")),
+		);
+	}
+
 	if (statements.length) {
 		await db.batch(statements);
 	}
-	return getSiteSettings(db);
+	return getRuntimeSettings(db);
 }
