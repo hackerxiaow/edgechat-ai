@@ -115,13 +115,13 @@ async function submit(event) {
       <form class="login-form" @submit.prevent="submit">
         
         <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 8px; justify-content: center;">
-          <button type="button" :class="['auth-tab', { active: loginMethod === 'password' }]" @click="loginMethod = 'password'">密码登录</button>
-          <button type="button" :class="['auth-tab', { active: loginMethod === 'code' }]" @click="loginMethod = 'code'">验证码登录</button>
+          <button type="button" :class="['auth-tab', { active: loginMethod === 'password' }]" @click="loginMethod = 'password'">{{ t('auth.passwordLogin') }}</button>
+          <button type="button" :class="['auth-tab', { active: loginMethod === 'code' }]" @click="loginMethod = 'code'">{{ t('auth.codeLogin') }}</button>
         </div>
 
         <template v-if="loginMethod === 'password'">
           <label class="login-field">
-            <span class="login-label">用户名 / 邮箱</span>
+            <span class="login-label">{{ t('auth.accountOrEmail') }}</span>
             <span class="input-wrapper">
               <input v-model.trim="form.account" class="login-input" autocomplete="username" required type="text" />
             </span>
@@ -137,19 +137,19 @@ async function submit(event) {
 
         <template v-else>
           <label class="login-field">
-            <span class="login-label">邮箱</span>
+            <span class="login-label">{{ t('auth.email') }}</span>
             <div style="display: flex; gap: 8px;">
               <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" required type="email" />
               <button type="button" class="login-btn" style="width: auto; margin-top: 0; padding: 0 16px;" :disabled="!form.email || sendingCode || countdown > 0" @click="sendCode">
-                {{ countdown > 0 ? countdown + 's' : '获取验证码' }}
+                {{ countdown > 0 ? countdown + 's' : t('auth.getVerificationCode') }}
               </button>
             </div>
           </label>
 
           <label class="login-field">
-            <span class="login-label">验证码</span>
+            <span class="login-label">{{ t('auth.verificationCode') }}</span>
             <span class="input-wrapper">
-              <input v-model.trim="form.code" class="login-input" required type="text" placeholder="6位数字" />
+              <input v-model.trim="form.code" class="login-input" required type="text" :placeholder="t('auth.codePlaceholder')" />
             </span>
           </label>
         </template>
@@ -159,8 +159,8 @@ async function submit(event) {
         </button>
 
         <div style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 0.9rem;">
-          <router-link to="/forgot-password" style="color: var(--cool); text-decoration: none;">忘记密码？</router-link>
-          <router-link to="/register" style="color: var(--cool); text-decoration: none;">注册账号</router-link>
+          <router-link to="/forgot-password" style="color: var(--cool); text-decoration: none;">{{ t('auth.forgotPassword') }}</router-link>
+          <router-link to="/register" style="color: var(--cool); text-decoration: none;">{{ t('auth.registerAccount') }}</router-link>
         </div>
 
         <p v-if="error" class="login-error" role="alert">{{ error }}</p>

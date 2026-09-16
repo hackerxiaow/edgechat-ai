@@ -148,19 +148,19 @@ onMounted(() => {
 
       <form v-if="showForm && !error" class="login-form" @submit.prevent="submit">
         <label v-if="isOpenRegistration" class="login-field">
-          <span class="login-label">邮箱</span>
+          <span class="login-label">{{ t('auth.email') }}</span>
           <div style="display: flex; gap: 8px;">
             <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" type="email" required />
             <button type="button" class="login-btn" style="width: auto; margin-top: 0; padding: 0 16px;" :disabled="!form.email || sendingCode || countdown > 0" @click="sendCode">
-              {{ countdown > 0 ? countdown + 's' : '获取验证码' }}
+              {{ countdown > 0 ? countdown + 's' : t('auth.getVerificationCode') }}
             </button>
           </div>
         </label>
         
         <label v-if="isOpenRegistration" class="login-field">
-          <span class="login-label">验证码</span>
+          <span class="login-label">{{ t('auth.verificationCode') }}</span>
           <span class="input-wrapper">
-            <input v-model.trim="form.code" class="login-input" required type="text" placeholder="6位数字" />
+            <input v-model.trim="form.code" class="login-input" required type="text" :placeholder="t('auth.codePlaceholder')" />
           </span>
         </label>
         <label class="login-field">
@@ -225,7 +225,7 @@ onMounted(() => {
       </form>
       
       <div style="text-align: center; margin-top: 24px;">
-        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.95rem; font-weight: 500;">返回登录</router-link>
+        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.95rem; font-weight: 500;">{{ t('auth.backToLogin') }}</router-link>
       </div>
     </div>
   </div>

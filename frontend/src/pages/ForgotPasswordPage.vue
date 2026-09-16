@@ -54,7 +54,7 @@ async function submit() {
 
       <form v-if="!success" class="login-form" @submit.prevent="submit">
         <label class="login-field">
-          <span class="login-label">邮箱</span>
+          <span class="login-label">{{ t('auth.email') }}</span>
           <span class="input-wrapper">
             <input
               v-model.trim="email"
@@ -71,7 +71,7 @@ async function submit() {
         </button>
       </form>
       <div style="text-align: center; margin-top: 16px;">
-        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.9rem;">返回登录</router-link>
+        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.9rem;">{{ t('auth.backToLogin') }}</router-link>
       </div>
     </div>
   </div>
