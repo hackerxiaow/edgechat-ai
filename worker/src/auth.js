@@ -90,10 +90,22 @@ function resolveSessionTtl(session, fallback) {
 }
 
 export async function putSession(env, session, { ttlSeconds = SESSION_TTL_SECONDS } = {}) {
-  await env.SESSIONS.put(session.token, JSON.stringify(session), {
-    // 移动端 access token 的寿命短于网页会话；刷新资料时必须保留原到期时间，不能被普通写回延长。
-    expirationTtl: resolveSessionTtl(session, ttlSeconds)
-  });
+  if (env.DB) {
+    const ttl = resolveSessionTtl(session, ttlSeconds);
+    const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+    const data = JSON.stringify(session);
+    await env.DB.prepare(
+      `INSERT INTO sessions (token, user_id, data, expires_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(token) DO UPDATE SET data = excluded.data, expires_at = excluded.expires_at`
+    ).bind(session.token, Number(session.userId), data, expiresAt).run();
+    return;
+  }
+  if (env.SESSIONS) {
+    await env.SESSIONS.put(session.token, JSON.stringify(session), {
+      expirationTtl: resolveSessionTtl(session, ttlSeconds)
+    });
+  }
 }
 
 export async function createSession(env, user) {
@@ -118,24 +130,42 @@ export async function getSession(env, token) {
   if (!token) {
     return null;
   }
-  const raw = await env.SESSIONS.get(token);
-  if (!raw) {
-    return null;
+  if (env.DB) {
+    const now = Math.floor(Date.now() / 1000);
+    const row = await env.DB.prepare(
+      'SELECT data, expires_at FROM sessions WHERE token = ? LIMIT 1'
+    ).bind(token).first();
+    if (!row) return null;
+    if (row.expires_at < now) {
+      await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+      return null;
+    }
+    const session = JSON.parse(row.data);
+    session.token = token;
+    if (session.sessionVersion === undefined) session.sessionVersion = 0;
+    if (session.isAdmin === undefined) session.isAdmin = false;
+    return session;
   }
-  const session = JSON.parse(raw);
-  session.token = token;
-  if (session.sessionVersion === undefined) {
-    session.sessionVersion = 0;
+  if (env.SESSIONS) {
+    const raw = await env.SESSIONS.get(token);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    session.token = token;
+    if (session.sessionVersion === undefined) session.sessionVersion = 0;
+    if (session.isAdmin === undefined) session.isAdmin = false;
+    return session;
   }
-  if (session.isAdmin === undefined) {
-    session.isAdmin = false;
-  }
-  return session;
+  return null;
 }
 
 export async function deleteSession(env, token) {
   if (!token) {
     return;
   }
-  await env.SESSIONS.delete(token);
+  if (env.DB) {
+    await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+  }
+  if (env.SESSIONS) {
+    await env.SESSIONS.delete(token);
+  }
 }

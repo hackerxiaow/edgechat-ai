@@ -8,19 +8,20 @@ export function isR2ObjectUnavailableError(error) {
 
 export async function recordUploadedFile(
 	db,
-	{ key, ownerUserId, filename, contentType, size, clientUploadId = null },
+	{ key, ownerUserId, filename, contentType, size, clientUploadId = null, data = null },
 ) {
 	await db
 		.prepare(
 			`INSERT INTO uploaded_files (
-				   object_key, owner_user_id, filename, content_type, size, client_upload_id, created_at
-				 ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+				   object_key, owner_user_id, filename, content_type, size, client_upload_id, data, created_at
+				 ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 				 ON CONFLICT(object_key) DO UPDATE SET
 				   owner_user_id = excluded.owner_user_id,
 				   filename = excluded.filename,
 				   content_type = excluded.content_type,
 				   size = excluded.size,
-				   client_upload_id = excluded.client_upload_id`,
+				   client_upload_id = excluded.client_upload_id,
+				   data = coalesce(excluded.data, uploaded_files.data)`,
 		)
 		.bind(
 			String(key),
@@ -29,6 +30,7 @@ export async function recordUploadedFile(
 			String(contentType || ""),
 				Number(size || 0),
 				clientUploadId ? String(clientUploadId) : null,
+				data,
 			)
 		.run();
 }

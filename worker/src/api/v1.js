@@ -233,7 +233,8 @@ export function registerV1Routes(app) {
 				attachment: payload.attachment || null,
 				mentionUserIds: payload.mentionUserIds || [],
 				replyMessageId: payload.replyMessageId ?? null
-			  }
+			  },
+      ctx: c.executionCtx
     });
   });
 

@@ -311,8 +311,18 @@ app.get('/api/inbox/ws', async (c) => {
 });
 
 app.notFound(async (c) => {
-  if (new URL(c.req.url).pathname.startsWith('/api/')) {
+  const pathname = new URL(c.req.url).pathname;
+  if (pathname.startsWith('/api/')) {
     return errorResponse('接口不存在', 404);
+  }
+  // Cloudflare Pages ASSETS 静态资产与 SPA 404 回退到 index.html
+  if (c.env.ASSETS) {
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    if (res.status === 404 && !pathname.startsWith('/files/')) {
+      const indexReq = new Request(new URL('/index.html', c.req.url), c.req.raw);
+      return c.env.ASSETS.fetch(indexReq);
+    }
+    return res;
   }
   return new Response('Not Found', { status: 404 });
 });

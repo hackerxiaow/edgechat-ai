@@ -158,6 +158,15 @@ export default {
       body: payload
     });
   },
+  deleteRoomMessage(kind, roomId, messageId) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/messages/${Number(messageId)}`, {
+      method: 'DELETE'
+    });
+  },
+  syncRoomMessages(kind, roomId, cursor) {
+    const query = new URLSearchParams(cursor ? { cursor: String(cursor) } : {});
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/sync?${query.toString()}`);
+  },
   markRoomRead(kind, roomId, messageId) {
     return request('/messages/read', {
       method: 'POST',

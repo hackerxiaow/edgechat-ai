@@ -2,15 +2,25 @@ import {
 	createInternalHeaders,
 	createVerifiedPrincipalHeaders,
 } from "./verified-identity.js";
+import { submitRoomMessageIdempotent } from "./message-submission.js";
+import { deleteRoomMessage } from "./message-deletion.js";
+import { pinRoomMessage, unpinRoomMessage } from "./message-pinning.js";
+import { authorizeRoom } from "./room-access.js";
+import { projectUnreadMessage } from "./unread-projection.js";
+import { forwardEdgeChatMessageToTelegram } from "./integrations/telegram/bridge.js";
+import { processAiBotResponse } from "./integrations/ai-bot.js";
+import { submitExternalMessage } from "./external-message-submission.js";
 
 const INTERNAL_ORIGIN = "https://cfchat.internal";
 
 function getChannelRoomStub(env, kind, roomId) {
+	if (!env.CHANNEL_ROOM) return null;
 	const name = `${kind}:${Number(roomId)}`;
 	return env.CHANNEL_ROOM.get(env.CHANNEL_ROOM.idFromName(name));
 }
 
 function getUserInboxStub(env, userId) {
+	if (!env.USER_INBOX) return null;
 	const name = `user:${Number(userId)}`;
 	return env.USER_INBOX.get(env.USER_INBOX.idFromName(name));
 }
@@ -22,6 +32,9 @@ export async function forwardVerifiedRequest({
 	searchParams = {},
 	principal,
 }) {
+	if (!stub) {
+		return new Response("Durable Objects not available on this deployment", { status: 501 });
+	}
 	const url = new URL(request.url);
 	url.pathname = pathname;
 	for (const [key, value] of Object.entries(searchParams)) {
@@ -35,15 +48,18 @@ export async function forwardVerifiedRequest({
 		headers: createVerifiedPrincipalHeaders(request.headers, principal),
 	};
 	if (!["GET", "HEAD"].includes(request.method)) {
-		// 先把请求体固化为可重放字节，避免跨运行时转发 ReadableStream 时依赖 Node 专属 duplex 配置。
 		init.body = await request.arrayBuffer();
 	}
 	return stub.fetch(new Request(url.toString(), init));
 }
 
 export function forwardRoomConnection({ env, request, kind, roomId, principal }) {
+	const stub = getChannelRoomStub(env, kind, roomId);
+	if (!stub) {
+		return new Response("WebSockets require Workers Paid Durable Objects; using polling mode", { status: 501 });
+	}
 	return forwardVerifiedRequest({
-		stub: getChannelRoomStub(env, kind, roomId),
+		stub,
 		request,
 		pathname: "/connect",
 		searchParams: { kind, id: roomId, token: principal.token },
@@ -52,8 +68,12 @@ export function forwardRoomConnection({ env, request, kind, roomId, principal })
 }
 
 export function forwardInboxConnection({ env, request, principal }) {
+	const stub = getUserInboxStub(env, principal.userId);
+	if (!stub) {
+		return new Response("WebSockets require Workers Paid Durable Objects; using polling mode", { status: 501 });
+	}
 	return forwardVerifiedRequest({
-		stub: getUserInboxStub(env, principal.userId),
+		stub,
 		request,
 		pathname: "/connect",
 		principal,
@@ -61,35 +81,101 @@ export function forwardInboxConnection({ env, request, principal }) {
 }
 
 export async function notifyUserInbox(env, userId, payload) {
-	const response = await getUserInboxStub(env, userId).fetch(`${INTERNAL_ORIGIN}/notify`, {
+	const stub = getUserInboxStub(env, userId);
+	if (!stub) return null;
+	return stub.fetch(`${INTERNAL_ORIGIN}/notify`, {
 		method: "POST",
 		headers: createInternalHeaders({ "Content-Type": "application/json" }),
 		body: JSON.stringify(payload),
 	});
-	return response;
 }
 
-export function submitClientRoomAction(env, { room, principal, action }) {
-  return forwardVerifiedRequest({
-    stub: getChannelRoomStub(env, room.kind, room.id),
-    request: new Request(`${INTERNAL_ORIGIN}/client-action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room, action })
-    }),
-    pathname: '/client-action',
-    principal
-  });
+export async function submitClientRoomAction(env, { room, principal, action, ctx = null }) {
+	const stub = getChannelRoomStub(env, room.kind, room.id);
+	if (stub) {
+		return forwardVerifiedRequest({
+			stub,
+			request: new Request(`${INTERNAL_ORIGIN}/client-action`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ room, action })
+			}),
+			pathname: '/client-action',
+			principal
+		});
+	}
+
+	// 纯 D1 模式（无需 Durable Objects，直接在 D1 事务与函数中执行）
+	const access = await authorizeRoom(env.DB, principal, room.kind, room.id);
+	if (!access.ok) {
+		return Response.json(
+			{ error: { code: 'forbidden', message: '无权访问该会话' } },
+			{ status: 403 }
+		);
+	}
+
+	const meta = { principal, room: access.room };
+	if (action?.type === 'send') {
+		const result = await submitRoomMessageIdempotent(env, meta, action);
+		if (result.created) {
+			void projectUnreadMessage(env, {
+				room: access.room,
+				senderId: result.message.sender?.kind === 'local' ? result.message.sender.id : null,
+				message: result.message,
+				replyToSenderId: result.replyToSenderId
+			}).catch(console.error);
+
+			void forwardEdgeChatMessageToTelegram(env, { room: access.room, message: result.message }).catch(console.error);
+
+			const dummyRoom = {
+				env,
+				broadcast: async () => {},
+				runMessageProjections: () => {}
+			};
+			const aiPromise = processAiBotResponse(dummyRoom, { room: access.room, message: result.message }).catch(console.error);
+			if (ctx && typeof ctx.waitUntil === 'function') {
+				ctx.waitUntil(aiPromise);
+			} else {
+				// 兜底等待，保证 AI 回复生成不被边缘实例挂起终止
+				await aiPromise;
+			}
+		}
+		return Response.json({ created: result.created, message: result.message });
+	}
+
+	if (action?.type === 'delete_message') {
+		const result = await deleteRoomMessage(env, meta, action);
+		return Response.json({ ok: true, messageId: result.messageId });
+	}
+
+	if (action?.type === 'pin_message') {
+		const result = await pinRoomMessage(env, meta, action);
+		return Response.json({ ok: true, message: result.message });
+	}
+
+	if (action?.type === 'unpin_message') {
+		const result = await unpinRoomMessage(env, meta, action);
+		return Response.json({ ok: true, messageId: result.messageId });
+	}
+
+	return Response.json(
+		{ error: { code: 'invalid_request', message: '不支持的消息操作' } },
+		{ status: 400 }
+	);
 }
 
 export async function submitExternalRoomMessage(env, payload) {
 	const room = payload.room;
-	return getChannelRoomStub(env, room.kind, room.id).fetch(
-		`${INTERNAL_ORIGIN}/external-message`,
-		{
-			method: "POST",
-			headers: createInternalHeaders({ "Content-Type": "application/json" }),
-			body: JSON.stringify(payload),
-		},
-	);
+	const stub = getChannelRoomStub(env, room.kind, room.id);
+	if (stub) {
+		return stub.fetch(
+			`${INTERNAL_ORIGIN}/external-message`,
+			{
+				method: "POST",
+				headers: createInternalHeaders({ "Content-Type": "application/json" }),
+				body: JSON.stringify(payload),
+			},
+		);
+	}
+	return submitExternalMessage(env, payload);
 }

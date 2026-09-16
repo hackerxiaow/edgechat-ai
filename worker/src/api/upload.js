@@ -73,8 +73,8 @@ function validateUpload(env, file) {
 
 export function registerUploadRoutes(app) {
   app.post('/api/upload', async (c) => {
-    if (!c.env.FILES) {
-      return errorResponse('当前部署没有绑定 R2，无法上传附件', 503);
+    if (!c.env.FILES && !c.env.DB) {
+      return errorResponse('存储服务不可用，无法上传附件', 503);
     }
 
     const session = c.get('session');
@@ -111,16 +111,26 @@ export function registerUploadRoutes(app) {
     if (!canRead) {
       return new Response('Forbidden', { status: 403 });
     }
-    if (!c.env.FILES) {
-      return errorResponse('当前部署没有绑定 R2，无法读取附件', 503);
-    }
+    // 优先从 R2 获取，若无 R2 或 R2 无此文件，从 D1 读取
+    let object = c.env.FILES ? await c.env.FILES.get(key) : null;
+    const fileMetadata = await getUploadedFileMetadata(c.env.DB, key);
 
-    const [object, fileMetadata] = await Promise.all([
-      c.env.FILES.get(key),
-      getUploadedFileMetadata(c.env.DB, key)
-    ]);
     if (!object) {
-      return new Response('Not Found', { status: 404 });
+      const d1File = await c.env.DB.prepare(
+        'SELECT filename, content_type, data FROM uploaded_files WHERE object_key = ? LIMIT 1'
+      ).bind(key).first();
+      if (!d1File || !d1File.data) {
+        return new Response('Not Found', { status: 404 });
+      }
+      const headers = new Headers();
+      const contentType = normalizeContentType(d1File.content_type) || 'application/octet-stream';
+      headers.set('content-type', contentType);
+      headers.set('cache-control', 'public, max-age=31536000, immutable');
+      headers.set('x-content-type-options', 'nosniff');
+      const inlineAllowed = isInlineContentType(contentType);
+      const dispositionKind = inlineAllowed && !contentType.startsWith('text/') ? 'inline' : 'attachment';
+      headers.set('content-disposition', contentDispositionValue(dispositionKind, d1File.filename || 'file'));
+      return new Response(d1File.data, { headers });
     }
 
     let decrypted;
@@ -172,11 +182,16 @@ export async function saveUploadedFile(env, session, file, { clientUploadId = nu
   const key = `${session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
   const filename = sanitizeFilename(file.name);
   const contentType = normalizeContentType(file.type) || 'application/octet-stream';
-  const encryptedFile = await encryptAttachment(env, await file.arrayBuffer(), key);
-  await env.FILES.put(key, encryptedFile, {
-    httpMetadata: { contentType, cacheControl: FILE_RESPONSE_CACHE_CONTROL },
-    customMetadata: { filename, edgechatEncryption: 'v1' }
-  });
+
+  const fileBytes = await file.arrayBuffer();
+
+  if (env.FILES) {
+    const encryptedFile = await encryptAttachment(env, fileBytes, key);
+    await env.FILES.put(key, encryptedFile, {
+      httpMetadata: { contentType, cacheControl: FILE_RESPONSE_CACHE_CONTROL },
+      customMetadata: { filename, edgechatEncryption: 'v1' }
+    });
+  }
 
   try {
     await recordUploadedFile(env.DB, {
@@ -185,14 +200,16 @@ export async function saveUploadedFile(env, session, file, { clientUploadId = nu
       filename,
       contentType,
       size: file.size,
-      clientUploadId
+      clientUploadId,
+      data: !env.FILES ? new Uint8Array(fileBytes) : null
     });
   } catch (error) {
-    // 元数据失败或幂等键竞争时移除本次新对象，避免 R2 留下没有稳定引用的副本。
-    try {
-      await env.FILES.delete(key);
-    } catch (deleteError) {
-      console.warn('Failed to delete orphaned upload after metadata error', deleteError);
+    if (env.FILES) {
+      try {
+        await env.FILES.delete(key);
+      } catch (deleteError) {
+        console.warn('Failed to delete orphaned upload after metadata error', deleteError);
+      }
     }
     if (clientUploadId && String(error?.message || error).includes('UNIQUE')) {
       const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);

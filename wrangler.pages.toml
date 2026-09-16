@@ -1,0 +1,15 @@
+name = "edgechat"
+pages_build_output_dir = "frontend/dist"
+compatibility_date = "2026-04-05"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ADMIN_USERNAMES = "admin"
+MESSAGE_RETENTION_DAYS = "7"
+MAX_FILE_SIZE = "1048576"
+SITE_ORIGINS = "https://chat.cnz.kdns.fr"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cfchat-db"
+database_id = "0d012571-bc6f-4cf2-90fe-e480a14369b3"
