@@ -1,24 +1,3 @@
-
-function typewriteMessage(target, fullText, scrollTo) {
-	if (!fullText || fullText === '...' || typeof fullText !== 'string') {
-		target.content = fullText;
-		return;
-	}
-	let idx = 0;
-	target.content = '';
-	const total = fullText.length;
-	const step = Math.max(1, Math.ceil(total / 35));
-	const timer = setInterval(() => {
-		idx = Math.min(total, idx + step);
-		target.content = fullText.slice(0, idx);
-		scrollTo?.();
-		if (idx >= total) {
-			clearInterval(timer);
-			target.content = fullText;
-			scrollTo?.();
-		}
-	}, 25);
-}
 import { nextTick, ref, watch } from "vue";
 import api from "../api.js";
 import { dispatchAuthInvalid } from "../auth-storage.js";
@@ -151,6 +130,22 @@ export function useChatRoom({
 		}
 	}
 
+	function upsertMessage(message) {
+		if (!message) return;
+		const targetId = Number(message.id);
+		const clientMsgId = message.clientMessageId;
+		const idx = messages.value.findIndex((m) =>
+			(targetId > 0 && Number(m.id) === targetId) ||
+			(clientMsgId && m.clientMessageId === clientMsgId)
+		);
+		if (idx !== -1) {
+			messages.value[idx] = { ...messages.value[idx], ...message };
+		} else {
+			messages.value = [...messages.value, message];
+		}
+		nextTick().then(scrollToBottom);
+	}
+
 	const roomSession = createRealtimeSession({
 		openConnection(params, handlers) {
 			return openRoomConnection({
@@ -167,58 +162,10 @@ export function useChatRoom({
 			if (connection?.key !== roomKey()) {
 				return;
 			}
-			if (payload.type === "message" && payload.message) {
-				const existing = messages.value.find((item) => Number(item.id) === Number(payload.message.id));
-				if (existing) {
-					if (existing.content !== payload.message.content) {
-						if (payload.message.source === 'ai') {
-							typewriteMessage(existing, payload.message.content, scrollToBottom);
-						} else {
-							existing.content = payload.message.content;
-							nextTick().then(scrollToBottom);
-						}
-					}
-					return;
-				}
-				const newMsg = { ...payload.message };
-				messages.value = [...messages.value, newMsg];
+			if ((payload.type === "message" || payload.type === "message_updated") && payload.message) {
+				upsertMessage(payload.message);
 				applyActiveRoomActivity(payload.message);
-				if (payload.message.source === 'ai' && payload.message.content !== '...') {
-					typewriteMessage(newMsg, payload.message.content, scrollToBottom);
-				} else {
-					nextTick().then(scrollToBottom);
-				}
-			}
-			if (payload.type === "message_updated" && payload.message) {
-				const existing = messages.value.find((item) => Number(item.id) === Number(payload.message.id));
-				if (existing) {
-					if (existing.content !== payload.message.content) {
-						if (payload.message.source === 'ai') {
-							typewriteMessage(existing, payload.message.content, scrollToBottom);
-						} else {
-							existing.content = payload.message.content;
-							nextTick().then(scrollToBottom);
-						}
-					}
-				}
-			}
-			if (payload.type === "message_stream" && payload.messageId) {
-				const target = messages.value.find((item) => Number(item.id) === Number(payload.messageId));
-				if (target) {
-					if (payload.replace) {
-						target.content = payload.delta;
-					} else {
-						target.content = (target.content || "") + payload.delta;
-					}
-					nextTick().then(scrollToBottom);
-				}
-			}
-			if (payload.type === "message_updated" && payload.message) {
-				const index = messages.value.findIndex((item) => Number(item.id) === Number(payload.message.id));
-				if (index !== -1) {
-					messages.value[index] = { ...messages.value[index], ...payload.message };
-					nextTick().then(scrollToBottom);
-				}
+				return;
 			}
 			if (payload.type === "message_deleted") {
 				const messageId = Number(payload.messageId);
@@ -357,9 +304,7 @@ export function useChatRoom({
 				source: 'edgechat',
 				clientMessageId
 			};
-			messages.value = [...messages.value, optimisticMsg];
-			await nextTick();
-			scrollToBottom();
+			upsertMessage(optimisticMsg);
 
 			try {
 				const res = await roomApi.sendRoomMessage(activeRoom.value.kind, activeRoom.value.id, {
@@ -370,15 +315,12 @@ export function useChatRoom({
 					replyMessageId: replyMessageId ? Number(replyMessageId) : null
 				});
 				if (res?.message) {
-					const idx = messages.value.findIndex(m => m.id === tempId || m.clientMessageId === clientMessageId);
-					if (idx !== -1) {
-						messages.value[idx] = res.message;
-					}
+					upsertMessage(res.message);
 				}
 				return true;
 			} catch (currentError) {
 				error.value = currentError.message;
-				messages.value = messages.value.filter(m => m.id !== tempId);
+				messages.value = messages.value.filter(m => m.id !== tempId && m.clientMessageId !== clientMessageId);
 				return false;
 			} finally {
 				sending.value = false;
