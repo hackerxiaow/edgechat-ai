@@ -20,6 +20,7 @@ const invite = ref(null);
 
 const form = reactive({
   email: '',
+  code: '',
   username: '',
   displayName: '',
   password: '',
@@ -28,6 +29,32 @@ const form = reactive({
 
 const token = computed(() => String(route.params.token || '').trim());
 const isOpenRegistration = computed(() => !token.value);
+const sendingCode = ref(false);
+const countdown = ref(0);
+
+async function sendCode() {
+  if (!form.email || sendingCode.value || countdown.value > 0) return;
+  sendingCode.value = true;
+  error.value = '';
+  try {
+    const res = await fetch('/api/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email, purpose: 'register' })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    countdown.value = 60;
+    const timer = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) clearInterval(timer);
+    }, 1000);
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    sendingCode.value = false;
+  }
+}
 // 后台「运行配置」里的开放注册开关；关闭时无 token 访问只能看到提示。
 const openRegistrationEnabled = computed(() => Boolean(store.site.allowOpenRegistration));
 const showForm = computed(() => Boolean(invite.value) || (isOpenRegistration.value && openRegistrationEnabled.value));
@@ -122,8 +149,18 @@ onMounted(() => {
       <form v-if="showForm && !error" class="login-form" @submit.prevent="submit">
         <label v-if="isOpenRegistration" class="login-field">
           <span class="login-label">邮箱</span>
+          <div style="display: flex; gap: 8px;">
+            <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" type="email" required />
+            <button type="button" class="login-btn" style="width: auto; margin-top: 0; padding: 0 16px;" :disabled="!form.email || sendingCode || countdown > 0" @click="sendCode">
+              {{ countdown > 0 ? countdown + 's' : '获取验证码' }}
+            </button>
+          </div>
+        </label>
+        
+        <label v-if="isOpenRegistration" class="login-field">
+          <span class="login-label">验证码</span>
           <span class="input-wrapper">
-            <input v-model.trim="form.email" class="login-input" autocomplete="email" type="email" required />
+            <input v-model.trim="form.code" class="login-input" required type="text" placeholder="6位数字" />
           </span>
         </label>
         <label class="login-field">
@@ -186,6 +223,9 @@ onMounted(() => {
           {{ loading ? t('auth.registering') : t('auth.completeRegistration') }}
         </button>
       </form>
+      <div style="text-align: center; margin-top: 16px;">
+        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.9rem;">已有账号？返回登录</router-link>
+      </div>
     </div>
   </div>
 </template>

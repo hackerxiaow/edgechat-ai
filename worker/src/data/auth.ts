@@ -39,3 +39,39 @@ export async function clearPasswordReset(db: D1Database, token: string) {
 export async function resetUserPassword(db: D1Database, userId: number, passwordHash: string, passwordSalt: string) {
   await db.prepare(`UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?`).bind(passwordHash, passwordSalt, userId).run();
 }
+
+export async function generateVerificationCode(db: D1Database, email: string, purpose: 'register' | 'login'): Promise<string> {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+  await db.prepare('INSERT INTO verification_codes (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)')
+    .bind(email, code, purpose, expiresAt)
+    .run();
+  return code;
+}
+
+export async function verifyVerificationCode(db: D1Database, email: string, code: string, purpose: 'register' | 'login'): Promise<boolean> {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+  const row = await db.prepare('SELECT id FROM verification_codes WHERE email = ? AND code = ? AND purpose = ? AND expires_at > ?')
+    .bind(email, code, purpose, now)
+    .first<{ id: number }>();
+  if (row) {
+    await db.prepare('DELETE FROM verification_codes WHERE id = ?').bind(row.id).run();
+    return true;
+  }
+  return false;
+}
+
+export async function sendEmail(smtpRelayUrl: string, smtpApiKey: string, to: string, subject: string, text: string) {
+  if (!smtpRelayUrl) return false;
+  try {
+    const res = await fetch(smtpRelayUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${smtpApiKey}` },
+      body: JSON.stringify({ to, subject, text })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('sendEmail error', e);
+    return false;
+  }
+}

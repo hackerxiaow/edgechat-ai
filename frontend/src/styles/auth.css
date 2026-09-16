@@ -257,3 +257,23 @@ html.dark .login-btn:hover:not(:disabled) {
   .custom-cursor.visible { animation: none; opacity: 1; }
   .login-btn, .login-input { transition: none; }
 }
+
+
+.auth-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-soft);
+}
+.auth-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--cool);
+}
+.auth-tab:hover:not(.active) {
+  color: var(--text-soft);
+}

@@ -170,3 +170,19 @@ export async function listStorageOwners(db: D1Database): Promise<StorageOwner[]>
 		isDeleted: Boolean(row.deleted_at),
 	}));
 }
+
+export async function getUserByEmail(db: D1Database, email: string): Promise<UserRow | null> {
+  const { results } = await db
+    .prepare("SELECT * FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1")
+    .bind(email)
+    .all<UserRow>();
+  return results[0] || null;
+}
+
+export async function getUserByIdentifier(db: D1Database, identifier: string): Promise<UserRow | null> {
+  const { results } = await db
+    .prepare("SELECT * FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL LIMIT 1")
+    .bind(identifier, identifier)
+    .all<UserRow>();
+  return results[0] || null;
+}

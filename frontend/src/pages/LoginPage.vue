@@ -18,9 +18,38 @@ const loading = ref(false);
 const error = ref('');
 const form = reactive({
   serverOrigin: getStoredNativeServerOrigin(),
-  username: '',
-  password: ''
+  account: '',
+  password: '',
+  email: '',
+  code: ''
 });
+const loginMethod = ref('password');
+const sendingCode = ref(false);
+const countdown = ref(0);
+
+async function sendCode() {
+  if (!form.email || sendingCode.value || countdown.value > 0) return;
+  sendingCode.value = true;
+  error.value = '';
+  try {
+    const res = await fetch('/api/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email, purpose: 'login' })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    countdown.value = 60;
+    const timer = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) clearInterval(timer);
+    }, 1000);
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    sendingCode.value = false;
+  }
+}
 const registered = computed(() => route.query.registered === '1');
 
 const usernameInput = ref(null);
@@ -41,8 +70,10 @@ async function submit(event) {
   error.value = '';
   try {
     // Android WebView 的自动填充不一定触发 input 事件，提交时以输入框当前值为准。
-    const submitted = new FormData(event.currentTarget);
-    const { serverOrigin, credentials } = readLoginSubmission(submitted);
+    const serverOrigin = form.serverOrigin;
+    const credentials = loginMethod.value === 'code' 
+      ? { method: 'code', email: form.email, code: form.code }
+      : { method: 'password', account: form.account, password: form.password };
     if (isCapacitorAndroid) {
       await store.configureNativeServer(serverOrigin);
     }
@@ -80,55 +111,48 @@ async function submit(event) {
 
       <p v-if="registered" class="login-hint" role="status">{{ t('auth.registerSuccess') }}</p>
 
+      
       <form class="login-form" @submit.prevent="submit">
-        <label v-if="isCapacitorAndroid" class="login-field">
-          <span class="login-label">{{ t('auth.serverOrigin') }}</span>
-          <span class="input-wrapper">
-            <span ref="serverCursor" class="custom-cursor"></span>
-            <input
-              ref="serverInput"
-              v-model.trim="form.serverOrigin"
-              class="login-input"
-              autocomplete="url"
-              inputmode="url"
-              name="serverOrigin"
-              required
-              type="url"
-            />
-          </span>
-        </label>
+        
+        <div class="auth-tabs" style="display: flex; gap: 16px; margin-bottom: 8px; justify-content: center;">
+          <button type="button" :class="['auth-tab', { active: loginMethod === 'password' }]" @click="loginMethod = 'password'">密码登录</button>
+          <button type="button" :class="['auth-tab', { active: loginMethod === 'code' }]" @click="loginMethod = 'code'">验证码登录</button>
+        </div>
 
-        <label class="login-field">
-          <span class="login-label">{{ t('auth.account') }}</span>
-          <span class="input-wrapper">
-            <span ref="usernameCursor" class="custom-cursor"></span>
-            <input
-              ref="usernameInput"
-              v-model.trim="form.username"
-              class="login-input"
-              autocomplete="username"
-              name="username"
-              required
-              type="text"
-            />
-          </span>
-        </label>
+        <template v-if="loginMethod === 'password'">
+          <label class="login-field">
+            <span class="login-label">用户名 / 邮箱</span>
+            <span class="input-wrapper">
+              <input v-model.trim="form.account" class="login-input" autocomplete="username" required type="text" />
+            </span>
+          </label>
 
-        <label class="login-field">
-          <span class="login-label">{{ t('auth.password') }}</span>
-          <span class="input-wrapper">
-            <span ref="passwordCursor" class="custom-cursor"></span>
-            <input
-              ref="passwordInput"
-              v-model="form.password"
-              class="login-input"
-              autocomplete="current-password"
-              name="password"
-              required
-              type="password"
-            />
-          </span>
-        </label>
+          <label class="login-field">
+            <span class="login-label">{{ t('auth.password') }}</span>
+            <span class="input-wrapper">
+              <input v-model="form.password" class="login-input" autocomplete="current-password" required type="password" />
+            </span>
+          </label>
+        </template>
+
+        <template v-else>
+          <label class="login-field">
+            <span class="login-label">邮箱</span>
+            <div style="display: flex; gap: 8px;">
+              <input v-model.trim="form.email" class="login-input" style="flex: 1;" autocomplete="email" required type="email" />
+              <button type="button" class="login-btn" style="width: auto; margin-top: 0; padding: 0 16px;" :disabled="!form.email || sendingCode || countdown > 0" @click="sendCode">
+                {{ countdown > 0 ? countdown + 's' : '获取验证码' }}
+              </button>
+            </div>
+          </label>
+
+          <label class="login-field">
+            <span class="login-label">验证码</span>
+            <span class="input-wrapper">
+              <input v-model.trim="form.code" class="login-input" required type="text" placeholder="6位数字" />
+            </span>
+          </label>
+        </template>
 
         <button class="login-btn" :disabled="loading" type="submit">
           {{ loading ? t('auth.signingIn') : t('auth.signIn') }}
@@ -141,6 +165,7 @@ async function submit(event) {
 
         <p v-if="error" class="login-error" role="alert">{{ error }}</p>
       </form>
+
     </div>
   </div>
 </template>
