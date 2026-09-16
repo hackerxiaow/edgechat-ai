@@ -1,6 +1,28 @@
 const USER_OBJECT_KEY_PATTERN = /^(\d+)\//;
 
-export function storageOwnerFromObjectKey(key) {
+export interface StorageOwnerRef {
+	key: string;
+	type: "user" | "telegram" | "unknown";
+	userId: number | null;
+}
+
+export interface StorageSummary {
+	ownerKey: string;
+	ownerType: StorageOwnerRef["type"];
+	ownerId: number | null;
+	objectCount: number;
+	bytes: number;
+	latestUploadedAt: string | null;
+}
+
+/** R2Object 中本模块实际使用的字段。 */
+export interface StorageObjectLike {
+	key?: string;
+	size?: number;
+	uploaded?: Date | string;
+}
+
+export function storageOwnerFromObjectKey(key: unknown): StorageOwnerRef {
 	const normalizedKey = String(key || "");
 	const userMatch = USER_OBJECT_KEY_PATTERN.exec(normalizedKey);
 	if (userMatch) {
@@ -17,8 +39,8 @@ export function storageOwnerFromObjectKey(key) {
 	return { key: "system:unknown", type: "unknown", userId: null };
 }
 
-export function summarizeR2Objects(objects = []) {
-	const summaries = new Map();
+export function summarizeR2Objects(objects: StorageObjectLike[] = []): StorageSummary[] {
+	const summaries = new Map<string, StorageSummary>();
 
 	for (const object of objects) {
 		const owner = storageOwnerFromObjectKey(object?.key);

@@ -1,6 +1,6 @@
 import type { UserProfile, UserSummary } from "../../../shared/user-profile.ts";
 import { publicFileUrl } from "../utils.js";
-import { activeUserSql, projectUserBan } from "../user-status.js";
+import { activeUserSql, projectUserBan } from "../user-status.ts";
 
 /** users 表的完整行；`SELECT *` 的调用方（登录、会话校验）需要全部字段。 */
 export interface UserRow {
@@ -56,7 +56,13 @@ export async function getUserProfile(
 	return row ? { ...mapUserSummary(row), bio: row.bio } : null;
 }
 
-function mapAdminUser(row: SummaryRow & Parameters<typeof projectUserBan>[0]): AdminUser {
+function mapAdminUser(
+	row: SummaryRow & {
+		is_disabled: number;
+		disabled_until: string | null;
+		created_at: string;
+	},
+): AdminUser {
 	return {
 		...mapUserSummary(row),
 		...projectUserBan(row),

@@ -18,7 +18,7 @@ import {
   revokeMobileDeviceSession
 } from '../worker/src/mobile-session.js';
 import { issueRealtimeTicket, consumeRealtimeTicket } from '../worker/src/realtime-tickets.js';
-import { validateSession } from '../worker/src/session.js';
+import { validateSession } from '../worker/src/session.ts';
 import { createD1Adapter } from './support/d1.js';
 
 const SQL = await initSqlJs();

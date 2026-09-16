@@ -4,7 +4,7 @@ import { ensureDmChannel } from '../data/dm-provisioning.ts';
 import { listAdminDms, listUserDms } from '../data/dm-queries.ts';
 import { getUserBlockStatus } from '../data/user-blocks.ts';
 import { errorResponse, parseJsonRequest } from '../utils.js';
-import { activeUserSql } from '../user-status.js';
+import { activeUserSql } from '../user-status.ts';
 
 interface DmTargetRow {
   id: number;

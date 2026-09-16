@@ -16,13 +16,13 @@ import {
   getChannelById,
   getChannelMembership
 } from '../room-access.js';
-import { ApiError } from '../errors.js';
+import { ApiError } from '../errors.ts';
 import {
   isR2ObjectUnavailableError,
   resolveAvatarKeyUpdate
-} from '../avatar-policy.js';
+} from '../avatar-policy.ts';
 import { errorResponse, parseJsonRequest, publicFileUrl } from '../utils.js';
-import { activeUserSql } from '../user-status.js';
+import { activeUserSql } from '../user-status.ts';
 import { hardDeleteChannel } from '../data/channel-deletion.ts';
 
 function normalizeMemberIds(payload: Record<string, unknown>): number[] {

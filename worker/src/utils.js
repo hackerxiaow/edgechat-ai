@@ -1,4 +1,4 @@
-import { normalizeAudioAttachmentMetadata } from "./attachment-metadata.js";
+import { normalizeAudioAttachmentMetadata } from "./attachment-metadata.ts";
 
 export function jsonResponse(data, init = {}) {
   return new Response(JSON.stringify(data), {

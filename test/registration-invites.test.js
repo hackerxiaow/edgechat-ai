@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { ApiError } from "../worker/src/errors.js";
+import { ApiError } from "../worker/src/errors.ts";
 import {
 	createRegistrationInvite,
 	createUserWithRegistrationInvite,

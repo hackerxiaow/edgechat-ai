@@ -1,12 +1,31 @@
+import type { AppBindings, SessionUser } from './types.ts';
 import { deleteSession, getSession, isAdminUser, putSession } from './auth.js';
-import { isUserDisabled } from './user-status.js';
+import { isUserDisabled } from './user-status.ts';
 
-function toNumber(value, fallback = 0) {
+type SessionEnv = Pick<AppBindings, 'DB' | 'SESSIONS'>;
+
+export type SessionValidationResult =
+  | { ok: false; status: number; message: string }
+  | { ok: true; session: SessionUser };
+
+interface SessionUserRow {
+  username: string;
+  is_disabled: number;
+  disabled_until: string | null;
+  deleted_at: string | null;
+  session_version: number;
+  is_admin: number;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
-export async function validateSession(env, token) {
+export async function validateSession(
+  env: SessionEnv,
+  token: string,
+): Promise<SessionValidationResult> {
   const session = await getSession(env, token);
   if (!session) {
     return { ok: false, status: 401, message: '请先登录' };
@@ -19,7 +38,7 @@ export async function validateSession(env, token) {
      LIMIT 1`
   )
     .bind(session.userId)
-    .all();
+    .all<SessionUserRow>();
 
   const user = results[0];
   if (!user || user.deleted_at || isUserDisabled(user)) {
@@ -38,7 +57,7 @@ export async function validateSession(env, token) {
        LIMIT 1`
     )
       .bind(String(session.deviceSessionId), session.userId)
-      .all();
+      .all<{ session_version: number }>();
     const deviceSession = device.results[0];
     if (!deviceSession || toNumber(deviceSession.session_version) !== toNumber(user.session_version)) {
       await deleteSession(env, token);
@@ -53,7 +72,7 @@ export async function validateSession(env, token) {
     return { ok: false, status: 401, message: '登录已过期，请重新登录' };
   }
 
-  const refreshed = {
+  const refreshed: SessionUser = {
     ...session,
     isAdmin: isAdminUser(env, user),
     sessionVersion: dbVersion
@@ -65,4 +84,3 @@ export async function validateSession(env, token) {
 
   return { ok: true, session: refreshed };
 }
-

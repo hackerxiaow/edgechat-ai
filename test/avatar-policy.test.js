@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveAvatarKeyUpdate } from "../worker/src/avatar-policy.js";
+import { resolveAvatarKeyUpdate } from "../worker/src/avatar-policy.ts";
 
 function createDb(row) {
 	return {

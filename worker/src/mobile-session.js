@@ -1,6 +1,6 @@
 import { deleteSession, isAdminUser, putSession } from './auth.js';
-import { ApiError } from './errors.js';
-import { isUserDisabled } from './user-status.js';
+import { ApiError } from './errors.ts';
+import { isUserDisabled } from './user-status.ts';
 import { randomToken } from './utils.js';
 
 export const MOBILE_ACCESS_TTL_SECONDS = 60 * 60;

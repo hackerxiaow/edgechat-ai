@@ -1,7 +1,7 @@
 import { decryptSecretValue, encryptSecretValue } from './encryption.js';
-import { ApiError } from './errors.js';
+import { ApiError } from './errors.ts';
 import { hashOpaqueToken } from './mobile-session.js';
-import { validateSession } from './session.js';
+import { validateSession } from './session.ts';
 import { randomToken } from './utils.js';
 
 export const REALTIME_TICKET_TTL_SECONDS = 60;

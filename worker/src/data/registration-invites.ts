@@ -1,4 +1,4 @@
-import { ApiError } from '../errors.js';
+import { ApiError } from '../errors.ts';
 
 export const MAX_INVITE_USES = 1000;
 

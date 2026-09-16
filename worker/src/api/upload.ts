@@ -7,8 +7,8 @@ import {
   recordUploadedFile
 } from '../data/uploaded-files.ts';
 import { decryptAttachment, encryptAttachment } from '../encryption.js';
-import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.js';
-import { validateSession } from '../session.js';
+import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.ts';
+import { validateSession } from '../session.ts';
 import { errorResponse, requestBodyTooLarge } from '../utils.js';
 
 const FILE_RESPONSE_CACHE_CONTROL = 'private, no-store';

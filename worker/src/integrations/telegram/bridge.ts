@@ -10,7 +10,7 @@ import {
 	getMessageSourceReference,
 	type MessageSourceReference,
 } from "../../data/replies.ts";
-import { submitExternalMessage } from "../../external-message-submission.js";
+import { submitExternalMessage } from "../../external-message-submission.ts";
 import type { AppBindings } from "../../types.ts";
 import { sendTelegramMedia, sendTelegramText } from "./client.ts";
 import {

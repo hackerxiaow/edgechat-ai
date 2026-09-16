@@ -1,6 +1,6 @@
 import type { Message } from '../data/messages.ts';
 import type { AppBindings } from '../types.ts';
-import { submitExternalMessage } from '../external-message-submission.js';
+import { submitExternalMessage } from '../external-message-submission.ts';
 
 const AI_API_URL = 'https://api.seurl.eu.org/v1/chat/completions';
 // TODO: 迁移到 Worker Secret。当前保留源码内默认值以维持既有行为，

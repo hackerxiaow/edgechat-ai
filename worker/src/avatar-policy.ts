@@ -2,11 +2,20 @@ import {
 	getOwnedUploadedFileMetadata,
 	isR2ObjectUnavailableError,
 } from "./data/uploaded-files.ts";
-import { ApiError } from "./errors.js";
+import { ApiError } from "./errors.ts";
 
 export { isR2ObjectUnavailableError };
 
-export async function resolveAvatarKeyUpdate(db, userId, payload) {
+export interface AvatarKeyUpdate {
+	provided: boolean;
+	key: string | null;
+}
+
+export async function resolveAvatarKeyUpdate(
+	db: D1Database,
+	userId: number | string,
+	payload: { avatarKey?: unknown },
+): Promise<AvatarKeyUpdate> {
 	if (!Object.hasOwn(payload, "avatarKey")) {
 		return { provided: false, key: null };
 	}

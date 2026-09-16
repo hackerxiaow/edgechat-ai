@@ -10,7 +10,7 @@ import {
 import {
   storageOwnerFromObjectKey,
   summarizeR2Objects
-} from '../worker/src/storage-statistics.js';
+} from '../worker/src/storage-statistics.ts';
 import { registerAdminRoutes } from '../worker/src/api/admin.ts';
 
 function storageScanHandler() {

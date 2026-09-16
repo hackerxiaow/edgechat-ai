@@ -1,7 +1,9 @@
+import type { MiddlewareHandler } from 'hono';
+import type { AppEnv } from './types.ts';
 import { errorResponse, errorCodeForStatus, v1ErrorResponse } from './utils.js';
-import { validateSession } from './session.js';
+import { validateSession } from './session.ts';
 
-function extractToken(request) {
+function extractToken(request: Request): string {
   const authHeader = request.headers.get('authorization') || '';
   if (authHeader.startsWith('Bearer ')) {
     return authHeader.slice('Bearer '.length).trim();
@@ -11,7 +13,7 @@ function extractToken(request) {
   return url.searchParams.get('token') || '';
 }
 
-export async function authMiddleware(c, next) {
+export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const token = extractToken(c.req.raw);
   const result = await validateSession(c.env, token);
   if (!result.ok) {
@@ -23,9 +25,9 @@ export async function authMiddleware(c, next) {
 
   c.set('session', result.session);
   await next();
-}
+};
 
-export async function adminMiddleware(c, next) {
+export const adminMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const session = c.get('session');
   if (!session?.isAdmin) {
     if (new URL(c.req.url).pathname.startsWith('/api/v1/')) {
@@ -35,4 +37,4 @@ export async function adminMiddleware(c, next) {
   }
 
   await next();
-}
+};

@@ -1,4 +1,4 @@
-import { activeUserSql } from "../user-status.js";
+import { activeUserSql } from "../user-status.ts";
 
 export function normalizeMentionUserIds(values: unknown): number[] {
 	if (!Array.isArray(values)) {

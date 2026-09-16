@@ -13,10 +13,10 @@ import {
 import { getSiteSettings, updateSiteSettings } from '../data/site-settings.ts';
 import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
 import { listAdminUsers, listStorageOwners, type StorageOwner } from '../data/users.ts';
-import { ApiError } from '../errors.js';
-import { summarizeR2Objects } from '../storage-statistics.js';
+import { ApiError } from '../errors.ts';
+import { summarizeR2Objects } from '../storage-statistics.ts';
 import { errorResponse, parseJsonRequest, randomToken } from '../utils.js';
-import { banExpiryFromMinutes } from '../user-status.js';
+import { banExpiryFromMinutes } from '../user-status.ts';
 
 const STORAGE_SCAN_PAGE_SIZE = 1000;
 

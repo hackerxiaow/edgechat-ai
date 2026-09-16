@@ -17,8 +17,8 @@ import {
 } from './data/registration-invites.ts';
 import { getSiteSettings } from './data/site-settings.ts';
 import { getUserByUsername, listActiveUsers } from './data/users.ts';
-import { ApiError } from './errors.js';
-import { adminMiddleware, authMiddleware } from './middleware.js';
+import { ApiError } from './errors.ts';
+import { adminMiddleware, authMiddleware } from './middleware.ts';
 import { registerAdminRoutes } from './api/admin.ts';
 import { registerMaintenanceRoutes } from './api/maintenance.ts';
 import { registerChannelRoutes } from './api/channels.ts';
@@ -33,7 +33,7 @@ import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
-import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.js';
+import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.ts';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.js';
 import {
   errorCodeForStatus,

@@ -10,8 +10,8 @@ import {
 import { getSiteSettings } from '../data/site-settings.ts';
 import { getUserByUsername } from '../data/users.ts';
 import { submitClientRoomAction } from '../room-actions.ts';
-import { ApiError } from '../errors.js';
-import { authMiddleware } from '../middleware.js';
+import { ApiError } from '../errors.ts';
+import { authMiddleware } from '../middleware.ts';
 import {
   createMobileDeviceSession,
   refreshMobileDeviceSession,
@@ -20,7 +20,7 @@ import {
 import { issueRealtimeTicket } from '../realtime-tickets.js';
 import { authorizeRoom, isRoomKind } from '../room-access.js';
 import { markRoomRead } from '../data/unread.ts';
-import { isUserDisabled } from '../user-status.js';
+import { isUserDisabled } from '../user-status.ts';
 import {
   errorCodeForStatus,
   parseJsonRequest,

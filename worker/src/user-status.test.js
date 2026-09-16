@@ -5,7 +5,7 @@ import {
   banExpiryFromMinutes,
   isUserDisabled,
   projectUserBan
-} from './user-status.js';
+} from './user-status.ts';
 
 const NOW = Date.parse('2026-08-20T10:00:00.000Z');
 

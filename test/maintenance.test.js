@@ -3,7 +3,7 @@ import test from "node:test";
 import { Hono } from "hono";
 import { registerMaintenanceRoutes } from "../worker/src/api/maintenance.ts";
 import { inspectEnvironment, runSystemCheck } from "../worker/src/maintenance/system-check.ts";
-import { authMiddleware, adminMiddleware } from "../worker/src/middleware.js";
+import { authMiddleware, adminMiddleware } from "../worker/src/middleware.ts";
 
 const okDb = { prepare: () => ({ all: async () => ({ results: [{ ok: 1 }] }) }) };
 
