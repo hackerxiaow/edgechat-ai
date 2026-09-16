@@ -1,78 +1,6 @@
 /* auth.css — 登录页与注册邀请页共用的认证页视觉
-   两个页面结构同构（.login-page > .login-card > 表单），样式集中在这里，
-   避免各写一份后风格漂移。颜色令牌挂在 html 上，深色同时兼容
-   html[data-theme="dark"]（useTheme 写入）与系统偏好，两者都命中同一个令牌块。 */
-
-html {
-  --auth-bg-from: #e9f2fa;
-  --auth-bg-mid: #f8fbfd;
-  --auth-bg-to: #e2edf7;
-  --auth-glow-strong: rgba(93, 156, 219, 0.34);
-  --auth-glow-soft: rgba(150, 199, 234, 0.3);
-  --auth-card-bg: rgba(255, 255, 255, 0.76);
-  --auth-card-border: rgba(255, 255, 255, 0.8);
-  --auth-card-shadow: 0 24px 60px rgba(23, 52, 88, 0.15), 0 2px 8px rgba(23, 52, 88, 0.06);
-  --auth-text: #14263a;
-  --auth-text-soft: #5c7288;
-  --auth-text-muted: #8d9daf;
-  --auth-accent: #2f74b8;
-  --auth-accent-strong: #27639f;
-  --auth-accent-on: #ffffff;
-  --auth-ring: rgba(47, 116, 184, 0.22);
-  --auth-field-bg: rgba(255, 255, 255, 0.9);
-  --auth-field-border: rgba(20, 38, 58, 0.14);
-  --auth-btn-shadow: rgba(47, 116, 184, 0.28);
-  --auth-success: #2f7d5b;
-  --auth-danger: #c0453f;
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme='light']) {
-    --auth-bg-from: #0a1420;
-    --auth-bg-mid: #101d2b;
-    --auth-bg-to: #0b1622;
-    --auth-glow-strong: rgba(64, 122, 189, 0.26);
-    --auth-glow-soft: rgba(38, 86, 133, 0.24);
-    --auth-card-bg: rgba(20, 32, 46, 0.78);
-    --auth-card-border: rgba(255, 255, 255, 0.1);
-    --auth-card-shadow: 0 26px 64px rgba(0, 0, 0, 0.46), 0 2px 8px rgba(0, 0, 0, 0.3);
-    --auth-text: #e8f0f9;
-    --auth-text-soft: #93a8bd;
-    --auth-text-muted: #74889c;
-    --auth-accent: #3579bd;
-    --auth-accent-strong: #4a8ed0;
-    --auth-accent-on: #ffffff;
-    --auth-ring: rgba(74, 142, 208, 0.28);
-    --auth-field-bg: rgba(9, 18, 28, 0.66);
-    --auth-field-border: rgba(255, 255, 255, 0.13);
-    --auth-btn-shadow: rgba(0, 0, 0, 0.4);
-    --auth-success: #63bd92;
-    --auth-danger: #ef8880;
-  }
-}
-
-html[data-theme='dark'] {
-  --auth-bg-from: #0a1420;
-  --auth-bg-mid: #101d2b;
-  --auth-bg-to: #0b1622;
-  --auth-glow-strong: rgba(64, 122, 189, 0.26);
-  --auth-glow-soft: rgba(38, 86, 133, 0.24);
-  --auth-card-bg: rgba(20, 32, 46, 0.78);
-  --auth-card-border: rgba(255, 255, 255, 0.1);
-  --auth-card-shadow: 0 26px 64px rgba(0, 0, 0, 0.46), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --auth-text: #e8f0f9;
-  --auth-text-soft: #93a8bd;
-  --auth-text-muted: #74889c;
-  --auth-accent: #3579bd;
-  --auth-accent-strong: #4a8ed0;
-  --auth-accent-on: #ffffff;
-  --auth-ring: rgba(74, 142, 208, 0.28);
-  --auth-field-bg: rgba(9, 18, 28, 0.66);
-  --auth-field-border: rgba(255, 255, 255, 0.13);
-  --auth-btn-shadow: rgba(0, 0, 0, 0.4);
-  --auth-success: #63bd92;
-  --auth-danger: #ef8880;
-}
+   采用极简、一体化风格，与主应用的双色流体背景无缝融合，参考 Telegram Web 版的设计语言。
+ */
 
 .login-page {
   position: relative;
@@ -82,49 +10,28 @@ html[data-theme='dark'] {
   min-height: 100dvh;
   padding: 24px;
   overflow: hidden;
-  color: var(--auth-text);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Noto Sans SC', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: linear-gradient(165deg, var(--auth-bg-from) 0%, var(--auth-bg-mid) 48%, var(--auth-bg-to) 100%);
-}
-
-/* 两团柔和光斑，用径向渐变自带柔边，避免移动端 blur 滤镜开销。 */
-.login-page::before,
-.login-page::after {
-  content: '';
-  position: absolute;
-  width: 62vmax;
-  height: 62vmax;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.login-page::before {
-  top: -26vmax;
-  left: -18vmax;
-  background: radial-gradient(circle at center, var(--auth-glow-strong) 0%, transparent 66%);
-}
-
-.login-page::after {
-  right: -24vmax;
-  bottom: -30vmax;
-  background: radial-gradient(circle at center, var(--auth-glow-soft) 0%, transparent 68%);
+  /* 移除原有的固定背景，透明以透出 base.css 的全局流体双色光晕背景 */
+  background: transparent;
+  color: var(--text);
 }
 
 .login-card {
   position: relative;
   z-index: 1;
-  width: min(440px, 100%);
-  padding: 40px 36px 34px;
-  border: 1px solid var(--auth-card-border);
-  border-radius: 24px;
-  background: var(--auth-card-bg);
-  box-shadow: var(--auth-card-shadow);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
-  animation: auth-rise 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  width: min(420px, 100%);
+  padding: 48px 40px;
+  border-radius: var(--radius-window);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  animation: auth-rise 460ms var(--transition-soft) both;
+}
+
+html[data-theme='dark'] .login-card,
+html.dark .login-card {
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 @keyframes auth-rise {
@@ -138,58 +45,83 @@ html[data-theme='dark'] {
   }
 }
 
+/* 语言切换器融入卡片右上角 */
+.login-card-header {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+}
+
+.login-language-switch {
+  /* 覆盖原本的外框，更极简 */
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-soft) !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+}
+
+.login-language-switch:hover {
+  background: var(--surface-0) !important;
+  color: var(--text) !important;
+}
+
+/* 品牌居中展现 (Telegram Style) */
 .login-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 26px;
+  text-align: center;
+  gap: 16px;
+  margin-bottom: 36px;
+  margin-top: 12px;
 }
 
 .login-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
   flex: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .login-brand-text {
   display: grid;
-  gap: 3px;
-  min-width: 0;
+  gap: 6px;
 }
 
 .login-title {
   margin: 0;
-  font-size: 1.375rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--auth-text);
-  overflow-wrap: anywhere;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
 .login-subtitle {
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  color: var(--auth-text-soft);
+  font-size: 0.95rem;
+  color: var(--text-soft);
 }
 
 .login-form {
   display: grid;
-  gap: 15px;
+  gap: 20px;
 }
 
 .login-field {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .login-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--auth-text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-left: 4px;
 }
 
 .input-wrapper {
@@ -199,38 +131,38 @@ html[data-theme='dark'] {
 
 .login-input {
   width: 100%;
-  height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--auth-field-border);
-  border-radius: 12px;
-  background: var(--auth-field-bg);
-  color: var(--auth-text);
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface-0);
+  color: var(--text);
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 500;
   outline: none;
-  /* 原生光标由 useCursor 的 .custom-cursor 顶替，WebView 下位置才可控。 */
-  caret-color: transparent;
+  caret-color: transparent; /* 由 useCursor 控制 */
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease;
+    border-color var(--transition-soft),
+    box-shadow var(--transition-soft),
+    background-color var(--transition-soft);
 }
 
 .login-input::placeholder {
-  color: var(--auth-text-muted);
+  color: var(--text-faint);
   font-weight: 400;
 }
 
 .login-input:focus {
-  border-color: var(--auth-accent);
-  box-shadow: 0 0 0 3px var(--auth-ring);
+  border-color: var(--cool);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px var(--cool-soft);
 }
 
 .custom-cursor {
   position: absolute;
   width: 2px;
-  background: var(--auth-accent);
+  background: var(--cool);
   border-radius: 2px;
   opacity: 0;
   pointer-events: none;
@@ -242,49 +174,43 @@ html[data-theme='dark'] {
 }
 
 @keyframes auth-blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 
 .login-btn {
   width: 100%;
-  height: 48px;
-  margin-top: 9px;
+  height: 52px;
+  margin-top: 12px;
   border: none;
-  border-radius: 12px;
-  background: var(--auth-accent);
-  color: var(--auth-accent-on);
+  border-radius: var(--radius-control);
+  background: var(--cool);
+  color: #ffffff;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow: 0 10px 22px var(--auth-btn-shadow);
+  box-shadow: 0 8px 24px var(--cool-soft);
   transition:
-    background-color 160ms ease,
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    opacity 160ms ease;
+    background-color var(--transition-soft),
+    transform var(--transition-soft),
+    box-shadow var(--transition-soft),
+    opacity var(--transition-soft);
 }
 
 .login-btn:hover:not(:disabled) {
-  background: var(--auth-accent-strong);
-  transform: translateY(-1px);
+  background: #2b65a0;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px var(--cool-soft);
+}
+
+html[data-theme='dark'] .login-btn:hover:not(:disabled),
+html.dark .login-btn:hover:not(:disabled) {
+  background: #5b9ce2;
 }
 
 .login-btn:active:not(:disabled) {
   transform: translateY(0);
-}
-
-.login-btn:focus-visible {
-  outline: 2px solid var(--auth-accent);
-  outline-offset: 2px;
 }
 
 .login-btn:disabled {
@@ -297,58 +223,30 @@ html[data-theme='dark'] {
 .login-hint,
 .login-error {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   text-align: center;
 }
 
-.login-info {
-  color: var(--auth-text-soft);
-}
-
-.login-hint {
-  color: var(--auth-success);
-}
-
-.login-error {
-  color: var(--auth-danger);
-}
-
-.login-language-switch {
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
-  z-index: 2;
-  color: var(--auth-text-soft);
-}
+.login-info { color: var(--text-soft); }
+.login-hint { color: var(--cool); }
+.login-error { color: var(--danger); }
 
 @media (max-width: 480px) {
   .login-page {
-    padding: 18px;
+    padding: 16px;
   }
-
   .login-card {
-    padding: 30px 22px 26px;
-    border-radius: 20px;
+    padding: 36px 24px;
+    border-radius: 24px;
   }
-
   .login-title {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-card {
-    animation: none;
-  }
-
-  .custom-cursor.visible {
-    animation: none;
-    opacity: 1;
-  }
-
-  .login-btn,
-  .login-input {
-    transition: none;
-  }
+  .login-card { animation: none; }
+  .custom-cursor.visible { animation: none; opacity: 1; }
+  .login-btn, .login-input { transition: none; }
 }

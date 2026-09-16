@@ -81,10 +81,12 @@ onMounted(() => {
 
 <template>
   <div class="login-page">
-    <LanguageSwitch class="login-language-switch" />
     <div class="login-card">
+      <div class="login-card-header">
+        <LanguageSwitch class="login-language-switch" />
+      </div>
       <div class="login-brand">
-        <img class="login-logo" src="/logo.svg" alt="" width="46" height="46" />
+        <img class="login-logo" src="/logo.svg" alt="" width="64" height="64" />
         <div class="login-brand-text">
           <h1 class="login-title">{{ store.site.siteName }}</h1>
           <p class="login-subtitle">{{ t('auth.welcomeBack') }}</p>
