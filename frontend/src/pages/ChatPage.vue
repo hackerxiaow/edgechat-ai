@@ -921,6 +921,24 @@ onBeforeUnmount(() => {
               <span class="message-time">{{ formatBubbleTime(msg.createdAt) }}</span>
             </div>
           </article>
+
+          <!-- 「正在输入」必须留在消息容器内部：容器带有水平内边距，
+               放到外面会让头像与气泡比真实消息整体左移 28px。 -->
+          <div v-if="typingUsers.length" class="typing-row">
+            <UiAvatar
+              class="message-avatar"
+              :src="typingUsers[0].avatarUrl"
+              :alt="typingUsers[0].displayName"
+              :fallback="typingUsers[0].displayName"
+              size="sm"
+            />
+            <div class="typing-bubble">
+              <span class="sr-only">{{ typingLabel }}</span>
+              <span class="typing-dot" aria-hidden="true" />
+              <span class="typing-dot" aria-hidden="true" />
+              <span class="typing-dot" aria-hidden="true" />
+            </div>
+          </div>
         </section>
 
         <MessageContextMenu
@@ -938,23 +956,6 @@ onBeforeUnmount(() => {
           @unpin="unpinSelectedMessage"
           @delete="confirmDeleteMessage"
         />
-
-		<!-- 「正在输入」：头像 + 三个循环闪烁的点，跟在消息流末尾。 -->
-		<div v-if="typingUsers.length" class="typing-row">
-		  <UiAvatar
-		    class="message-avatar"
-		    :src="typingUsers[0].avatarUrl"
-		    :alt="typingUsers[0].displayName"
-		    :fallback="typingUsers[0].displayName"
-		    size="sm"
-		  />
-		  <div class="typing-bubble">
-		    <span class="sr-only">{{ typingLabel }}</span>
-		    <span class="typing-dot" aria-hidden="true" />
-		    <span class="typing-dot" aria-hidden="true" />
-		    <span class="typing-dot" aria-hidden="true" />
-		  </div>
-		</div>
 
 		<p v-if="composerDisabledHint" class="composer-disabled-hint">{{ composerDisabledHint }}</p>
 

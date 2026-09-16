@@ -52,7 +52,7 @@ function stopLinkGesture(event: Event) {
 	margin-left: 1px;
 	background: currentColor;
 	vertical-align: text-bottom;
-	animation: markdown-caret-blink 900ms steps(1, end) infinite;
+	animation: markdown-caret-blink 1100ms steps(1, end) infinite;
 }
 
 /* 未在显现时保留占位但不可见，避免气泡高度在显现开始/结束的瞬间发生变化。 */
