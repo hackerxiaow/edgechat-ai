@@ -119,31 +119,40 @@ test("聊天侧栏跟随全屏根节点且不污染后台根节点", () => {
 		assert.match(chatPage, /\.right-sidebar-action__label\s*{[^}]*font-size:\s*11px;/s);
 });
 
-	test("GitHub 仓库入口位于添加人员左侧并复用相同按钮尺寸", () => {
-		const githubLink = chatPage.indexOf('href="https://github.com/aozorae/Edgechat"');
+	test("会话列表顶栏用语言切换取代 GitHub 链接并复用相同按钮尺寸", () => {
+		const langSwitch = chatPage.indexOf('<LanguageSwitch class="header-language-switch" />');
 		const addConversation = chatPage.indexOf(':title="t(\'chat.addPeople\')"');
-	assert.notEqual(githubLink, -1);
-	assert.ok(githubLink < addConversation);
-	assert.match(chatPage, /src="\/github\.svg"/);
-	assert.match(chatPage, /rel="noopener noreferrer"/);
+		assert.notEqual(langSwitch, -1);
+		// 语言切换在「添加人员」左侧，两者同处 .sidebar-header-actions。
+		assert.ok(langSwitch < addConversation);
+		// 语言切换就位于会话列表顶栏的动作区里（允许中间夹注释）。
+		assert.match(
+			chatPage,
+			/<div class="sidebar-header-actions">[\s\S]*?<LanguageSwitch class="header-language-switch" \/>/,
+		);
+		// GitHub 入口已从顶栏移走，仅保留在移动端导航抽屉里。
+		assert.doesNotMatch(chatPage, /href="https:\/\/github\.com\/aozorae\/Edgechat"/);
+		assert.doesNotMatch(chatPage, /src="\/github\.svg"/);
 
-	const headerAction = getStyleRule(chatPage, ".header-action");
+		// 必须走 :deep()，否则父组件的 data-v 只落在子组件根元素上，样式匹配不到内部按钮。
+		const languageSwitchButton = getStyleRule(chatPage, ".header-language-switch :deep(.language-switch)");
+		assert.match(languageSwitchButton, /width:\s*var\(--chat-control\);/);
+		assert.match(languageSwitchButton, /height:\s*var\(--chat-control\);/);
+		assert.match(languageSwitchButton, /border:\s*none;/);
+		assert.match(languageSwitchButton, /border-radius:\s*50%;/);
+
+		const headerAction = getStyleRule(chatPage, ".header-action");
 		assert.match(headerAction, /flex:\s*0 0 var\(--chat-control\);/);
 		assert.match(headerAction, /width:\s*var\(--chat-control\);/);
 		assert.match(headerAction, /height:\s*var\(--chat-control\);/);
 	});
 
-	test("语言切换入口与「添加人员」并排，移动端保持可达", () => {
+	test("语言切换入口唯一且常驻，移动端保持可达", () => {
 		assert.doesNotMatch(chatPage, /right-sidebar-action--language/);
 		assert.match(chatPage, /<LanguageSwitch class="chat-header__language-switch" \/>/);
-		assert.match(chatPage, /<LanguageSwitch class="empty-language-switch" \/>/);
-		assert.match(chatPage, /<LanguageSwitch class="mobile-language-switch" \/>/);
-		// 语言切换不再飘在空状态右上角，而是与「添加人员」按钮同排、位于其左侧。
-		assert.doesNotMatch(chatPage, /chat-empty__language-switch/);
-		assert.match(
-			chatPage,
-			/<div class="empty-actions">\s*<LanguageSwitch class="empty-language-switch" \/>\s*<button[^>]*class="empty-start"/s,
-		);
+		// 空状态里不再额外放一个语言切换，只在会话列表顶栏保留常驻入口。
+		assert.doesNotMatch(chatPage, /chat-empty__language-switch|empty-language-switch/);
+		assert.doesNotMatch(chatPage, /mobile-language-switch/);
 		// 深浅色切换只保留右侧导航栏那一处，避免同一屏出现两个。
 		assert.equal((chatPage.match(/class="header-action"[\s\S]{0,200}?toggleTheme/g) || []).length, 0);
 	});

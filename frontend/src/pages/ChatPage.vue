@@ -605,18 +605,9 @@ onBeforeUnmount(() => {
           </button>
           <h1 class="brand-title">EdgeChat</h1>
           <div class="sidebar-header-actions">
-            <a
-              class="header-action header-action--github"
-              href="https://github.com/aozorae/Edgechat"
-              target="_blank"
-              rel="noopener noreferrer"
-              :title="t('nav.githubRepository')"
-              :aria-label="t('nav.openGithubRepository')"
-            >
-              <img src="/github.svg" alt="" width="20" height="20" />
-              <span class="sr-only">{{ t('nav.openGithubRepository') }}</span>
-            </a>
-            <!-- 深浅色切换已由右侧导航栏统一提供，这里不再重复放置。 -->
+            <!-- 语言切换取代了原来的 GitHub 链接位置，样式复用 .header-action
+                 （与右侧导航栏的深浅色按钮同为无边框圆形图标）。 -->
+            <LanguageSwitch class="header-language-switch" />
             <button
               type="button"
               class="header-action header-action--primary"
@@ -632,7 +623,6 @@ onBeforeUnmount(() => {
                 <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
               </svg>
             </button>
-            <LanguageSwitch class="mobile-language-switch" />
           </div>
         </div>
 
@@ -863,13 +853,10 @@ onBeforeUnmount(() => {
             <span class="empty-title">EdgeChat</span>
           </div>
           <p>{{ t('chat.noConversationSelected') }}</p>
-          <div class="empty-actions">
-            <LanguageSwitch class="empty-language-switch" />
-            <button type="button" class="empty-start" @click="openAddConversation">
-              <MessageCircle :size="18" aria-hidden="true" />
-              {{ t('chat.addPeople') }}
-            </button>
-          </div>
+          <button type="button" class="empty-start" @click="openAddConversation">
+            <MessageCircle :size="18" aria-hidden="true" />
+            {{ t('chat.addPeople') }}
+          </button>
         </div>
       </div>
     </main>
@@ -1042,10 +1029,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.mobile-language-switch {
-  display: none;
 }
 
 .header-action {
@@ -1361,12 +1344,6 @@ onBeforeUnmount(() => {
   outline-offset: 2px;
 }
 
-.header-action img {
-  display: block;
-  width: 20px;
-  height: 20px;
-}
-
 .chat-header h2 {
   margin: 0;
   padding: 0;
@@ -1532,31 +1509,41 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.empty-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 语言切换与右侧导航栏的深浅色按钮保持同一风格：无边框、透明底、圆形。 */
-.empty-language-switch {
+/* 语言切换复用 .header-action 的视觉（无边框、透明底、圆形图标），
+   与右侧导航栏的深浅色按钮保持一致。 */
+.header-language-switch {
   display: inline-grid;
   place-items: center;
+  flex: 0 0 var(--chat-control);
 }
 
-.empty-language-switch .language-switch {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
+/* 必须用 :deep()：父组件的 data-v 只会加到子组件根元素上，
+   直接写 .header-language-switch .language-switch 匹配不到内部那个按钮。 */
+.header-language-switch :deep(.language-switch) {
+  width: var(--chat-control);
+  height: var(--chat-control);
+  min-width: var(--chat-control);
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
   box-shadow: none;
   color: var(--chat-muted);
+  transition: background 150ms, color 150ms;
 }
 
-.empty-language-switch .language-switch:hover {
-  background: var(--chat-hover);
+.header-language-switch :deep(.language-switch:hover) {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--chat-ink);
+}
+
+.header-language-switch :deep(.language-switch__menu) {
+  background: var(--chat-paper);
+  border-color: var(--chat-line);
+  color: var(--chat-ink);
+}
+
+.header-language-switch :deep(.language-switch__option) {
   color: var(--chat-ink);
 }
 
@@ -1694,22 +1681,17 @@ onBeforeUnmount(() => {
     font-size: 21px;
   }
 
-  .header-action {
+  .header-action,
+  .header-language-switch,
+  .header-language-switch :deep(.language-switch) {
     flex-basis: 44px;
     width: 44px;
     height: 44px;
-  }
-
-  .header-action--github {
-    display: none;
+    min-width: 44px;
   }
 
   .sidebar-header-actions {
     gap: 4px;
-  }
-
-  .mobile-language-switch {
-    display: inline-grid;
   }
 
   .chat-header {
