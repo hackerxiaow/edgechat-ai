@@ -34,6 +34,9 @@ export function useActiveRoom({ activeRoom }) {
 			memberCount: Number(channel.memberCount || 0),
 			// 群组信息页展示用
 			createdAt: channel.createdAt || "",
+			sendMessagesPermission: channel.sendMessagesPermission || "all",
+			slowModeDelay: Number(channel.slowModeDelay) || 0,
+			historyVisibility: channel.historyVisibility || "visible",
 		};
 	}
 

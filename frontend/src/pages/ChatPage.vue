@@ -546,6 +546,19 @@ function messageContent(message) {
   return String(message.content || '').slice(0, shown);
 }
 
+// 群组把发言权限设为「仅群主和管理员」时，普通成员的输入框整体禁用。
+const composerDisabled = computed(() => {
+  const room = activeRoom.value;
+  if (!room || room.kind === 'dm') return false;
+  if (room.sendMessagesPermission !== 'owner') return false;
+  if (session.value?.isAdmin) return false;
+  return room.myRole !== 'owner';
+});
+
+const composerDisabledHint = computed(() =>
+  composerDisabled.value ? t('chat.sendForbiddenOwnerOnly') : ''
+);
+
 const typingLabel = computed(() => {
   const names = typingUsers.value.map((user) => user.displayName).filter(Boolean);
   if (!names.length) return t('chat.typing');
@@ -921,12 +934,14 @@ onBeforeUnmount(() => {
 		  </div>
 		</div>
 
+		<p v-if="composerDisabledHint" class="composer-disabled-hint">{{ composerDisabledHint }}</p>
+
 		<MessageComposer
 		  ref="messageComposer"
 		  v-model="composerText"
 		  :pending-attachment="pendingAttachment"
 		  :sending="sending"
-			  :disabled="!activeRoom || activeDmBlockedByMe"
+			  :disabled="!activeRoom || activeDmBlockedByMe || composerDisabled"
 			  :error="error"
 			  :mention-candidates="mentionCandidates"
 			  :replying-to="replyingTo"
@@ -1577,6 +1592,17 @@ onBeforeUnmount(() => {
 }
 
 /* ===== 「正在输入」气泡 ===== */
+.composer-disabled-hint {
+  margin: 0 auto 8px;
+  max-width: 940px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--chat-paper);
+  color: var(--chat-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .typing-row {
   display: flex;
   align-items: flex-end;

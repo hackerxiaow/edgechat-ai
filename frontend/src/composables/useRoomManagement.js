@@ -36,6 +36,9 @@ export function useRoomManagement({
 		description: "",
 		avatarUrl: "",
 		avatarKey: "",
+		sendMessagesPermission: "all",
+		slowModeDelay: 0,
+		historyVisibility: "visible",
 	});
 	const groupTransferring = ref(false);
 	let memberLoadGeneration = 0;
@@ -50,6 +53,11 @@ export function useRoomManagement({
 	function syncGroupSettingsForm() {
 		groupSettingsForm.name = activeRoom.value?.name || "";
 		groupSettingsForm.description = activeRoom.value?.description || "";
+		groupSettingsForm.sendMessagesPermission =
+			activeRoom.value?.sendMessagesPermission || "all";
+		groupSettingsForm.slowModeDelay = Number(activeRoom.value?.slowModeDelay) || 0;
+		groupSettingsForm.historyVisibility =
+			activeRoom.value?.historyVisibility || "visible";
 		groupSettingsForm.avatarUrl = activeRoom.value?.avatarUrl || "";
 		groupSettingsForm.avatarKey = activeRoom.value?.avatarKey || "";
 	}
@@ -306,9 +314,18 @@ export function useRoomManagement({
 				name,
 				description: groupSettingsForm.description.trim(),
 				avatarKey: groupSettingsForm.avatarKey || null,
+				sendMessagesPermission: groupSettingsForm.sendMessagesPermission,
+				slowModeDelay: Number(groupSettingsForm.slowModeDelay) || 0,
+				historyVisibility: groupSettingsForm.historyVisibility,
 			});
 			activeRoom.value.name = payload.channel.name;
 			activeRoom.value.description = payload.channel.description ?? activeRoom.value.description;
+			activeRoom.value.sendMessagesPermission =
+				payload.channel.sendMessagesPermission ?? activeRoom.value.sendMessagesPermission;
+			activeRoom.value.slowModeDelay =
+				payload.channel.slowModeDelay ?? activeRoom.value.slowModeDelay;
+			activeRoom.value.historyVisibility =
+				payload.channel.historyVisibility ?? activeRoom.value.historyVisibility;
 			activeRoom.value.avatarKey = payload.channel.avatarKey || "";
 			activeRoom.value.avatarUrl = payload.channel.avatarUrl || "";
 			syncGroupSettingsForm();

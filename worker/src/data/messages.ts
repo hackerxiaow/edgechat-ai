@@ -401,9 +401,14 @@ export async function listMessages(
 	roomId: number | string,
 	before: number | string | null = null,
 	limit: number | string = 30,
+	visibility?: { mode: string; joinedAt: string }
 ): Promise<Message[]> {
 	const filters = ["m.channel_id = ?", "m.deleted_at IS NULL"];
-	const binds: number[] = [Number(roomId)];
+	const binds: (number | string)[] = [Number(roomId)];
+	if (visibility?.mode === 'hidden') {
+		filters.push("m.created_at >= ?");
+		binds.push(visibility.joinedAt);
+	}
 	if (before) {
 		filters.push("m.id < ?");
 		binds.push(Number(before));
@@ -533,6 +538,7 @@ export async function listRoomMessageEvents(
 	channelId: number | string,
 	afterSequence: number | string = 0,
 	limit: number | string = 100,
+	visibility?: { mode: string; joinedAt: string }
 ): Promise<RoomMessageEventsPage> {
 	const normalizedCursor = Number(afterSequence) || 0;
 	const compactedThrough = await getRoomCompactedCursor(env.DB, channelId);

@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS channels (
   kind TEXT NOT NULL CHECK (kind IN ('public', 'private', 'dm')),
   dm_key TEXT UNIQUE,
   created_by INTEGER,
+  send_messages_permission TEXT NOT NULL DEFAULT 'all' CHECK (send_messages_permission IN ('all', 'owner')),
+  slow_mode_delay INTEGER NOT NULL DEFAULT 0 CHECK (slow_mode_delay >= 0),
+  history_visibility TEXT NOT NULL DEFAULT 'visible' CHECK (history_visibility IN ('visible', 'hidden')),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted_at TEXT,
   FOREIGN KEY (created_by) REFERENCES users(id)

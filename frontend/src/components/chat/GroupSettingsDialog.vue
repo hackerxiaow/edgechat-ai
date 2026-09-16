@@ -112,6 +112,37 @@ async function openAvatarPicker() {
           </div>
         </dl>
 
+        <!-- 群组权限控制（仅群主/管理员可见） -->
+        <template v-if="room && !room.isGeneral && room.canManage">
+          <label class="room-dialog__field">
+            <span>{{ t('group.permissions.sendMessages') }}</span>
+            <select v-model="form.sendMessagesPermission" class="room-dialog__input">
+              <option value="all">{{ t('group.permissions.sendAll') }}</option>
+              <option value="owner">{{ t('group.permissions.sendAdminsOnly') }}</option>
+            </select>
+          </label>
+
+          <label class="room-dialog__field">
+            <span>{{ t('group.permissions.slowMode') }}</span>
+            <select v-model.number="form.slowModeDelay" class="room-dialog__input">
+              <option :value="0">{{ t('group.permissions.slowModeOff') }}</option>
+              <option :value="10">{{ t('group.permissions.slowModeSeconds', { count: 10 }) }}</option>
+              <option :value="30">{{ t('group.permissions.slowModeSeconds', { count: 30 }) }}</option>
+              <option :value="60">{{ t('group.permissions.slowModeMinutes', { count: 1 }) }}</option>
+              <option :value="300">{{ t('group.permissions.slowModeMinutes', { count: 5 }) }}</option>
+            </select>
+          </label>
+
+          <label class="room-dialog__field">
+            <span>{{ t('group.permissions.history') }}</span>
+            <select v-model="form.historyVisibility" class="room-dialog__input">
+              <option value="visible">{{ t('group.permissions.historyVisible') }}</option>
+              <option value="hidden">{{ t('group.permissions.historyHidden') }}</option>
+            </select>
+            <p class="room-dialog__field-hint">{{ t('group.permissions.historyHint') }}</p>
+          </label>
+        </template>
+
         <!-- 群主转让：仅群主可见，列出现有成员 -->
         <label v-if="room && !room.isGeneral && isOwner && transferCandidates.length" class="room-dialog__field">
           <span>{{ t('group.transferOwner') }}</span>
@@ -158,6 +189,13 @@ async function openAvatarPicker() {
   resize: vertical;
   min-height: 72px;
   font: inherit;
+}
+
+.room-dialog__field-hint {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 
 .room-dialog__meta {

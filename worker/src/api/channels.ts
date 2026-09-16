@@ -227,8 +227,34 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
     const description =
       payload.description === undefined ? undefined : String(payload.description || '').trim();
 
+    const SEND_PERMISSIONS = new Set(['all', 'owner']);
+    const HISTORY_VISIBILITY = new Set(['visible', 'hidden']);
+    const sendMessagesPermission =
+      payload.sendMessagesPermission === undefined
+        ? undefined
+        : String(payload.sendMessagesPermission || 'all');
+    if (sendMessagesPermission !== undefined && !SEND_PERMISSIONS.has(sendMessagesPermission)) {
+      return errorResponse('发言权限取值无效');
+    }
+    const historyVisibility =
+      payload.historyVisibility === undefined
+        ? undefined
+        : String(payload.historyVisibility || 'visible');
+    if (historyVisibility !== undefined && !HISTORY_VISIBILITY.has(historyVisibility)) {
+      return errorResponse('历史消息可见性取值无效');
+    }
+    let slowModeDelay: number | undefined;
+    if (payload.slowModeDelay !== undefined) {
+      const parsed = Number(payload.slowModeDelay);
+      // 上限一天；0 表示关闭
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 86400) {
+        return errorResponse('慢速模式间隔取值无效');
+      }
+      slowModeDelay = Math.floor(parsed);
+    }
+
     const updates: string[] = [];
-    const binds: (string | null)[] = [];
+    const binds: (string | number | null)[] = [];
     if (name !== undefined) {
       updates.push('name = ?');
       binds.push(name);
@@ -240,6 +266,18 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
     if (avatarUpdate.provided) {
       updates.push('avatar_key = ?');
       binds.push(avatarUpdate.key);
+    }
+    if (sendMessagesPermission !== undefined) {
+      updates.push('send_messages_permission = ?');
+      binds.push(sendMessagesPermission);
+    }
+    if (slowModeDelay !== undefined) {
+      updates.push('slow_mode_delay = ?');
+      binds.push(slowModeDelay);
+    }
+    if (historyVisibility !== undefined) {
+      updates.push('history_visibility = ?');
+      binds.push(historyVisibility);
     }
 
     if (!updates.length) {
@@ -276,7 +314,10 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
         name: updated.name,
         description: updated.description || '',
         avatarKey: updated.avatar_key || '',
-        avatarUrl: updated.avatar_key ? publicFileUrl(updated.avatar_key) : ''
+        avatarUrl: updated.avatar_key ? publicFileUrl(updated.avatar_key) : '',
+        sendMessagesPermission: updated.send_messages_permission || 'all',
+        slowModeDelay: Number(updated.slow_mode_delay) || 0,
+        historyVisibility: updated.history_visibility || 'visible'
       }
     });
   });

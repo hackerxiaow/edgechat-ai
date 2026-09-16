@@ -48,17 +48,23 @@ test("room kind 与基础查询拒绝无效身份参数", async () => {
 });
 
 test("普通成员与管理员走稳定的 authorizeRoom decision surface", async () => {
-	const member = createQueryQueue([[{ id: 5, kind: "private" }]]);
+	// 前两个绑定取自 my_role / my_joined_at 两个子查询（用于群组权限判定）
+	const member = createQueryQueue([
+		[{ id: 5, kind: "private", my_role: "member", my_joined_at: "2026-01-01" }],
+	]);
 	const memberAccess = await authorizeRoom(member.db, { userId: "7" }, "private", "5");
 	assert.equal(memberAccess.ok, true);
-	assert.deepEqual(member.calls[0].binds, [5, "private", 7]);
+	assert.deepEqual(member.calls[0].binds, [7, 7, 5, "private", 7]);
 	assert.deepEqual(memberAccess.identity, { isAdmin: false, userId: 7 });
+	assert.equal(memberAccess.membership?.role, "member");
 
 	const admin = createQueryQueue([[{ id: 5, kind: "private" }]]);
 	const adminAccess = await authorizeRoom(admin.db, { isAdmin: true }, "private", 5);
 	assert.equal(adminAccess.ok, true);
-	assert.deepEqual(admin.calls[0].binds, [5, "private"]);
+	assert.deepEqual(admin.calls[0].binds, [0, 0, 5, "private"]);
 	assert.deepEqual(adminAccess.identity, { isAdmin: true, userId: 0 });
+	// 管理员不是成员时没有 membership，避免把它当成 owner
+	assert.equal(adminAccess.membership, undefined);
 });
 
 test("authorizeRoom 对非法、未找到与无成员资格返回稳定失败原因", async () => {
@@ -121,7 +127,8 @@ test("消息管理允许超级管理员删除任意可见消息，并只允许�
 		8,
 	);
 	assert.equal(adminAccess.ok, true);
-	assert.deepEqual(adminDm.calls.map((call) => call.binds), [[8, "dm"]]);
+	// 前两个绑定来自 my_role / my_joined_at 子查询
+	assert.deepEqual(adminDm.calls.map((call) => call.binds), [[0, 0, 8, "dm"]]);
 
 	const owner = createQueryQueue([
 		[{ id: 5, kind: "private" }],

@@ -175,8 +175,19 @@ test("群设置保存与头像上传同步 active room 和频道 projection", as
 
 	assert.deepEqual(calls.filter(([name]) => name !== "refreshSidebar"), [
 		["uploadFile", file],
-		// description 随群设置一起提交（群组信息页可编辑简介）
-		["updateChannel", 4, { name: "Renamed", description: "", avatarKey: "avatars/new.png" }],
+		// 群设置一次提交：简介、头像，以及群组权限三项
+		[
+			"updateChannel",
+			4,
+			{
+				name: "Renamed",
+				description: "",
+				avatarKey: "avatars/new.png",
+				sendMessagesPermission: "all",
+				slowModeDelay: 0,
+				historyVisibility: "visible"
+			}
+		],
 	]);
 	assert.equal(event.target.value, "");
 	assert.equal(activeRoom.value.name, "Renamed");

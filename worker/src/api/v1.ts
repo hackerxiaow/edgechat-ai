@@ -174,12 +174,16 @@ export function registerV1Routes(app: Hono<AppEnv>) {
   });
 
   app.get('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {
-    const { roomId, room } = await requireRoom(c);
+    const access = await authorizeRoom(c.env.DB, c.get('session'), c.req.param('kind'), c.req.param('id'));
+    if (!access.ok) return v1ErrorResponse('forbidden', access.reason, 403);
+    const { room } = access;
+    const roomId = room.id;
     const messages = await listMessages(
       c.env,
       roomId,
       c.req.query('before'),
-      sanitizeLimit(c.req.query('limit'))
+      sanitizeLimit(c.req.query('limit')),
+      room.kind !== 'dm' && room.history_visibility === 'hidden' && !c.get('session').isAdmin ? { mode: 'hidden', joinedAt: access.membership?.joined_at || '' } : undefined
     );
     return c.json({
       room: {
@@ -194,14 +198,18 @@ export function registerV1Routes(app: Hono<AppEnv>) {
   });
 
   app.get('/api/v1/rooms/:kind/:id/sync', authMiddleware, async (c) => {
-    const { roomId } = await requireRoom(c);
+    const access = await authorizeRoom(c.env.DB, c.get('session'), c.req.param('kind'), c.req.param('id'));
+    if (!access.ok) return v1ErrorResponse('forbidden', access.reason, 403);
+    const { room } = access;
+    const roomId = room.id;
     const cursor = Math.max(0, Number(c.req.query('cursor')) || 0);
     const [result, typing] = await Promise.all([
       listRoomMessageEvents(
         c.env,
         roomId,
         cursor,
-        sanitizeLimit(c.req.query('limit'), 100, 100)
+        sanitizeLimit(c.req.query('limit'), 100, 100),
+        room.kind !== 'dm' && room.history_visibility === 'hidden' && !c.get('session').isAdmin ? { mode: 'hidden', joinedAt: access.membership?.joined_at || '' } : undefined
       ).catch((error) => {
         if (error?.code === 'sync_cursor_expired') {
           throw new ApiError('同步游标已过期，请重新加载会话', 409, error.code);
@@ -218,7 +226,29 @@ export function registerV1Routes(app: Hono<AppEnv>) {
   });
 
   app.post('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {
-    const { session, room } = await requireRoom(c);
+    const session = c.get('session');
+    const access = await authorizeRoom(c.env.DB, session, c.req.param('kind'), c.req.param('id'));
+    if (!access.ok) return v1ErrorResponse('forbidden', access.reason, 403);
+    const { room } = access;
+    
+    if (room.kind !== 'dm') {
+      if (room.send_messages_permission === 'owner' && access.membership?.role !== 'owner' && !session.isAdmin) {
+        return v1ErrorResponse('forbidden', '只有群主和管理员可以发言', 403);
+      }
+      if (room.slow_mode_delay && room.slow_mode_delay > 0 && !session.isAdmin && access.membership?.role !== 'owner') {
+        const lastMsg = await c.env.DB.prepare(
+          'SELECT created_at FROM messages WHERE channel_id = ? AND sender_id = ? ORDER BY id DESC LIMIT 1'
+        ).bind(room.id, session.userId).first<{ created_at: string }>();
+        if (lastMsg && lastMsg.created_at) {
+          const lastTime = new Date(`${lastMsg.created_at.replace(' ', 'T')}Z`).getTime();
+          const now = Date.now();
+          if (now - lastTime < room.slow_mode_delay * 1000) {
+            return v1ErrorResponse('slow_mode', `慢速模式已开启，请等待 ${Math.ceil((room.slow_mode_delay * 1000 - (now - lastTime)) / 1000)} 秒后再发言`, 429);
+          }
+        }
+      }
+    }
+
     const payload = await parseJsonRequest<{
       clientMessageId?: string;
       content?: string;

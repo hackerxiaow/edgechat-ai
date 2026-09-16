@@ -215,6 +215,15 @@ export const D1_MIGRATIONS = [
 		artifacts: ["table:verification_codes", "index:idx_verification_codes_lookup"],
 	},
 	{
+		id: "2026-09-17-channel-permissions",
+		file: "worker/migrations/2026-09-17-channel-permissions.sql",
+		artifacts: [
+			"column:channels.send_messages_permission",
+			"column:channels.slow_mode_delay",
+			"column:channels.history_visibility",
+		],
+	},
+	{
 		id: "2026-09-17-room-typing-external",
 		file: "worker/migrations/2026-09-17-room-typing-external.sql",
 		// 只登记这次真正新增的列：表本身在上一迁移里已存在，

@@ -74,6 +74,10 @@ test("可见频道查询保持十二个数值身份绑定与直接关注 project
 		mentionUnreadCount: 1,
 		// 群组信息页要展示创建时间，这里随频道投影一起下发
 		createdAt: "",
+		// 群组权限设置随频道投影下发，供设置面板与输入框禁用态使用
+		sendMessagesPermission: "all",
+		slowModeDelay: 0,
+		historyVisibility: "visible",
 	});
 	assert.match(capture.sql, /CASE WHEN c\.name = 'general' THEN 0 ELSE 1 END/);
 });

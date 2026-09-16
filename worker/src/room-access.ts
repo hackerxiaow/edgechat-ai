@@ -23,6 +23,9 @@ export interface RoomRecord {
 	created_by?: number | null;
 	/** 群组创建时间；仅部分查询会带上，缺失时为 undefined。 */
 	created_at?: string | null;
+	send_messages_permission?: string;
+	slow_mode_delay?: number;
+	history_visibility?: string;
 }
 
 export interface ChannelMembership {
@@ -33,7 +36,7 @@ export interface ChannelMembership {
 }
 
 export type RoomAccessResult =
-	| { ok: true; room: RoomRecord; identity: RoomIdentity }
+	| { ok: true; room: RoomRecord; identity: RoomIdentity; membership?: ChannelMembership }
 	| { ok: false; reason: string };
 
 export type ChannelManagementResult =
@@ -77,7 +80,8 @@ export async function getChannelById(
 
 	const { results } = await db
 		.prepare(
-			`SELECT id, name, description, avatar_key, kind, dm_key, created_by, created_at
+			`SELECT id, name, description, avatar_key, kind, dm_key, created_by, created_at,
+			        send_messages_permission, slow_mode_delay, history_visibility
 			 FROM channels
 			 WHERE id = ?
 			   AND deleted_at IS NULL
@@ -138,7 +142,10 @@ export async function authorizeRoom(
 		? "1 = 1"
 		: "EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?)";
 	const statement = db.prepare(
-		`SELECT c.id, c.name, c.description, c.avatar_key, c.kind, c.dm_key
+		`SELECT c.id, c.name, c.description, c.avatar_key, c.kind, c.dm_key,
+		        c.send_messages_permission, c.slow_mode_delay, c.history_visibility,
+		        (SELECT cm.role FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?) AS my_role,
+		        (SELECT cm.joined_at FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?) AS my_joined_at
 		 FROM channels c
 		 WHERE c.id = ?
 		   AND c.kind = ?
@@ -147,9 +154,9 @@ export async function authorizeRoom(
 		 LIMIT 1`,
 	);
 	const bound = identity.isAdmin
-		? statement.bind(numericRoomId, kind)
-		: statement.bind(numericRoomId, kind, identity.userId);
-	const { results } = await bound.all<RoomRecord>();
+		? statement.bind(identity.userId, identity.userId, numericRoomId, kind)
+		: statement.bind(identity.userId, identity.userId, numericRoomId, kind, identity.userId);
+	const { results } = await bound.all<RoomRecord & { my_role?: string; my_joined_at?: string }>();
 	const room = results[0] || null;
 	if (!room) {
 		return {
@@ -159,7 +166,8 @@ export async function authorizeRoom(
 				: ROOM_ACCESS_FAILURE.FORBIDDEN,
 		};
 	}
-	return { ok: true, room, identity };
+	const membership = room.my_role ? { channel_id: numericRoomId, user_id: identity.userId, role: room.my_role, joined_at: room.my_joined_at || '' } : undefined;
+	return { ok: true, room, identity, membership };
 }
 
 export async function authorizeChannelManagement(
