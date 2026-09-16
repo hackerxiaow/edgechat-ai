@@ -1,5 +1,5 @@
 <script setup>
-import { ref, toRef } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { isCapacitorAndroid, pickNativeFile } from '../../capacitor-platform.ts';
 import { useOverlayLifecycle } from '../../composables/useOverlayLifecycle.js';
 import { t } from '../../i18n.js';
@@ -10,13 +10,40 @@ const props = defineProps({
   room: { type: Object, default: null },
   form: { type: Object, required: true },
   saving: { type: Boolean, default: false },
-  avatarUploading: { type: Boolean, default: false }
+  avatarUploading: { type: Boolean, default: false },
+  members: { type: Array, default: () => [] },
+  transferring: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['close', 'upload-avatar', 'save', 'delete-group']);
+const emit = defineEmits([
+  'close',
+  'upload-avatar',
+  'save',
+  'delete-group',
+  'leave-group',
+  'transfer-owner'
+]);
 const avatarInput = ref(null);
 const nameInputEl = ref(null);
 const pickerError = ref('');
+const transferTarget = ref('');
+
+const isOwner = computed(() => props.room?.myRole === 'owner');
+const memberCount = computed(() => props.members.length);
+// 转让对象不能是自己，也不能是当前群主
+const transferCandidates = computed(() =>
+  props.members.filter(
+    (member) => member.role !== 'owner' && Number(member.id) !== Number(props.room?.ownerUserId)
+  )
+);
+const createdLabel = computed(() => {
+  const raw = String(props.room?.createdAt || '').trim();
+  if (!raw) return t('group.unknownCreatedAt');
+  // D1 的 CURRENT_TIMESTAMP 是不带时区的 UTC 字符串，显式按 UTC 解析
+  const date = new Date(`${raw.replace(' ', 'T')}Z`);
+  if (Number.isNaN(date.getTime())) return raw.slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+});
 
 useOverlayLifecycle({
   open: toRef(props, 'show'),
@@ -61,9 +88,56 @@ async function openAvatarPicker() {
           <input ref="nameInputEl" v-model="form.name" type="text" class="room-dialog__input" :disabled="room?.isGeneral" />
         </label>
 
-        <div v-if="room && !room.isGeneral && room.canManage" class="room-dialog__danger-zone">
-          <button type="button" class="room-dialog__danger" @click="emit('delete-group')">
+        <label class="room-dialog__field">
+          <span>{{ t('group.description') }}</span>
+          <textarea
+            v-model="form.description"
+            class="room-dialog__input room-dialog__textarea"
+            rows="3"
+            maxlength="500"
+            :disabled="room?.isGeneral"
+            :placeholder="t('group.descriptionPlaceholder')"
+          ></textarea>
+        </label>
+
+        <!-- 群组信息页要展示的元信息 -->
+        <dl class="room-dialog__meta">
+          <div>
+            <dt>{{ t('group.memberCount') }}</dt>
+            <dd>{{ memberCount }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('group.createdAt') }}</dt>
+            <dd>{{ createdLabel }}</dd>
+          </div>
+        </dl>
+
+        <!-- 群主转让：仅群主可见，列出现有成员 -->
+        <label v-if="room && !room.isGeneral && isOwner && transferCandidates.length" class="room-dialog__field">
+          <span>{{ t('group.transferOwner') }}</span>
+          <select class="room-dialog__input" :value="transferTarget" @change="transferTarget = $event.target.value">
+            <option value="">{{ t('group.transferOwnerPlaceholder') }}</option>
+            <option v-for="member in transferCandidates" :key="member.id" :value="member.id">
+              {{ member.displayName }} @{{ member.username }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="room-dialog__secondary"
+            :disabled="!transferTarget || transferring"
+            @click="emit('transfer-owner', Number(transferTarget))"
+          >
+            {{ transferring ? t('common.saving') : t('group.transferOwnerAction') }}
+          </button>
+        </label>
+
+        <div v-if="room && !room.isGeneral" class="room-dialog__danger-zone">
+          <button v-if="room.canManage" type="button" class="room-dialog__danger" @click="emit('delete-group')">
             {{ t('group.delete') }}
+          </button>
+          <!-- 群主必须先转让或删除群组，因此不给退出入口 -->
+          <button v-if="!isOwner" type="button" class="room-dialog__danger" @click="emit('leave-group')">
+            {{ t('group.leave') }}
           </button>
         </div>
 
@@ -80,6 +154,33 @@ async function openAvatarPicker() {
 </template>
 
 <style scoped>
+.room-dialog__textarea {
+  resize: vertical;
+  min-height: 72px;
+  font: inherit;
+}
+
+.room-dialog__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.room-dialog__meta dt {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.room-dialog__meta dd {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .room-dialog-overlay {
   position: fixed;
   inset: 0;

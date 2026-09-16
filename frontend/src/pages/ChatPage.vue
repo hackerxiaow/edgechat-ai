@@ -319,7 +319,10 @@ const {
   open: openGroupEditor,
   close: closeGroupEditor,
   uploadAvatar: uploadGroupAvatar,
-  save: saveGroupSettings
+  save: saveGroupSettings,
+  leave: leaveGroup,
+  transferOwner,
+  transferring: groupTransferring
 } = groupSettings;
 
 async function selectConversation(item) {
@@ -1039,10 +1042,14 @@ onBeforeUnmount(() => {
       :form="groupSettingsForm"
       :saving="groupSettingsSaving"
       :avatar-uploading="groupAvatarUploading"
+      :members="groupMembers"
+      :transferring="groupTransferring"
       @close="closeGroupEditor"
       @upload-avatar="uploadGroupAvatar"
       @save="saveGroupSettings"
       @delete-group="deleteGroup"
+      @leave-group="leaveGroup"
+      @transfer-owner="transferOwner"
     />
     <InAppNotificationStack
       :notifications="inAppNotifications"

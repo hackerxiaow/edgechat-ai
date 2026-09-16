@@ -187,7 +187,8 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
         kind: channel.kind,
         isGeneral: isGeneralChannel(channel),
         myRole: membership?.role || '',
-        canManage: session.isAdmin || membership?.role === 'owner'
+        canManage: session.isAdmin || membership?.role === 'owner',
+        createdAt: channel.created_at || ''
       },
       members
     });
@@ -223,11 +224,18 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
 
     const avatarUpdate = await resolveAvatarKeyUpdate(c.env.DB, session.userId, payload);
 
+    const description =
+      payload.description === undefined ? undefined : String(payload.description || '').trim();
+
     const updates: string[] = [];
     const binds: (string | null)[] = [];
     if (name !== undefined) {
       updates.push('name = ?');
       binds.push(name);
+    }
+    if (description !== undefined) {
+      updates.push('description = ?');
+      binds.push(description.slice(0, 500));
     }
     if (avatarUpdate.provided) {
       updates.push('avatar_key = ?');
@@ -266,6 +274,7 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
       channel: {
         id: Number(updated.id),
         name: updated.name,
+        description: updated.description || '',
         avatarKey: updated.avatar_key || '',
         avatarUrl: updated.avatar_key ? publicFileUrl(updated.avatar_key) : ''
       }
@@ -337,6 +346,79 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
       ok: true,
       members: await listChannelMembers(c.env.DB, channelId)
     });
+  });
+
+  app.post('/api/channels/:channelId/leave', async (c) => {
+    const session = c.get('session');
+    const channelId = Number(c.req.param('channelId'));
+    const channel = await getChannelById(c.env.DB, channelId);
+    if (!channel || channel.kind === 'dm') {
+      return errorResponse('群组不存在', 404);
+    }
+    if (isGeneralChannel(channel)) {
+      return errorResponse('general 系统群组不能退出');
+    }
+
+    const membership = await getChannelMembership(c.env.DB, channelId, session.userId);
+    if (!membership) {
+      return errorResponse('你不是该群组成员', 403);
+    }
+    // 群主不能直接退出：否则群组会没有负责人，必须先转让或删除群组。
+    if (membership.role === 'owner') {
+      return errorResponse('群主不能退出群组，请先转让群主或删除群组');
+    }
+
+    await c.env.DB.prepare(
+      `DELETE FROM channel_members WHERE channel_id = ? AND user_id = ?`
+    )
+      .bind(channelId, session.userId)
+      .run();
+
+    return c.json({ ok: true, left: true });
+  });
+
+  app.post('/api/channels/:channelId/transfer', async (c) => {
+    const session = c.get('session');
+    const channelId = Number(c.req.param('channelId'));
+    const payload = await parseJsonRequest(c.req.raw);
+    const targetUserId = Number(payload.userId);
+    if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+      return errorResponse('请选择要转让的成员');
+    }
+
+    const channel = await getChannelById(c.env.DB, channelId);
+    if (!channel || channel.kind === 'dm') {
+      return errorResponse('群组不存在', 404);
+    }
+    if (isGeneralChannel(channel)) {
+      return errorResponse('general 系统群组不能转让');
+    }
+
+    // 必须是群组里真实的 owner：管理员并非成员时按上面的写法会留下两个群主。
+    const ownerMembership = await getChannelMembership(c.env.DB, channelId, session.userId);
+    if (ownerMembership?.role !== 'owner') {
+      return errorResponse('只有群主可以转让群组', 403);
+    }
+    if (Number(targetUserId) === Number(session.userId)) {
+      return errorResponse('不能转让给自己');
+    }
+
+    const target = await getChannelMembership(c.env.DB, channelId, targetUserId);
+    if (!target) {
+      return errorResponse('该用户不是群组成员', 404);
+    }
+
+    // 两步必须在同一个事务里，避免中途失败导致群组没有群主。
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE channel_members SET role = 'member' WHERE channel_id = ? AND user_id = ?`
+      ).bind(channelId, session.userId),
+      c.env.DB.prepare(
+        `UPDATE channel_members SET role = 'owner' WHERE channel_id = ? AND user_id = ?`
+      ).bind(channelId, targetUserId)
+    ]);
+
+    return c.json({ ok: true, members: await listChannelMembers(c.env.DB, channelId) });
   });
 
   app.delete('/api/channels/:channelId', async (c) => {

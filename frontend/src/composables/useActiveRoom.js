@@ -32,6 +32,8 @@ export function useActiveRoom({ activeRoom }) {
 			canManage: Boolean(channel.canManage),
 			myRole: channel.myRole || "",
 			memberCount: Number(channel.memberCount || 0),
+			// 群组信息页展示用
+			createdAt: channel.createdAt || "",
 		};
 	}
 

@@ -21,6 +21,8 @@ export interface RoomRecord {
 	kind: string;
 	dm_key: string | null;
 	created_by?: number | null;
+	/** 群组创建时间；仅部分查询会带上，缺失时为 undefined。 */
+	created_at?: string | null;
 }
 
 export interface ChannelMembership {
@@ -75,7 +77,7 @@ export async function getChannelById(
 
 	const { results } = await db
 		.prepare(
-			`SELECT id, name, description, avatar_key, kind, dm_key, created_by
+			`SELECT id, name, description, avatar_key, kind, dm_key, created_by, created_at
 			 FROM channels
 			 WHERE id = ?
 			   AND deleted_at IS NULL

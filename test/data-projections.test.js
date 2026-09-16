@@ -72,6 +72,8 @@ test("可见频道查询保持十二个数值身份绑定与直接关注 project
 		lastMessageAt: null,
 		unreadCount: 2,
 		mentionUnreadCount: 1,
+		// 群组信息页要展示创建时间，这里随频道投影一起下发
+		createdAt: "",
 	});
 	assert.match(capture.sql, /CASE WHEN c\.name = 'general' THEN 0 ELSE 1 END/);
 });

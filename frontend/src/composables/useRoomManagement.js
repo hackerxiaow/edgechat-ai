@@ -1,6 +1,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import api from "../api.js";
 import { t } from "../i18n.js";
+import { localizeErrorMessage } from "../localized-error.js";
 
 export function useRoomManagement({
 	activeRoom,
@@ -32,9 +33,11 @@ export function useRoomManagement({
 	const inviteUserId = ref("");
 	const groupSettingsForm = reactive({
 		name: "",
+		description: "",
 		avatarUrl: "",
 		avatarKey: "",
 	});
+	const groupTransferring = ref(false);
 	let memberLoadGeneration = 0;
 
 	const availableInviteUsers = computed(() => {
@@ -46,6 +49,7 @@ export function useRoomManagement({
 
 	function syncGroupSettingsForm() {
 		groupSettingsForm.name = activeRoom.value?.name || "";
+		groupSettingsForm.description = activeRoom.value?.description || "";
 		groupSettingsForm.avatarUrl = activeRoom.value?.avatarUrl || "";
 		groupSettingsForm.avatarKey = activeRoom.value?.avatarKey || "";
 	}
@@ -202,7 +206,41 @@ export function useRoomManagement({
 		}
 	}
 
-		async function deleteGroup() {
+		async function leaveGroup() {
+		const room = activeRoom.value;
+		if (!room || room.kind === "dm") return;
+		if (!confirmAction(t("group.leaveConfirm", { name: room.name || "" }))) return;
+		error.value = "";
+		try {
+			await roomApi.leaveChannel(room.id);
+			showGroupEditor.value = false;
+			await refreshSidebar();
+			returnToConversationList();
+		} catch (currentError) {
+			error.value = localizeErrorMessage(currentError);
+		}
+	}
+
+	async function transferOwner(userId) {
+		const room = activeRoom.value;
+		if (!room || room.kind === "dm") return;
+		if (!confirmAction(t("group.transferConfirm"))) return;
+		groupTransferring.value = true;
+		error.value = "";
+		try {
+			const payload = await roomApi.transferChannel(room.id, userId);
+			if (Array.isArray(payload?.members)) groupMembers.value = payload.members;
+			room.myRole = "member";
+			showGroupEditor.value = false;
+			await refreshSidebar();
+		} catch (currentError) {
+			error.value = localizeErrorMessage(currentError);
+		} finally {
+			groupTransferring.value = false;
+		}
+	}
+
+	async function deleteGroup() {
 			if (
 				!activeRoom.value ||
 				activeRoom.value.kind === "dm" ||
@@ -266,9 +304,11 @@ export function useRoomManagement({
 		try {
 			const payload = await roomApi.updateChannel(activeRoom.value.id, {
 				name,
+				description: groupSettingsForm.description.trim(),
 				avatarKey: groupSettingsForm.avatarKey || null,
 			});
 			activeRoom.value.name = payload.channel.name;
+			activeRoom.value.description = payload.channel.description ?? activeRoom.value.description;
 			activeRoom.value.avatarKey = payload.channel.avatarKey || "";
 			activeRoom.value.avatarUrl = payload.channel.avatarUrl || "";
 			syncGroupSettingsForm();
@@ -337,6 +377,9 @@ export function useRoomManagement({
 			close: closeGroupEditor,
 			uploadAvatar: uploadGroupAvatar,
 			save: saveGroupSettings,
+			leave: leaveGroup,
+			transferOwner,
+			transferring: groupTransferring,
 		},
 		deleteGroup,
 	};

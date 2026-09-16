@@ -17,6 +17,8 @@ export interface VisibleChannel {
 	lastMessageAt: string | null;
 	unreadCount: number;
 	mentionUnreadCount: number;
+	/** 群组创建时间，群组信息页展示用。 */
+	createdAt: string;
 }
 
 export interface AdminChannel {
@@ -59,6 +61,7 @@ interface VisibleChannelRow {
 	last_message_at: string | null;
 	unread_count: number;
 	attention_unread_count: number;
+	created_at: string | null;
 }
 
 interface AdminChannelRow {
@@ -101,6 +104,7 @@ function mapVisibleChannel(row: VisibleChannelRow): VisibleChannel {
 		lastMessageAt: row.last_message_at || null,
 		unreadCount: Number(row.unread_count || 0),
 		mentionUnreadCount: Number(row.attention_unread_count || 0),
+		createdAt: row.created_at || "",
 	};
 }
 
@@ -131,7 +135,7 @@ export async function listVisibleChannels(
 	const { results } = await db
 		.prepare(
 			`SELECT
-			   c.id, c.name, c.description, c.avatar_key, c.kind,
+			   c.id, c.name, c.description, c.avatar_key, c.kind, c.created_at,
 			   CASE WHEN c.name = 'general' THEN 1 ELSE 0 END AS is_general,
 		   owner.display_name AS owner_display_name,
 		   EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?) AS is_member,

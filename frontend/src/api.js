@@ -249,6 +249,16 @@ export default {
     }
     return resolveServerUrl(url.pathname + url.search);
   },
+  leaveChannel(channelId) {
+    return request(`/channels/${encodeURIComponent(channelId)}/leave`, { method: 'POST' });
+  },
+  transferChannel(channelId, userId) {
+    return request(`/channels/${encodeURIComponent(channelId)}/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { userId }
+    });
+  },
   adminUsers() {
     return request('/admin/users');
   },
