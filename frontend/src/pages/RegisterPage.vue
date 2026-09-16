@@ -98,11 +98,11 @@ onMounted(() => {
   <div class="login-page">
     <div class="login-card">
       <div class="login-card-header" style="display: flex; gap: 8px;">
-        <button type="button" class="login-language-switch" @click="toggleTheme" :title="isDark ? t('theme.light') : t('theme.dark')">
+        <button type="button" class="theme-toggle-btn" @click="toggleTheme" :title="isDark ? t('theme.light') : t('theme.dark')">
           <Moon v-if="isDark" :size="21" />
           <Sun v-else :size="21" />
         </button>
-        <LanguageSwitch class="login-language-switch" />
+        <LanguageSwitch />
       </div>
       <div class="login-brand">
         <img class="login-logo" src="/logo.svg" alt="" width="64" height="64" />

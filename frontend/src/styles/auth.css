@@ -53,18 +53,25 @@ html.dark .login-card {
   z-index: 10;
 }
 
-.login-language-switch {
-  /* 覆盖原本的外框，更极简 */
+.theme-toggle-btn,
+.login-card-header .language-switch {
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--text-soft) !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  transition: all var(--transition-soft) !important;
+  cursor: pointer;
 }
 
-.login-language-switch:hover {
+.theme-toggle-btn:hover,
+.login-card-header .language-switch:hover {
   background: var(--surface-0) !important;
   color: var(--text) !important;
 }
