@@ -5,10 +5,13 @@ import store from '../store.js';
 import { useCursor } from '../composables/useCursor.js';
 import { useI18n } from '../i18n.js';
 import LanguageSwitch from '../components/ui/LanguageSwitch.vue';
+import { Sun, Moon } from '@lucide/vue';
+import { useTheme } from '../composables/useTheme.js';
 import { getStoredNativeServerOrigin, isCapacitorAndroid } from '../capacitor-platform.ts';
 import { readLoginSubmission } from '../login-submission.ts';
 
 const route = useRoute();
+const { isDark, toggleTheme } = useTheme();
 const router = useRouter();
 const { t } = useI18n();
 const loading = ref(false);
@@ -60,7 +63,11 @@ async function submit(event) {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="login-card-header">
+      <div class="login-card-header" style="display: flex; gap: 8px;">
+        <button type="button" class="login-language-switch" @click="toggleTheme" :title="isDark ? t('theme.light') : t('theme.dark')">
+          <Moon v-if="isDark" :size="21" />
+          <Sun v-else :size="21" />
+        </button>
         <LanguageSwitch class="login-language-switch" />
       </div>
       <div class="login-brand">
@@ -126,6 +133,11 @@ async function submit(event) {
         <button class="login-btn" :disabled="loading" type="submit">
           {{ loading ? t('auth.signingIn') : t('auth.signIn') }}
         </button>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 0.9rem;">
+          <router-link to="/forgot-password" style="color: var(--cool); text-decoration: none;">忘记密码？</router-link>
+          <router-link to="/register" style="color: var(--cool); text-decoration: none;">注册账号</router-link>
+        </div>
 
         <p v-if="error" class="login-error" role="alert">{{ error }}</p>
       </form>

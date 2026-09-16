@@ -18,7 +18,25 @@ import { addAuthInvalidListener } from './auth-storage.js';
 const router = createRouter({
   history: isCapacitorAndroid ? createWebHashHistory() : createWebHistory(),
   routes: [
+
     {
+      path: '/register',
+      name: 'register-open',
+      component: RegisterPage,
+      meta: { public: true, transition: 'page' }
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: ForgotPasswordPage,
+      meta: { public: true, transition: 'page' }
+    },
+    {
+      path: '/reset-password/:token',
+      name: 'reset-password',
+      component: ResetPasswordPage,
+      meta: { public: true, transition: 'page' }
+    },    {
       path: '/login',
       name: 'login',
       component: LoginPage,

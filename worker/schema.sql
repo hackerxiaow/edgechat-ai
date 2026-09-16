@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   bio TEXT NOT NULL DEFAULT '',
+  email TEXT UNIQUE,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   avatar_key TEXT,
@@ -606,3 +607,11 @@ CREATE INDEX IF NOT EXISTS idx_message_events_channel_sequence
 
 CREATE INDEX IF NOT EXISTS idx_telegram_mappings_channel
   ON telegram_mappings(channel_id, enabled, id);
+
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

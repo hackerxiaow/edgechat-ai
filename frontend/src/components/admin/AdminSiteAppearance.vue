@@ -24,6 +24,9 @@ const siteForm = reactive({
   softDeleteRetentionDays: 60,
   orphanUploadRetentionDays: 1,
   gcIntervalMinutes: 60,
+  allowOpenRegistration: false,
+  smtpRelayUrl: '',
+  smtpApiKey: '',
   siteOrigins: ''
 });
 
@@ -38,6 +41,9 @@ function applySite(site) {
   siteForm.softDeleteRetentionDays = Number(site?.softDeleteRetentionDays) || 60;
   siteForm.orphanUploadRetentionDays = Number(site?.orphanUploadRetentionDays) || 1;
   siteForm.gcIntervalMinutes = Number(site?.gcIntervalMinutes) || 60;
+  siteForm.allowOpenRegistration = Boolean(site?.allowOpenRegistration);
+  siteForm.smtpRelayUrl = site?.smtpRelayUrl || '';
+  siteForm.smtpApiKey = site?.smtpApiKey || '';
   siteForm.siteOrigins = (site?.siteOrigins || []).join(', ');
 }
 
@@ -90,6 +96,9 @@ async function saveSiteSettings() {
       softDeleteRetentionDays: Number(siteForm.softDeleteRetentionDays),
       orphanUploadRetentionDays: Number(siteForm.orphanUploadRetentionDays),
       gcIntervalMinutes: Number(siteForm.gcIntervalMinutes),
+      allowOpenRegistration: siteForm.allowOpenRegistration,
+      smtpRelayUrl: siteForm.smtpRelayUrl,
+      smtpApiKey: siteForm.smtpApiKey,
       siteOrigins: siteForm.siteOrigins
     });
     applySite(payload.site);

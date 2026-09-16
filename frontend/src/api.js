@@ -351,3 +351,24 @@ export default {
     });
   }
 };
+
+export async function registerOpen(data) {
+  return request('/api/auth/register-open', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function forgotPassword(email) {
+  return request('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function resetPassword(token, password) {
+  return request('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password })
+  });
+}

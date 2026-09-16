@@ -1,13 +1,16 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import api from '../api.js';
+import api, { registerOpen } from '../api.js';
 import store from '../store.js';
 import { useCursor } from '../composables/useCursor.js';
 import { useI18n } from '../i18n.js';
 import LanguageSwitch from '../components/ui/LanguageSwitch.vue';
+import { Sun, Moon } from '@lucide/vue';
+import { useTheme } from '../composables/useTheme.js';
 
 const route = useRoute();
+const { isDark, toggleTheme } = useTheme();
 const router = useRouter();
 const { t } = useI18n();
 const loading = ref(false);
@@ -16,6 +19,7 @@ const error = ref('');
 const invite = ref(null);
 
 const form = reactive({
+  email: '',
   username: '',
   displayName: '',
   password: '',
@@ -23,6 +27,7 @@ const form = reactive({
 });
 
 const token = computed(() => String(route.params.token || '').trim());
+const isOpenRegistration = computed(() => !token.value);
 
 const usernameInput = ref(null);
 const displayNameInput = ref(null);
@@ -41,6 +46,8 @@ useCursor([
 ], invite);
 
 async function loadInvite() {
+  if (isOpenRegistration.value) return;
+
   validating.value = true;
   error.value = '';
   try {
@@ -65,7 +72,11 @@ async function submit() {
   loading.value = true;
   error.value = '';
   try {
-    await api.registerWithInvite(token.value, form);
+    if (isOpenRegistration.value) {
+      await registerOpen(form);
+    } else {
+      await api.registerWithInvite(token.value, form);
+    }
     router.push({ name: 'login', query: { registered: '1' } });
   } catch (currentError) {
     error.value = currentError.message;
@@ -82,7 +93,11 @@ onMounted(() => {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="login-card-header">
+      <div class="login-card-header" style="display: flex; gap: 8px;">
+        <button type="button" class="login-language-switch" @click="toggleTheme" :title="isDark ? t('theme.light') : t('theme.dark')">
+          <Moon v-if="isDark" :size="21" />
+          <Sun v-else :size="21" />
+        </button>
         <LanguageSwitch class="login-language-switch" />
       </div>
       <div class="login-brand">
@@ -97,7 +112,13 @@ onMounted(() => {
       <p v-else-if="invite?.note" class="login-info">{{ t('auth.invitationNote', { note: invite.note }) }}</p>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
 
-      <form v-if="invite && !error" class="login-form" @submit.prevent="submit">
+      <form v-if="(invite || isOpenRegistration) && !error" class="login-form" @submit.prevent="submit">
+        <label v-if="isOpenRegistration" class="login-field">
+          <span class="login-label">邮箱</span>
+          <span class="input-wrapper">
+            <input v-model.trim="form.email" class="login-input" autocomplete="email" type="email" required />
+          </span>
+        </label>
         <label class="login-field">
           <span class="login-label">{{ t('auth.username') }}</span>
           <span class="input-wrapper">

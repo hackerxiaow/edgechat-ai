@@ -35,6 +35,7 @@ export interface CreateRegistrationInviteInput {
 }
 
 export interface CreateUserWithInviteInput {
+  email?: string;
   username: string;
   displayName: string;
   passwordHash: string;
@@ -176,11 +177,12 @@ export async function createUserWithRegistrationInvite(
       db.prepare(
         `INSERT INTO users (
            username,
+           email,
            display_name,
            password_hash,
            password_salt
-         ) VALUES (?, ?, ?, ?)`
-      ).bind(user.username, user.displayName, user.passwordHash, user.passwordSalt),
+         ) VALUES (?, ?, ?, ?, ?)`
+      ).bind(user.username, user.email || null, user.displayName, user.passwordHash, user.passwordSalt),
       db.prepare(
         `INSERT INTO registration_invite_uses (invite_id, user_id)
          VALUES (?, (SELECT id FROM users WHERE username = ?))`

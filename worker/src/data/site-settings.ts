@@ -22,6 +22,9 @@ export interface RuntimeSettings extends SiteSettings {
 	gcIntervalMinutes: number;
 	/** 本站 origin 列表，用于识别升级前保存的完整 /files/ 图标 URL。 */
 	siteOrigins: string[];
+	allowOpenRegistration: boolean;
+	smtpRelayUrl: string;
+	smtpApiKey: string;
 }
 
 export interface UpdateSiteSettingsInput {
@@ -59,6 +62,9 @@ export const RUNTIME_SETTING_DEFAULTS: RuntimeSettings = {
 	orphanUploadRetentionDays: 1,
 	gcIntervalMinutes: 60,
 	siteOrigins: [],
+	allowOpenRegistration: false,
+	smtpRelayUrl: '',
+	smtpApiKey: '',
 };
 
 /** 设置项在表里的键名，导出给后台表单复用，避免两处写死字符串。 */
@@ -136,6 +142,9 @@ export async function getRuntimeSettings(db: D1Database): Promise<RuntimeSetting
 			max: 10_080,
 		}),
 		siteOrigins: parseOrigins(map.site_origins, defaults.siteOrigins),
+		allowOpenRegistration: map.allow_open_registration === "1",
+		smtpRelayUrl: map.smtp_relay_url || defaults.smtpRelayUrl,
+		smtpApiKey: map.smtp_api_key || defaults.smtpApiKey,
 	};
 }
 

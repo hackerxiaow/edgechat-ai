@@ -204,6 +204,11 @@ export const D1_MIGRATIONS = [
 		file: "worker/migrations/2026-09-16-uploaded-file-blobs.sql",
 		artifacts: ["column:uploaded_files.data"],
 	},
+	{
+		id: "2026-09-16-user-email",
+		file: "worker/migrations/2026-09-16-user-email.sql",
+		artifacts: ["column:users.email", "table:password_resets"],
+	},
 ];
 
 // b3f6855 曾发布、0c13e8f 已撤回的迁移：仅识别历史 ledger，不要求新安装创建废弃表，也不删除旧数据。
