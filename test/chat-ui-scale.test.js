@@ -133,13 +133,20 @@ test("聊天侧栏跟随全屏根节点且不污染后台根节点", () => {
 		assert.match(headerAction, /height:\s*var\(--chat-control\);/);
 	});
 
-	test("语言切换入口位于聊天页右上区域且移动端保持可达", () => {
+	test("语言切换入口与「添加人员」并排，移动端保持可达", () => {
 		assert.doesNotMatch(chatPage, /right-sidebar-action--language/);
 		assert.match(chatPage, /<LanguageSwitch class="chat-header__language-switch" \/>/);
-		assert.match(chatPage, /<LanguageSwitch class="chat-empty__language-switch" \/>/);
+		assert.match(chatPage, /<LanguageSwitch class="empty-language-switch" \/>/);
 		assert.match(chatPage, /<LanguageSwitch class="mobile-language-switch" \/>/);
-		assert.match(chatPage, /\.chat-empty__language-switch\s*{[^}]*position:\s*absolute;[^}]*right:\s*16px;/s);
-		});
+		// 语言切换不再飘在空状态右上角，而是与「添加人员」按钮同排、位于其左侧。
+		assert.doesNotMatch(chatPage, /chat-empty__language-switch/);
+		assert.match(
+			chatPage,
+			/<div class="empty-actions">\s*<LanguageSwitch class="empty-language-switch" \/>\s*<button[^>]*class="empty-start"/s,
+		);
+		// 深浅色切换只保留右侧导航栏那一处，避免同一屏出现两个。
+		assert.equal((chatPage.match(/class="header-action"[\s\S]{0,200}?toggleTheme/g) || []).length, 0);
+	});
 
 test("聊天页面通过专用组件编排会话列表和消息输入区", () => {
 	assert.match(chatPage, /<ConversationList/);

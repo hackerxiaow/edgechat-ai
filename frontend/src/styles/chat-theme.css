@@ -27,13 +27,13 @@
   
   --chat-font: var(--font-sans, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
   --chat-font-heading: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --chat-control: 44px;
-  --chat-radius: 12px;
+  --chat-control: 38px;
+  --chat-radius: 10px;
   --chat-space-xs: 4px;
   --chat-space-sm: 8px;
-  --chat-space-md: 12px;
-  --chat-space-lg: 16px;
-  --chat-space-xl: 24px;
+  --chat-space-md: 10px;
+  --chat-space-lg: 14px;
+  --chat-space-xl: 20px;
 }
 
 /* 暗黑模式主题覆盖 */
@@ -220,4 +220,79 @@ html.dark .composer-textarea {
 .message-row--own .message-bubble .message-time,
 .message-row--own .message-bubble .message-sender-name {
   color: rgba(255, 255, 255, 0.85) !important;
+}
+
+
+/* ================================================
+   「添加人员」弹窗的暗色适配
+   ================================================ */
+
+/* 该组件的 scoped 样式里全是写死的浅色值（标题 #111b21、卡片 #fff 等），
+   而之前的覆盖只写了 .add-conversation-title 这个并不存在的类名，
+   于是暗色下深色标题压在深色底上完全看不见。
+   这里按真实类名逐一改写到全局令牌。 */
+.add-conversation-dialog {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--line-soft) !important;
+  -webkit-backdrop-filter: var(--blur-lg) !important;
+  backdrop-filter: var(--blur-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.add-conversation-dialog__header h2 {
+  color: var(--text) !important;
+}
+
+.add-conversation-dialog__header p {
+  color: var(--text-soft) !important;
+}
+
+.add-conversation-dialog__close {
+  color: var(--text-soft) !important;
+}
+
+.add-conversation-dialog__close:hover {
+  background: var(--surface-0) !important;
+  color: var(--text) !important;
+}
+
+.add-conversation-choice,
+.add-conversation-person {
+  background: var(--surface-2) !important;
+  border-color: var(--line-soft) !important;
+  color: var(--text) !important;
+}
+
+.add-conversation-choice:hover,
+.add-conversation-person:hover:not(:disabled) {
+  background: var(--surface-0) !important;
+  border-color: var(--cool) !important;
+}
+
+.add-conversation-choice__icon {
+  background: var(--cool-soft) !important;
+  color: var(--cool) !important;
+}
+
+.add-conversation-choice small,
+.add-conversation-person small,
+.add-conversation-dialog__empty,
+.add-conversation-dialog__error {
+  color: var(--text-soft) !important;
+}
+
+.add-conversation-choice__arrow {
+  color: var(--text-faint) !important;
+}
+
+.add-conversation-dialog__back {
+  color: var(--cool) !important;
+}
+
+.add-conversation-dialog__back:hover {
+  background: var(--surface-0) !important;
+}
+
+.add-conversation-dialog__error {
+  color: var(--danger) !important;
 }

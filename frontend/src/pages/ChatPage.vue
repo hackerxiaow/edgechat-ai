@@ -616,20 +616,7 @@ onBeforeUnmount(() => {
               <img src="/github.svg" alt="" width="20" height="20" />
               <span class="sr-only">{{ t('nav.openGithubRepository') }}</span>
             </a>
-            <button
-              type="button"
-              class="header-action"
-              :title="t('theme.toggle')"
-              :aria-label="t('theme.toggle')"
-              @click="toggleTheme"
-            >
-              <svg v-if="isDark" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-              <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            </button>
+            <!-- 深浅色切换已由右侧导航栏统一提供，这里不再重复放置。 -->
             <button
               type="button"
               class="header-action header-action--primary"
@@ -870,17 +857,19 @@ onBeforeUnmount(() => {
       </template>
 
       <div v-else class="chat-empty">
-        <LanguageSwitch class="chat-empty__language-switch" />
         <div class="empty-content">
           <div class="empty-brand">
             <MessageCircle :size="36" :stroke-width="1.5" aria-hidden="true" />
             <span class="empty-title">EdgeChat</span>
           </div>
           <p>{{ t('chat.noConversationSelected') }}</p>
-          <button type="button" class="empty-start" @click="openAddConversation">
-            <MessageCircle :size="18" aria-hidden="true" />
-            {{ t('chat.addPeople') }}
-          </button>
+          <div class="empty-actions">
+            <LanguageSwitch class="empty-language-switch" />
+            <button type="button" class="empty-start" @click="openAddConversation">
+              <MessageCircle :size="18" aria-hidden="true" />
+              {{ t('chat.addPeople') }}
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -1003,7 +992,8 @@ onBeforeUnmount(() => {
 
 .left-sidebar {
   flex-shrink: 0;
-  width: clamp(300px, 27vw, 380px);
+  /* 原来是 clamp(300px, 27vw, 380px)，偏宽挤压了聊天区。 */
+  width: clamp(230px, 20vw, 288px);
   height: 100%;
   position: relative;
   z-index: 10;
@@ -1029,8 +1019,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 84px;
-  padding: 20px 24px 16px;
+  min-height: 68px;
+  padding: 14px 16px 12px;
   /* 同上：由 .left-sidebar 统一提供玻璃背景。 */
   background: transparent;
 }
@@ -1272,8 +1262,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 76px;
-  padding: 12px 24px;
+  min-height: 62px;
+  padding: 10px 18px;
   background: var(--chat-paper);
   border-bottom: 1px solid var(--chat-line);
 }
@@ -1542,10 +1532,32 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.chat-empty__language-switch {
-  position: absolute;
-  top: 10px;
-  right: 16px;
+.empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 语言切换与右侧导航栏的深浅色按钮保持同一风格：无边框、透明底、圆形。 */
+.empty-language-switch {
+  display: inline-grid;
+  place-items: center;
+}
+
+.empty-language-switch .language-switch {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--chat-muted);
+}
+
+.empty-language-switch .language-switch:hover {
+  background: var(--chat-hover);
+  color: var(--chat-ink);
 }
 
 .empty-content {
