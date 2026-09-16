@@ -103,8 +103,8 @@ markdown.renderer.rules.link_open = (tokens, index, options, _environment, rende
 
 markdown.renderer.rules.image = (tokens, index) => {
 	const token = tokens[index];
-	const source = token.attrGet("src") || "";
-	const label = token.content || source;
+	const source = String(token.attrGet("src") ?? "");
+	const label = String(token.content || source);
 	const escapedLabel = markdown.utils.escapeHtml(label);
 	if (!isSafeWebUrl(source)) {
 		return `<span class="message-image-syntax">${markdown.utils.escapeHtml(`![${label}](${source})`)}</span>`;
@@ -114,15 +114,16 @@ markdown.renderer.rules.image = (tokens, index) => {
 
 markdown.renderer.rules.edgechat_mention = (tokens, index) => {
 	const token = tokens[index];
-	const classes = token.meta.self
+	const classes = token.meta?.self
 		? "message-mention message-mention--self"
 		: "message-mention";
-	return `<span class="${classes}">${markdown.utils.escapeHtml(token.content)}</span>`;
+	return `<span class="${classes}">${markdown.utils.escapeHtml(String(token.content))}</span>`;
 };
 
 markdown.renderer.rules.edgechat_link = (tokens, index) => {
 	const token = tokens[index];
-	return `<a class="message-link" href="${markdown.utils.escapeHtml(token.meta.href)}" target="_blank" rel="noopener noreferrer">${markdown.utils.escapeHtml(token.content)}</a>`;
+	const href = String(token.meta?.href ?? "");
+	return `<a class="message-link" href="${markdown.utils.escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${markdown.utils.escapeHtml(String(token.content))}</a>`;
 };
 
 export function renderMessageMarkdownHtml(

@@ -1,13 +1,11 @@
 import manifest from '../generated/schema-manifest.json' with { type: 'json' };
 import { inspectSchema, type SchemaQuery } from './schema-contract.ts';
 
-interface Database {
-  prepare(sql: string): { all(): Promise<{ results: Awaited<ReturnType<SchemaQuery>> }> };
-}
+// 只依赖实际探测到的能力，便于注入最小替身；D1 的 results 在边界处收窄。
 interface MaintenanceEnv {
-  DB?: Database;
-  SESSIONS?: { get(key: string): Promise<unknown> };
-  FILES?: { list(options: { limit: number }): Promise<unknown> };
+  DB?: Pick<D1Database, 'prepare'>;
+  SESSIONS?: Pick<KVNamespace, 'get'>;
+  FILES?: Pick<R2Bucket, 'list'>;
   [key: string]: unknown;
 }
 type CheckStatus = 'ok' | 'error' | 'missing' | 'disabled' | 'blocked';
@@ -34,7 +32,7 @@ async function probe(id: string, operation: () => Promise<Partial<Check>>, timeo
     // 上游异常可能包含请求地址或凭据；只返回稳定诊断码，不透传 exception。
     return { id, status: 'error', code: 'request_failed', durationMs: Date.now() - started };
   } finally {
-    clearTimeout(timer);
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -57,7 +55,8 @@ export async function runSystemCheck(env: MaintenanceEnv, { timeoutMs = 8000 } =
   const database = async (): Promise<Check[]> => {
     if (!env.DB) return [absent('d1'), { id: 'schema', status: 'blocked', code: 'database_unavailable', durationMs: 0 }];
     const db = env.DB;
-    const query: SchemaQuery = async (sql) => (await db.prepare(sql).all()).results;
+    const query: SchemaQuery = async (sql) =>
+      (await db.prepare(sql).all()).results as Awaited<ReturnType<SchemaQuery>>;
     const connectivity = await probe('d1', async () => { await query('SELECT 1'); return {}; }, timeoutMs);
     if (connectivity.status !== 'ok') return [connectivity, { id: 'schema', status: 'blocked', code: 'database_unavailable', durationMs: 0 }];
     const schema = await probe('schema', async () => {

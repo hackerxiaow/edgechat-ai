@@ -26,7 +26,8 @@
     "biome:write": "biome check --write .",
     "biome:check": "biome check .",
     "biome:ci": "biome ci .",
-    "check": "npm run biome:ci && npm run build",
+    "typecheck": "tsc -p tsconfig.json && tsc -p frontend/tsconfig.json",
+    "check": "npm run biome:ci && npm run typecheck && npm run build",
     "deploy": "npm run build && wrangler deploy",
     "deploy:demo": "npm run build:demo && wrangler deploy --config wrangler.demo.toml",
     "d1:apply": "wrangler d1 execute cfchat-db --file ./worker/schema.sql",
@@ -47,8 +48,10 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
     "@capacitor/cli": "^8.5.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "sql.js": "1.14.2",
+    "typescript": "^5.9.3",
     "vite": "^8.2.1",
     "wrangler": "^4.11.1"
   },

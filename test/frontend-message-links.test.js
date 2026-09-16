@@ -5,7 +5,7 @@ import test from "node:test";
 import {
 	tokenizeMessageText,
 	tokenizeWebLinks,
-} from "../frontend/src/message-text.js";
+} from "../frontend/src/message-text.ts";
 
 const messageMarkdownComponent = readFileSync(
 	new URL("../frontend/src/components/chat/MessageMarkdown.vue", import.meta.url),

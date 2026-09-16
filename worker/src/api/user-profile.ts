@@ -1,11 +1,12 @@
 import type { Hono } from "hono";
+import type { AppEnv } from "../types.ts";
 import { validateBio, parseLocalUserId } from "../../../shared/user-profile.ts";
 import { putSession } from "../auth.js";
 import { resolveAvatarKeyUpdate, isR2ObjectUnavailableError } from "../avatar-policy.js";
 import { getUserProfile } from "../data/users.js";
 import { errorResponse, parseJsonRequest } from "../utils.js";
 
-export function registerUserProfileRoutes(app: Hono) {
+export function registerUserProfileRoutes(app: Hono<AppEnv>) {
 	app.get("/api/users/:id/profile", async (c) => {
 		const id = parseLocalUserId(c.req.param("id"));
 		if (id === null) return errorResponse("用户 ID 无效", 400);

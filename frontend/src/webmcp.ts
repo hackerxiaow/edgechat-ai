@@ -219,7 +219,9 @@ export function createEdgeChatWebMcpTools(
         requireSession(getSession);
         const username = String(input.username || '').trim().toLowerCase();
         const payload = await apiClient.bootstrap();
-        const user = (payload.users || []).find(
+        // bootstrap 来自未类型化的 api.js，这里在边界处收窄成需要的字段。
+        const users = (payload.users || []) as Array<{ id: number; username?: string }>;
+        const user = users.find(
           (candidate) => String(candidate.username || '').toLowerCase() === username
         );
         if (!user) {

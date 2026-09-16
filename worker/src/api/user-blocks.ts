@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import type { AppEnv } from "../types.ts";
 import { getUserBlockStatus, setUserBlocked } from "../data/user-blocks.ts";
 import { errorResponse } from "../utils.js";
 
@@ -6,7 +7,7 @@ function targetUserId(c: { req: { param(name: string): string } }): number {
 	return Number(c.req.param("userId"));
 }
 
-export function registerUserBlockRoutes(app: Hono) {
+export function registerUserBlockRoutes(app: Hono<AppEnv>) {
 	app.put("/api/users/:userId/block", async (c) => {
 		const session = c.get("session");
 		const userId = targetUserId(c);
