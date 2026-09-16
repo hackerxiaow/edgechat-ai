@@ -223,8 +223,9 @@ onMounted(() => {
           {{ loading ? t('auth.registering') : t('auth.completeRegistration') }}
         </button>
       </form>
-      <div style="text-align: center; margin-top: 16px;">
-        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.9rem;">已有账号？返回登录</router-link>
+      
+      <div style="text-align: center; margin-top: 24px;">
+        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.95rem; font-weight: 500;">返回登录</router-link>
       </div>
     </div>
   </div>
