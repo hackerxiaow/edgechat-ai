@@ -1,4 +1,4 @@
-import { externalSenderExists } from "../data/messages.js";
+import { externalSenderExists } from "../data/messages.ts";
 import {
 	createTelegramMapping,
 	deleteTelegramMapping,
@@ -7,7 +7,7 @@ import {
 	listTelegramBridgeAdminState,
 	saveTelegramBridgeConfig,
 	updateTelegramMapping,
-} from "../data/telegram.js";
+} from "../data/telegram.ts";
 import { loadTelegramUserAvatar } from "../integrations/telegram/avatar.js";
 import {
 	getTelegramBot,

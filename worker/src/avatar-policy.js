@@ -1,7 +1,7 @@
 import {
 	getOwnedUploadedFileMetadata,
 	isR2ObjectUnavailableError,
-} from "./data/uploaded-files.js";
+} from "./data/uploaded-files.ts";
 import { ApiError } from "./errors.js";
 
 export { isR2ObjectUnavailableError };

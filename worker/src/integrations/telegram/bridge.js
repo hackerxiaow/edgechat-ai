@@ -1,13 +1,13 @@
 import {
 	getTelegramCredentials,
 	listEnabledTelegramMappingsForChannel,
-} from "../../data/telegram.js";
+} from "../../data/telegram.ts";
 import { isGroupChannelKind } from "../../../../shared/group-channel.ts";
-import { getMessageBySource } from "../../data/messages.js";
+import { getMessageBySource } from "../../data/messages.ts";
 import {
 	findMessageReplyBySource,
 	getMessageSourceReference,
-} from "../../data/replies.js";
+} from "../../data/replies.ts";
 import { submitExternalMessage } from "../../external-message-submission.js";
 import { sendTelegramMedia, sendTelegramText } from "./client.js";
 import {

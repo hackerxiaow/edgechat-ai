@@ -5,12 +5,12 @@ import {
 	listAdminChannels,
 	listChannelMembers,
 	listVisibleChannels,
-} from "../worker/src/data/channels.js";
-import { listAdminDms, listUserDms } from "../worker/src/data/dm-queries.js";
-import { listMessages, mapMessage } from "../worker/src/data/messages.js";
-import { getSiteSettings } from "../worker/src/data/site-settings.js";
-import { countUnreadMessages, listRoomMemberIds } from "../worker/src/data/unread.js";
-import { listAdminUsers } from "../worker/src/data/users.js";
+} from "../worker/src/data/channels.ts";
+import { listAdminDms, listUserDms } from "../worker/src/data/dm-queries.ts";
+import { listMessages, mapMessage } from "../worker/src/data/messages.ts";
+import { getSiteSettings } from "../worker/src/data/site-settings.ts";
+import { countUnreadMessages, listRoomMemberIds } from "../worker/src/data/unread.ts";
+import { listAdminUsers } from "../worker/src/data/users.ts";
 
 function createQueryDb(results) {
 	const capture = { sql: "", binds: [] };

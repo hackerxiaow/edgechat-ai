@@ -1,6 +1,6 @@
-import { listMessages } from '../data/messages.js';
-import { getPinnedMessage } from '../data/pins.js';
-import { markRoomRead } from '../data/unread.js';
+import { listMessages } from '../data/messages.ts';
+import { getPinnedMessage } from '../data/pins.ts';
+import { markRoomRead } from '../data/unread.ts';
 import { authorizeRoom, isRoomKind } from '../room-access.js';
 import { errorResponse, parseJsonRequest, sanitizeLimit } from '../utils.js';
 

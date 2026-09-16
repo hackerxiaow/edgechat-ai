@@ -1,6 +1,51 @@
 import { publicFileUrl } from "../utils.js";
 
-function mapUserDm(row) {
+export interface UserDm {
+	id: number;
+	kind: "dm";
+	name: string;
+	lastMessageAt: string | null;
+	unreadCount: number;
+	mentionUnreadCount: number;
+	otherUser: {
+		id: number;
+		username: string;
+		displayName: string;
+		avatarUrl: string;
+	};
+	isBlockedByMe: boolean;
+}
+
+export interface AdminDm {
+	id: number;
+	name: string;
+	participants: string | null;
+	createdAt: string;
+	messageCount: number;
+}
+
+interface UserDmRow {
+	id: number;
+	dm_key: string;
+	other_user_id: number;
+	other_username: string;
+	other_display_name: string;
+	other_avatar_key: string | null;
+	blocked_by_me: number;
+	last_message_at: string | null;
+	unread_count: number;
+	attention_unread_count: number;
+}
+
+interface AdminDmRow {
+	id: number;
+	dm_key: string;
+	created_at: string;
+	participants: string | null;
+	message_count: number;
+}
+
+function mapUserDm(row: UserDmRow): UserDm {
 	return {
 		id: Number(row.id),
 		kind: "dm",
@@ -18,7 +63,7 @@ function mapUserDm(row) {
 	};
 }
 
-function mapAdminDm(row) {
+function mapAdminDm(row: AdminDmRow): AdminDm {
 	return {
 		id: Number(row.id),
 		name: row.dm_key,
@@ -28,7 +73,10 @@ function mapAdminDm(row) {
 	};
 }
 
-export async function listUserDms(db, userId) {
+export async function listUserDms(
+	db: D1Database,
+	userId: number | string,
+): Promise<UserDm[]> {
 	const normalizedUserId = Number(userId);
 	const { results } = await db
 		.prepare(
@@ -55,22 +103,22 @@ export async function listUserDms(db, userId) {
 			 JOIN users other ON other.id = peer.user_id
 			 WHERE c.kind = 'dm' AND c.deleted_at IS NULL AND other.deleted_at IS NULL
 			 ORDER BY last_message_at DESC NULLS LAST, c.id DESC`,
-			)
-				.bind(
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-					normalizedUserId,
-				)
-		.all();
+		)
+		.bind(
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+			normalizedUserId,
+		)
+		.all<UserDmRow>();
 	return results.map(mapUserDm);
 }
 
-export async function listAdminDms(db) {
+export async function listAdminDms(db: D1Database): Promise<AdminDm[]> {
 	const { results } = await db
 		.prepare(
 			`SELECT
@@ -85,6 +133,6 @@ export async function listAdminDms(db) {
 			 WHERE c.kind = 'dm' AND c.deleted_at IS NULL
 			 ORDER BY c.created_at DESC`,
 		)
-		.all();
+		.all<AdminDmRow>();
 	return results.map(mapAdminDm);
 }

@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 
-import { listVisibleChannels } from "../worker/src/data/channels.js";
-import { listUserDms } from "../worker/src/data/dm-queries.js";
+import { listVisibleChannels } from "../worker/src/data/channels.ts";
+import { listUserDms } from "../worker/src/data/dm-queries.ts";
 import {
 	insertMessage,
 	listMessages,
 	softDeleteMessage,
-} from "../worker/src/data/messages.js";
-import { countUnreadAttention, markRoomRead } from "../worker/src/data/unread.js";
+} from "../worker/src/data/messages.ts";
+import { countUnreadAttention, markRoomRead } from "../worker/src/data/unread.ts";
 import {
 	MessageSubmissionError,
 	submitRoomMessage,

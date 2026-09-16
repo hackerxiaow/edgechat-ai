@@ -9,7 +9,7 @@ import {
   getRoomSyncCursor,
   insertMessageIdempotent,
   listRoomMessageEvents
-} from '../worker/src/data/messages.js';
+} from '../worker/src/data/messages.ts';
 import { runScheduledGc } from '../worker/src/gc.js';
 import { saveUploadedFile } from '../worker/src/api/upload.js';
 import {

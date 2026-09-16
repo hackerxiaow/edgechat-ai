@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 
-import { insertMessage } from "../worker/src/data/messages.js";
-import { canAccessFile } from "../worker/src/data/uploaded-files.js";
+import { insertMessage } from "../worker/src/data/messages.ts";
+import { canAccessFile } from "../worker/src/data/uploaded-files.ts";
 import { ORPHAN_UPLOAD_QUERY, runScheduledGc } from "../worker/src/gc.js";
 import { createMessageSubmission } from "../worker/src/message-submission.js";
 import { createD1Adapter } from "./support/d1.js";

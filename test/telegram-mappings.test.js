@@ -8,7 +8,7 @@ import {
 	getTelegramMappingByChatId,
 	listEnabledTelegramMappingsForChannel,
 	listTelegramBridgeAdminState,
-} from "../worker/src/data/telegram.js";
+} from "../worker/src/data/telegram.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

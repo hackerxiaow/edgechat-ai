@@ -1,4 +1,14 @@
-export async function ensureDmChannel(db, actorId, targetUserId) {
+export interface DmChannelRow {
+	id: number;
+	name: string;
+	dm_key: string;
+}
+
+export async function ensureDmChannel(
+	db: D1Database,
+	actorId: number | string,
+	targetUserId: number | string,
+): Promise<DmChannelRow> {
 	const dmKey = [Number(actorId), Number(targetUserId)]
 		.sort((left, right) => left - right)
 		.join(":");
@@ -8,7 +18,7 @@ export async function ensureDmChannel(db, actorId, targetUserId) {
 			 WHERE kind = 'dm' AND dm_key = ? AND deleted_at IS NULL LIMIT 1`,
 		)
 		.bind(dmKey)
-		.all();
+		.all<DmChannelRow>();
 	if (existing.results[0]) {
 		return existing.results[0];
 	}
@@ -20,7 +30,7 @@ export async function ensureDmChannel(db, actorId, targetUserId) {
 		)
 		.bind(dmKey, dmKey, Number(actorId))
 		.run();
-	const channelId = created.meta.last_row_id;
+	const channelId = Number(created.meta.last_row_id ?? 0);
 	await db.batch([
 		db
 			.prepare(

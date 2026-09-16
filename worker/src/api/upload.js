@@ -3,7 +3,7 @@ import {
   getUploadedFileByClientId,
   getUploadedFileMetadata,
   recordUploadedFile
-} from '../data/uploaded-files.js';
+} from '../data/uploaded-files.ts';
 import { decryptAttachment, encryptAttachment } from '../encryption.js';
 import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.js';
 import { validateSession } from '../session.js';

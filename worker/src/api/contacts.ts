@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { AppEnv } from "../types.ts";
-import { listContacts } from "../data/users.js";
+import { listContacts } from "../data/users.ts";
 
 export function registerContactRoutes(app: Hono<AppEnv>) {
 	app.get("/api/contacts", async (c) => {

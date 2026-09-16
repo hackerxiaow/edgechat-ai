@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { softDeleteMessage } from "../worker/src/data/messages.js";
+import { softDeleteMessage } from "../worker/src/data/messages.ts";
 import {
 	createMessageDeletion,
 	MessageDeletionError,

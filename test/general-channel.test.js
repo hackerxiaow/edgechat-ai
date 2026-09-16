@@ -8,7 +8,7 @@ import {
 	ensureGeneralChannelMembership,
 	isGeneralChannel,
 	isReservedGeneralChannelName,
-} from "../worker/src/data/general-channel.js";
+} from "../worker/src/data/general-channel.ts";
 
 function createBatchDb() {
 	const statements = [];

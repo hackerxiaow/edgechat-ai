@@ -1,5 +1,30 @@
-export function isR2ObjectUnavailableError(error) {
-	const message = String(error?.message || error);
+export interface UploadedFile {
+	key: string;
+	name: string;
+	type: string;
+	size: number;
+	url: string;
+}
+
+export interface UploadedFileMetadata {
+	filename: string;
+	contentType: string;
+	size: number;
+}
+
+export interface RecordUploadedFileInput {
+	key: string;
+	ownerUserId: number | string;
+	filename: string;
+	contentType: string;
+	size: number;
+	clientUploadId?: string | null;
+	/** 无 R2 绑定时的附件正文；有 R2 时传 null。 */
+	data?: Uint8Array | null;
+}
+
+export function isR2ObjectUnavailableError(error: unknown): boolean {
+	const message = String((error as { message?: unknown })?.message || error);
 	return (
 		message.includes("r2_object_pending_delete") ||
 		message.includes("r2_local_object_unavailable")
@@ -7,9 +32,17 @@ export function isR2ObjectUnavailableError(error) {
 }
 
 export async function recordUploadedFile(
-	db,
-	{ key, ownerUserId, filename, contentType, size, clientUploadId = null, data = null },
-) {
+	db: D1Database,
+	{
+		key,
+		ownerUserId,
+		filename,
+		contentType,
+		size,
+		clientUploadId = null,
+		data = null,
+	}: RecordUploadedFileInput,
+): Promise<void> {
 	await db
 		.prepare(
 			`INSERT INTO uploaded_files (
@@ -28,14 +61,21 @@ export async function recordUploadedFile(
 			Number(ownerUserId),
 			String(filename || ""),
 			String(contentType || ""),
-				Number(size || 0),
-				clientUploadId ? String(clientUploadId) : null,
-				data,
-			)
+			Number(size || 0),
+			clientUploadId ? String(clientUploadId) : null,
+			data,
+		)
 		.run();
 }
 
-function mapUploadedFile(row) {
+interface UploadedFileRow {
+	object_key: string;
+	filename: string;
+	content_type: string;
+	size: number;
+}
+
+function mapUploadedFile(row: UploadedFileRow | undefined): UploadedFile | null {
 	return row
 		? {
 				key: row.object_key,
@@ -47,7 +87,11 @@ function mapUploadedFile(row) {
 		: null;
 }
 
-export async function getUploadedFileByClientId(db, userId, clientUploadId) {
+export async function getUploadedFileByClientId(
+	db: D1Database,
+	userId: number | string,
+	clientUploadId: string,
+): Promise<UploadedFile | null> {
 	const { results } = await db
 		.prepare(
 			`SELECT object_key, filename, content_type, size
@@ -56,18 +100,21 @@ export async function getUploadedFileByClientId(db, userId, clientUploadId) {
 			 LIMIT 1`,
 		)
 		.bind(Number(userId), String(clientUploadId))
-		.all();
+		.all<UploadedFileRow>();
 	return mapUploadedFile(results[0]);
 }
 
-export async function getUploadedFileMetadata(db, key) {
+export async function getUploadedFileMetadata(
+	db: D1Database,
+	key: string,
+): Promise<UploadedFileMetadata | null> {
 	const { results } = await db
 		.prepare(
 			`SELECT filename, content_type, size
 			 FROM uploaded_files WHERE object_key = ? LIMIT 1`,
 		)
 		.bind(String(key))
-		.all();
+		.all<UploadedFileRow>();
 	const row = results[0];
 	return row
 		? {
@@ -78,7 +125,11 @@ export async function getUploadedFileMetadata(db, key) {
 		: null;
 }
 
-export async function getOwnedUploadedFileMetadata(db, key, userId) {
+export async function getOwnedUploadedFileMetadata(
+	db: D1Database,
+	key: string,
+	userId: number | string,
+): Promise<UploadedFileMetadata | null> {
 	const { results } = await db
 		.prepare(
 			`SELECT filename, content_type, size
@@ -91,7 +142,7 @@ export async function getOwnedUploadedFileMetadata(db, key, userId) {
 			 LIMIT 1`,
 		)
 		.bind(String(key), Number(userId))
-		.all();
+		.all<UploadedFileRow>();
 	const row = results[0];
 	return row
 		? {
@@ -102,7 +153,11 @@ export async function getOwnedUploadedFileMetadata(db, key, userId) {
 		: null;
 }
 
-export async function fileBelongsToUser(db, key, userId) {
+export async function fileBelongsToUser(
+	db: D1Database,
+	key: string,
+	userId: number | string,
+): Promise<boolean> {
 	const { results } = await db
 		.prepare(
 			`SELECT 1 AS found FROM uploaded_files
@@ -114,11 +169,15 @@ export async function fileBelongsToUser(db, key, userId) {
 			 LIMIT 1`,
 		)
 		.bind(String(key), Number(userId))
-		.all();
+		.all<{ found: number }>();
 	return Boolean(results[0]);
 }
 
-export async function canAccessFile(db, key, userId = null) {
+export async function canAccessFile(
+	db: D1Database,
+	key: string,
+	userId: number | string | null = null,
+): Promise<boolean> {
 	const cleanKey = String(key || "");
 	if (!cleanKey) return false;
 
@@ -133,7 +192,7 @@ export async function canAccessFile(db, key, userId = null) {
 			   )`,
 		)
 		.bind(cleanKey, cleanKey, cleanKey)
-		.all();
+		.all<{ found: number }>();
 	if (publicRefs.results[0]) return true;
 	if (!Number.isFinite(Number(userId))) return false;
 
@@ -157,6 +216,6 @@ export async function canAccessFile(db, key, userId = null) {
 			 ))`,
 		)
 		.bind(cleanKey, cleanKey, Number(userId), cleanKey, Number(userId))
-		.all();
+		.all<{ found: number }>();
 	return Boolean(results[0]);
 }

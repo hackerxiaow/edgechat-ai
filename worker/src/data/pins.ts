@@ -1,6 +1,14 @@
-import { getMessageById } from "./messages.js";
+import type { AppBindings } from "../types.ts";
+import { getMessageById } from "./messages.ts";
 
-export async function getPinnedMessage(env, channelId) {
+interface PinnedRow {
+	message_id: number;
+}
+
+export async function getPinnedMessage(
+	env: Pick<AppBindings, "DB">,
+	channelId: number | string,
+) {
 	const { results } = await env.DB.prepare(
 		`SELECT message_id
 		 FROM channel_pins
@@ -8,11 +16,18 @@ export async function getPinnedMessage(env, channelId) {
 		 LIMIT 1`,
 	)
 		.bind(Number(channelId))
-		.all();
+		.all<PinnedRow>();
 	return results[0] ? getMessageById(env, results[0].message_id) : null;
 }
 
-export async function pinMessage(db, { channelId, messageId, pinnedBy }) {
+export async function pinMessage(
+	db: D1Database,
+	{
+		channelId,
+		messageId,
+		pinnedBy,
+	}: { channelId: number | string; messageId: number | string; pinnedBy: number | string },
+): Promise<boolean> {
 	// 用单条 INSERT SELECT 同时确认消息仍然存活，避免删除与置顶并发时留下失效引用。
 	const result = await db
 		.prepare(
@@ -32,7 +47,10 @@ export async function pinMessage(db, { channelId, messageId, pinnedBy }) {
 	return Number(result.meta?.changes || 0) > 0;
 }
 
-export async function unpinMessage(db, { channelId, messageId }) {
+export async function unpinMessage(
+	db: D1Database,
+	{ channelId, messageId }: { channelId: number | string; messageId: number | string },
+): Promise<boolean> {
 	const result = await db
 		.prepare(
 			`DELETE FROM channel_pins

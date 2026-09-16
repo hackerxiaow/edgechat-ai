@@ -8,15 +8,15 @@ import {
   putSession,
   verifyPassword
 } from './auth.js';
-import { listVisibleChannels } from './data/channels.js';
-import { listUserDms } from './data/dm-queries.js';
-import { ensureGeneralChannelMembership } from './data/general-channel.js';
+import { listVisibleChannels } from './data/channels.ts';
+import { listUserDms } from './data/dm-queries.ts';
+import { ensureGeneralChannelMembership } from './data/general-channel.ts';
 import {
   createUserWithRegistrationInvite,
   getAvailableRegistrationInvite
-} from './data/registration-invites.js';
-import { getSiteSettings } from './data/site-settings.js';
-import { getUserByUsername, listActiveUsers } from './data/users.js';
+} from './data/registration-invites.ts';
+import { getSiteSettings } from './data/site-settings.ts';
+import { getUserByUsername, listActiveUsers } from './data/users.ts';
 import { ApiError } from './errors.js';
 import { adminMiddleware, authMiddleware } from './middleware.js';
 import { registerAdminRoutes } from './api/admin.js';

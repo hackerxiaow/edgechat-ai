@@ -3,17 +3,17 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 
-import { listVisibleChannels } from "../worker/src/data/channels.js";
+import { listVisibleChannels } from "../worker/src/data/channels.ts";
 import {
 	insertMessage,
 	listMessages,
-} from "../worker/src/data/messages.js";
+} from "../worker/src/data/messages.ts";
 import {
 	contentMentionsUsername,
 	normalizeMentionUserIds,
 	resolveMessageMentionUserIds,
-} from "../worker/src/data/mentions.js";
-import { countUnreadMentions, markRoomRead } from "../worker/src/data/unread.js";
+} from "../worker/src/data/mentions.ts";
+import { countUnreadMentions, markRoomRead } from "../worker/src/data/unread.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

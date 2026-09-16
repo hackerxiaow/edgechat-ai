@@ -1,14 +1,22 @@
 export const GENERAL_CHANNEL_NAME = "general";
 
-export function isGeneralChannel(channel) {
+export interface GeneralChannelLike {
+	kind?: string | null;
+	name?: string | null;
+}
+
+export function isGeneralChannel(channel: GeneralChannelLike | null | undefined): boolean {
 	return channel?.kind !== "dm" && channel?.name === GENERAL_CHANNEL_NAME;
 }
 
-export function isReservedGeneralChannelName(name) {
+export function isReservedGeneralChannelName(name: unknown): boolean {
 	return String(name || "").trim().toLowerCase() === GENERAL_CHANNEL_NAME;
 }
 
-export async function ensureGeneralChannelMembership(db, userId) {
+export async function ensureGeneralChannelMembership(
+	db: D1Database,
+	userId: number | string,
+): Promise<void> {
 	const normalizedUserId = Number(userId);
 	if (!Number.isInteger(normalizedUserId) || normalizedUserId <= 0) {
 		throw new TypeError("general 群组成员必须是有效用户");

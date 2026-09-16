@@ -8,7 +8,7 @@ import {
 	createUserWithRegistrationInvite,
 	getAvailableRegistrationInvite,
 	listActiveRegistrationInvites,
-} from "../worker/src/data/registration-invites.js";
+} from "../worker/src/data/registration-invites.ts";
 
 function createStatementDb(handlers = {}) {
 	const calls = [];

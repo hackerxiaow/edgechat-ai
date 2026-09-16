@@ -1,6 +1,6 @@
-import { insertMessage, insertMessageIdempotent } from "./data/messages.js";
-import { resolveMessageMentionUserIds } from "./data/mentions.js";
-import { resolveMessageReply } from "./data/replies.js";
+import { insertMessage, insertMessageIdempotent } from "./data/messages.ts";
+import { resolveMessageMentionUserIds } from "./data/mentions.ts";
+import { resolveMessageReply } from "./data/replies.ts";
 import { getDirectMessageBlockStatus } from "./data/user-blocks.ts";
 
 export class MessageSubmissionError extends Error {

@@ -1,17 +1,19 @@
 import { activeUserSql } from "../user-status.js";
 
-export function normalizeMentionUserIds(values) {
+export function normalizeMentionUserIds(values: unknown): number[] {
 	if (!Array.isArray(values)) {
 		return [];
 	}
-	return [...new Set(values.map(Number).filter((value) => Number.isInteger(value) && value > 0))];
+	return [
+		...new Set(values.map(Number).filter((value) => Number.isInteger(value) && value > 0)),
+	];
 }
 
-function isMentionBoundary(character) {
+function isMentionBoundary(character: string): boolean {
 	return !character || /[\s()[\]{}<>"'，。！？、：；,.!?]/u.test(character);
 }
 
-export function contentMentionsUsername(content, username) {
+export function contentMentionsUsername(content: unknown, username: unknown): boolean {
 	const text = String(content || "");
 	const token = `@${String(username || "")}`;
 	if (token.length <= 1) {
@@ -30,13 +32,27 @@ export function contentMentionsUsername(content, username) {
 	return false;
 }
 
-export async function resolveMessageMentionUserIds(db, {
-	channelId,
-	roomKind,
-	senderId,
-	content,
-	candidateUserIds,
-}) {
+interface MentionCandidateRow {
+	user_id: number;
+	username: string;
+}
+
+export async function resolveMessageMentionUserIds(
+	db: D1Database,
+	{
+		channelId,
+		roomKind,
+		senderId,
+		content,
+		candidateUserIds,
+	}: {
+		channelId: number | string;
+		roomKind: string;
+		senderId: number | string;
+		content: string;
+		candidateUserIds: unknown;
+	},
+): Promise<number[]> {
 	const candidates = normalizeMentionUserIds(candidateUserIds).filter(
 		(userId) => userId !== Number(senderId),
 	);
@@ -56,7 +72,7 @@ export async function resolveMessageMentionUserIds(db, {
 			   AND ${activeUserSql("u")}`,
 		)
 		.bind(Number(channelId), ...candidates)
-		.all();
+		.all<MentionCandidateRow>();
 
 	return results
 		.filter((row) => contentMentionsUsername(content, row.username))

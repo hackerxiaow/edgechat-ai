@@ -1,10 +1,26 @@
 import { normalizeSiteIconForStorage, siteIconUrlFromStored } from "../site-icon.js";
 
-export async function getSiteSettings(db) {
+export interface SiteSettings {
+	siteName: string;
+	siteIconUrl: string;
+}
+
+export interface UpdateSiteSettingsInput {
+	siteName?: string;
+	siteIconUrl?: string;
+	siteOrigin?: string;
+}
+
+interface SiteSettingRow {
+	setting_key: string;
+	setting_value: string;
+}
+
+export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
 	const { results } = await db
 		.prepare("SELECT setting_key, setting_value FROM site_settings")
-		.all();
-	const map = Object.fromEntries(
+		.all<SiteSettingRow>();
+	const map: Record<string, string> = Object.fromEntries(
 		results.map((row) => [row.setting_key, row.setting_value]),
 	);
 	return {
@@ -13,8 +29,11 @@ export async function getSiteSettings(db) {
 	};
 }
 
-export async function updateSiteSettings(db, { siteName, siteIconUrl, siteOrigin = "" }) {
-	const statements = [];
+export async function updateSiteSettings(
+	db: D1Database,
+	{ siteName, siteIconUrl, siteOrigin = "" }: UpdateSiteSettingsInput,
+): Promise<SiteSettings> {
+	const statements: D1PreparedStatement[] = [];
 	if (siteName !== undefined) {
 		statements.push(
 			db

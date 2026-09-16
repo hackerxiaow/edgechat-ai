@@ -1,4 +1,4 @@
-import { getPinnedMessage, pinMessage, unpinMessage } from "./data/pins.js";
+import { getPinnedMessage, pinMessage, unpinMessage } from "./data/pins.ts";
 import { authorizeChannelManagement } from "./room-access.js";
 
 export class MessagePinningError extends Error {

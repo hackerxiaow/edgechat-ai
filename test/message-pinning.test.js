@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 
-import { getPinnedMessage, pinMessage } from "../worker/src/data/pins.js";
-import { softDeleteMessage } from "../worker/src/data/messages.js";
+import { getPinnedMessage, pinMessage } from "../worker/src/data/pins.ts";
+import { softDeleteMessage } from "../worker/src/data/messages.ts";
 import {
 	MessagePinningError,
 	pinRoomMessage,

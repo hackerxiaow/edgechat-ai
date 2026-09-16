@@ -4,9 +4,9 @@ import {
   getRoomSyncCursor,
   listMessages,
   listRoomMessageEvents
-} from '../data/messages.js';
-import { getSiteSettings } from '../data/site-settings.js';
-import { getUserByUsername } from '../data/users.js';
+} from '../data/messages.ts';
+import { getSiteSettings } from '../data/site-settings.ts';
+import { getUserByUsername } from '../data/users.ts';
 import { submitClientRoomAction } from '../room-actions.js';
 import { ApiError } from '../errors.js';
 import { authMiddleware } from '../middleware.js';
@@ -17,7 +17,7 @@ import {
 } from '../mobile-session.js';
 import { issueRealtimeTicket } from '../realtime-tickets.js';
 import { authorizeRoom, isRoomKind } from '../room-access.js';
-import { markRoomRead } from '../data/unread.js';
+import { markRoomRead } from '../data/unread.ts';
 import { isUserDisabled } from '../user-status.js';
 import {
   errorCodeForStatus,

@@ -1,16 +1,16 @@
 import { hashPassword } from '../auth.js';
-import { listAdminChannels } from '../data/channels.js';
-import { listAdminDms } from '../data/dm-queries.js';
-import { ensureGeneralChannelMembership } from '../data/general-channel.js';
+import { listAdminChannels } from '../data/channels.ts';
+import { listAdminDms } from '../data/dm-queries.ts';
+import { ensureGeneralChannelMembership } from '../data/general-channel.ts';
 import {
   createRegistrationInvite,
   listActiveRegistrationInvites,
   MAX_INVITE_USES,
   revokeRegistrationInvite
-} from '../data/registration-invites.js';
-import { getSiteSettings, updateSiteSettings } from '../data/site-settings.js';
-import { isR2ObjectUnavailableError } from '../data/uploaded-files.js';
-import { listAdminUsers, listStorageOwners } from '../data/users.js';
+} from '../data/registration-invites.ts';
+import { getSiteSettings, updateSiteSettings } from '../data/site-settings.ts';
+import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
+import { listAdminUsers, listStorageOwners } from '../data/users.ts';
 import { ApiError } from '../errors.js';
 import { summarizeR2Objects } from '../storage-statistics.js';
 import { errorResponse, parseJsonRequest, randomToken } from '../utils.js';

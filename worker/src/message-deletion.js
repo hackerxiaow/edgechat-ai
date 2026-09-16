@@ -1,5 +1,5 @@
 import { cleanupR2Keys } from "./gc.js";
-import { getMessageDeletionTarget, softDeleteMessage } from "./data/messages.js";
+import { getMessageDeletionTarget, softDeleteMessage } from "./data/messages.ts";
 import { authorizeMessageModeration } from "./room-access.js";
 
 export class MessageDeletionError extends Error {

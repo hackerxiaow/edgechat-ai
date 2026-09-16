@@ -1,4 +1,4 @@
-import { insertExternalMessage } from "./data/messages.js";
+import { insertExternalMessage } from "./data/messages.ts";
 
 export async function submitExternalMessage(env, { room, payload }) {
 	const result = await insertExternalMessage(env, {

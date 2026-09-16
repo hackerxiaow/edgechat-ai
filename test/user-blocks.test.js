@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
 
-import { listUserDms } from "../worker/src/data/dm-queries.js";
+import { listUserDms } from "../worker/src/data/dm-queries.ts";
 import {
 	getUserBlockStatus,
 	setUserBlocked,

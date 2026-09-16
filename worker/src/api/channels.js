@@ -2,12 +2,12 @@ import {
   listAdminChannels,
   listChannelMembers,
   listVisibleChannels
-} from '../data/channels.js';
+} from '../data/channels.ts';
 import {
   ensureGeneralChannelMembership,
   isGeneralChannel,
   isReservedGeneralChannelName
-} from '../data/general-channel.js';
+} from '../data/general-channel.ts';
 import {
   authorizeRoom,
   authorizeChannelManagement,

@@ -3,7 +3,7 @@ import type { AppEnv } from "../types.ts";
 import { validateBio, parseLocalUserId } from "../../../shared/user-profile.ts";
 import { putSession } from "../auth.js";
 import { resolveAvatarKeyUpdate, isR2ObjectUnavailableError } from "../avatar-policy.js";
-import { getUserProfile } from "../data/users.js";
+import { getUserProfile } from "../data/users.ts";
 import { errorResponse, parseJsonRequest } from "../utils.js";
 
 export function registerUserProfileRoutes(app: Hono<AppEnv>) {

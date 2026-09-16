@@ -4,7 +4,7 @@ import test from "node:test";
 import initSqlJs from "sql.js";
 
 import { createD1Adapter } from "./support/d1.js";
-import { insertExternalMessage, mapMessage } from "../worker/src/data/messages.js";
+import { insertExternalMessage, mapMessage } from "../worker/src/data/messages.ts";
 import {
 	decryptAttachment,
 	decryptMessageContent,
