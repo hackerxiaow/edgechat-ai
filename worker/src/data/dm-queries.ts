@@ -1,4 +1,4 @@
-import { publicFileUrl } from "../utils.js";
+import { publicFileUrl } from "../utils.ts";
 
 export interface UserDm {
 	id: number;

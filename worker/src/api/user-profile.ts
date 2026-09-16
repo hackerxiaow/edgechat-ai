@@ -1,10 +1,10 @@
 import type { Hono } from "hono";
 import type { AppEnv } from "../types.ts";
 import { validateBio, parseLocalUserId } from "../../../shared/user-profile.ts";
-import { putSession } from "../auth.js";
+import { putSession } from "../auth.ts";
 import { resolveAvatarKeyUpdate, isR2ObjectUnavailableError } from "../avatar-policy.ts";
 import { getUserProfile } from "../data/users.ts";
-import { errorResponse, parseJsonRequest } from "../utils.js";
+import { errorResponse, parseJsonRequest } from "../utils.ts";
 
 export function registerUserProfileRoutes(app: Hono<AppEnv>) {
 	app.get("/api/users/:id/profile", async (c) => {

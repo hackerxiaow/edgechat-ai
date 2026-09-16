@@ -1,15 +1,24 @@
-import type { AppBindings, SessionUser } from './types.ts';
-import { authorizeRoom } from './room-access.js';
-import { submitRoomMessageIdempotent } from './message-submission.js';
-import { deleteRoomMessage } from './message-deletion.js';
-import { pinRoomMessage, unpinRoomMessage } from './message-pinning.js';
+import type { AppBindings, RoomMeta, SessionUser } from './types.ts';
+import { authorizeRoom } from './room-access.ts';
+import { submitRoomMessageIdempotent } from './message-submission.ts';
+import { deleteRoomMessage } from './message-deletion.ts';
+import { pinRoomMessage, unpinRoomMessage } from './message-pinning.ts';
 import { forwardEdgeChatMessageToTelegram } from './integrations/telegram/bridge.ts';
 import { processAiBotResponse } from './integrations/ai-bot.ts';
 
-export interface RoomAction {
-	type: 'send' | 'delete_message' | 'pin_message' | 'unpin_message';
-	[key: string]: unknown;
-}
+/** 客户端提交的会话操作，按 type 判别。 */
+export type RoomAction =
+	| {
+			type: 'send';
+			content?: string;
+			clientMessageId?: string | null;
+			attachment?: unknown;
+			mentionUserIds?: unknown;
+			replyMessageId?: unknown;
+	  }
+	| { type: 'delete_message'; messageId: number | string }
+	| { type: 'pin_message'; messageId: number | string }
+	| { type: 'unpin_message'; messageId: number | string };
 
 export interface SubmitClientRoomActionInput {
 	room: { id: number | string; kind: string; name?: string };
@@ -33,11 +42,11 @@ export async function submitClientRoomAction(
 		);
 	}
 
-	const meta = { principal, room: access.room };
+	const meta: RoomMeta = { principal, room: access.room };
 
-	if (action?.type === 'send') {
+	if (action.type === 'send') {
 		const result = await submitRoomMessageIdempotent(env, meta, action);
-		if (result.created) {
+		if (result.created && result.message) {
 			void forwardEdgeChatMessageToTelegram(env, {
 				room: access.room,
 				message: result.message,
@@ -55,23 +64,16 @@ export async function submitClientRoomAction(
 		return Response.json({ created: result.created, message: result.message });
 	}
 
-	if (action?.type === 'delete_message') {
+	if (action.type === 'delete_message') {
 		const result = await deleteRoomMessage(env, meta, action);
 		return Response.json({ ok: true, messageId: result.messageId });
 	}
 
-	if (action?.type === 'pin_message') {
+	if (action.type === 'pin_message') {
 		const result = await pinRoomMessage(env, meta, action);
 		return Response.json({ ok: true, message: result.message });
 	}
 
-	if (action?.type === 'unpin_message') {
-		const result = await unpinRoomMessage(env, meta, action);
-		return Response.json({ ok: true, messageId: result.messageId });
-	}
-
-	return Response.json(
-		{ error: { code: 'invalid_request', message: '不支持的消息操作' } },
-		{ status: 400 },
-	);
+	const result = await unpinRoomMessage(env, meta, action);
+	return Response.json({ ok: true, messageId: result.messageId });
 }

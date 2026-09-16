@@ -1,4 +1,6 @@
-const ROOM_KINDS = new Set(["public", "private", "dm"]);
+export type RoomKind = "public" | "private" | "dm";
+
+const ROOM_KINDS = new Set<string>(["public", "private", "dm"]);
 
 export const ROOM_ACCESS_FAILURE = Object.freeze({
 	INVALID_ROOM: "invalid_room",
@@ -6,13 +8,53 @@ export const ROOM_ACCESS_FAILURE = Object.freeze({
 	FORBIDDEN: "forbidden",
 });
 
-export function isRoomKind(kind) {
-	return ROOM_KINDS.has(kind);
+export interface RoomIdentity {
+	isAdmin: boolean;
+	userId: number;
 }
 
-function normalizePrincipal(principal) {
-	const isAdmin = Boolean(principal?.isAdmin);
-	const userId = Number(principal?.userId);
+export interface RoomRecord {
+	id: number;
+	name: string;
+	description: string;
+	avatar_key: string | null;
+	kind: string;
+	dm_key: string | null;
+	created_by?: number | null;
+}
+
+export interface ChannelMembership {
+	channel_id: number;
+	user_id: number;
+	role: string;
+	joined_at: string;
+}
+
+export type RoomAccessResult =
+	| { ok: true; room: RoomRecord; identity: RoomIdentity }
+	| { ok: false; reason: string };
+
+export type ChannelManagementResult =
+	| { ok: true; channel: RoomRecord; membership: { role: string }; identity: RoomIdentity }
+	| { ok: false; reason: string };
+
+export type MessageModerationResult =
+	| { ok: false; reason: string }
+	| {
+			ok: true;
+			room: RoomRecord;
+			identity: RoomIdentity;
+			membership?: ChannelMembership;
+	  };
+
+export function isRoomKind(kind: unknown): kind is RoomKind {
+	return ROOM_KINDS.has(String(kind));
+}
+
+function normalizePrincipal(principal: unknown): RoomIdentity | null {
+	const source = principal as { isAdmin?: unknown; userId?: unknown } | null | undefined;
+	const isAdmin = Boolean(source?.isAdmin);
+	const userId = Number(source?.userId);
 	if (!isAdmin && (!Number.isInteger(userId) || userId <= 0)) {
 		return null;
 	}
@@ -22,7 +64,10 @@ function normalizePrincipal(principal) {
 	};
 }
 
-export async function getChannelById(db, channelId) {
+export async function getChannelById(
+	db: D1Database,
+	channelId: number | string,
+): Promise<RoomRecord | null> {
 	const numericChannelId = Number(channelId);
 	if (!Number.isInteger(numericChannelId) || numericChannelId <= 0) {
 		return null;
@@ -37,11 +82,15 @@ export async function getChannelById(db, channelId) {
 			 LIMIT 1`,
 		)
 		.bind(numericChannelId)
-		.all();
+		.all<RoomRecord>();
 	return results[0] || null;
 }
 
-export async function getChannelMembership(db, channelId, userId) {
+export async function getChannelMembership(
+	db: D1Database,
+	channelId: number | string,
+	userId: number | string,
+): Promise<ChannelMembership | null> {
 	const numericChannelId = Number(channelId);
 	const numericUserId = Number(userId);
 	if (
@@ -62,11 +111,16 @@ export async function getChannelMembership(db, channelId, userId) {
 			 LIMIT 1`,
 		)
 		.bind(numericChannelId, numericUserId)
-		.all();
+		.all<ChannelMembership>();
 	return results[0] || null;
 }
 
-export async function authorizeRoom(db, principal, kind, roomId) {
+export async function authorizeRoom(
+	db: D1Database,
+	principal: unknown,
+	kind: unknown,
+	roomId: unknown,
+): Promise<RoomAccessResult> {
 	const identity = normalizePrincipal(principal);
 	const numericRoomId = Number(roomId);
 	if (
@@ -93,7 +147,7 @@ export async function authorizeRoom(db, principal, kind, roomId) {
 	const bound = identity.isAdmin
 		? statement.bind(numericRoomId, kind)
 		: statement.bind(numericRoomId, kind, identity.userId);
-	const { results } = await bound.all();
+	const { results } = await bound.all<RoomRecord>();
 	const room = results[0] || null;
 	if (!room) {
 		return {
@@ -106,7 +160,11 @@ export async function authorizeRoom(db, principal, kind, roomId) {
 	return { ok: true, room, identity };
 }
 
-export async function authorizeChannelManagement(db, principal, channelId) {
+export async function authorizeChannelManagement(
+	db: D1Database,
+	principal: unknown,
+	channelId: number | string,
+): Promise<ChannelManagementResult> {
 	const identity = normalizePrincipal(principal);
 	if (!identity) {
 		return { ok: false, reason: ROOM_ACCESS_FAILURE.INVALID_ROOM };
@@ -132,7 +190,12 @@ export async function authorizeChannelManagement(db, principal, channelId) {
 	return { ok: true, channel, membership, identity };
 }
 
-export async function authorizeMessageModeration(db, principal, kind, roomId) {
+export async function authorizeMessageModeration(
+	db: D1Database,
+	principal: unknown,
+	kind: unknown,
+	roomId: unknown,
+): Promise<MessageModerationResult> {
 	const access = await authorizeRoom(db, principal, kind, roomId);
 	if (!access.ok || access.identity.isAdmin) {
 		return access;

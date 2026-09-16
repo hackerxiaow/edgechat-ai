@@ -1,4 +1,4 @@
-import { normalizeSiteIconForStorage, siteIconUrlFromStored } from "../site-icon.js";
+import { normalizeSiteIconForStorage, siteIconUrlFromStored } from "../site-icon.ts";
 
 export interface SiteSettings {
 	siteName: string;

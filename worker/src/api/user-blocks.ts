@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { AppEnv } from "../types.ts";
 import { getUserBlockStatus, setUserBlocked } from "../data/user-blocks.ts";
-import { errorResponse } from "../utils.js";
+import { errorResponse } from "../utils.ts";
 
 function targetUserId(c: { req: { param(name: string): string } }): number {
 	return Number(c.req.param("userId"));

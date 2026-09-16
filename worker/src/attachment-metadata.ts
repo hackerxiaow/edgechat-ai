@@ -38,7 +38,14 @@ export interface AudioAttachmentMetadata {
 }
 
 export function normalizeAudioAttachmentMetadata(
-	payload: { kind?: unknown; durationMs?: unknown; waveform?: unknown } | null | undefined,
+	payload:
+		| (Record<string, unknown> & {
+				kind?: unknown;
+				durationMs?: unknown;
+				waveform?: unknown;
+		  })
+		| null
+		| undefined,
 	contentType: unknown,
 ): AudioAttachmentMetadata {
 	const kind = payload?.kind === "voice" || payload?.kind === "audio" ? payload.kind : null;

@@ -1,6 +1,13 @@
 const R2_SITE_ICON_PREFIX = "r2:";
 
-function decodeFilePath(pathname) {
+export type StoredSiteIconKind = "none" | "local" | "external" | "ambiguous";
+
+export interface StoredSiteIcon {
+	kind: StoredSiteIconKind;
+	key: string | null;
+}
+
+function decodeFilePath(pathname: unknown): string | null {
 	if (!String(pathname || "").startsWith("/files/")) return null;
 	const encodedKey = String(pathname).slice("/files/".length);
 	if (!encodedKey) return null;
@@ -11,7 +18,7 @@ function decodeFilePath(pathname) {
 	}
 }
 
-function absoluteHttpUrl(value) {
+function absoluteHttpUrl(value: string): URL | null {
 	try {
 		const url = new URL(value);
 		return url.protocol === "http:" || url.protocol === "https:" ? url : null;
@@ -20,22 +27,22 @@ function absoluteHttpUrl(value) {
 	}
 }
 
-function normalizedOrigins(origins) {
+function normalizedOrigins(origins: unknown[]): Set<string> {
 	return new Set(
 		origins
 			.map((origin) => absoluteHttpUrl(String(origin || "").trim())?.origin)
-			.filter(Boolean),
+			.filter((origin): origin is string => Boolean(origin)),
 	);
 }
 
-export function siteIconUrlFromStored(value) {
+export function siteIconUrlFromStored(value: unknown): string {
 	const stored = String(value || "").trim();
 	if (!stored.startsWith(R2_SITE_ICON_PREFIX)) return stored;
 	const key = stored.slice(R2_SITE_ICON_PREFIX.length);
 	return key ? `/files/${encodeURIComponent(key)}` : "";
 }
 
-export function normalizeSiteIconForStorage(value, trustedOrigins = []) {
+export function normalizeSiteIconForStorage(value: unknown, trustedOrigins: unknown[] = []): string {
 	const raw = String(value || "").trim();
 	if (!raw) return "";
 	if (raw.startsWith(R2_SITE_ICON_PREFIX)) return raw;
@@ -58,7 +65,7 @@ export function normalizeSiteIconForStorage(value, trustedOrigins = []) {
 	return raw.startsWith("/") ? raw : `${R2_SITE_ICON_PREFIX}${raw}`;
 }
 
-export function classifyStoredSiteIcon(value, trustedOrigins = []) {
+export function classifyStoredSiteIcon(value: unknown, trustedOrigins: unknown[] = []): StoredSiteIcon {
 	const stored = String(value || "").trim();
 	if (!stored) return { kind: "none", key: null };
 	if (stored.startsWith(R2_SITE_ICON_PREFIX)) {

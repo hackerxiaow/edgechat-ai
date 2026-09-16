@@ -19,7 +19,7 @@ import {
 } from "../integrations/telegram/client.ts";
 import { ingestTelegramMessage } from "../integrations/telegram/bridge.ts";
 import { parseTelegramMessageUpdate } from "../integrations/telegram/parser.ts";
-import { errorResponse, parseJsonRequest, randomToken } from "../utils.js";
+import { errorResponse, parseJsonRequest, randomToken } from "../utils.ts";
 
 function webhookUrl(requestUrl: string): string {
 	const url = new URL(requestUrl);

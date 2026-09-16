@@ -3,7 +3,7 @@ import type { AppEnv } from '../types.ts';
 import { ensureDmChannel } from '../data/dm-provisioning.ts';
 import { listAdminDms, listUserDms } from '../data/dm-queries.ts';
 import { getUserBlockStatus } from '../data/user-blocks.ts';
-import { errorResponse, parseJsonRequest } from '../utils.js';
+import { errorResponse, parseJsonRequest } from '../utils.ts';
 import { activeUserSql } from '../user-status.ts';
 
 interface DmTargetRow {

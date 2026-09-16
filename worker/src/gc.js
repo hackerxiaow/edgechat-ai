@@ -1,5 +1,5 @@
 import { hardDeleteChannels } from "./data/channel-deletion.ts";
-import { classifyStoredSiteIcon } from "./site-icon.js";
+import { classifyStoredSiteIcon } from "./site-icon.ts";
 
 const DEFAULT_MESSAGE_RETENTION_DAYS = 7;
 const DEFAULT_SOFT_DELETE_RETENTION_DAYS = 60;

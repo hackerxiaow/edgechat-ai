@@ -4,7 +4,7 @@ import test from 'node:test';
 import initSqlJs from 'sql.js';
 
 import worker from '../worker/src/index.js';
-import { hashPassword } from '../worker/src/auth.js';
+import { hashPassword } from '../worker/src/auth.ts';
 import {
   getRoomSyncCursor,
   insertMessageIdempotent,
@@ -16,8 +16,8 @@ import {
   createMobileDeviceSession,
   refreshMobileDeviceSession,
   revokeMobileDeviceSession
-} from '../worker/src/mobile-session.js';
-import { issueRealtimeTicket, consumeRealtimeTicket } from '../worker/src/realtime-tickets.js';
+} from '../worker/src/mobile-session.ts';
+import { issueRealtimeTicket, consumeRealtimeTicket } from '../worker/src/realtime-tickets.ts';
 import { validateSession } from '../worker/src/session.ts';
 import { createD1Adapter } from './support/d1.js';
 

@@ -15,13 +15,13 @@ import {
   authorizeChannelManagement,
   getChannelById,
   getChannelMembership
-} from '../room-access.js';
+} from '../room-access.ts';
 import { ApiError } from '../errors.ts';
 import {
   isR2ObjectUnavailableError,
   resolveAvatarKeyUpdate
 } from '../avatar-policy.ts';
-import { errorResponse, parseJsonRequest, publicFileUrl } from '../utils.js';
+import { errorResponse, parseJsonRequest, publicFileUrl } from '../utils.ts';
 import { activeUserSql } from '../user-status.ts';
 import { hardDeleteChannel } from '../data/channel-deletion.ts';
 
@@ -259,6 +259,9 @@ export function registerChannelRoutes(app: Hono<AppEnv>) {
     }
 
     const updated = await getChannelById(c.env.DB, channelId);
+    if (!updated) {
+      return errorResponse('群组不存在', 404);
+    }
     return c.json({
       channel: {
         id: Number(updated.id),

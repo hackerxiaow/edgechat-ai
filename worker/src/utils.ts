@@ -1,6 +1,6 @@
 import { normalizeAudioAttachmentMetadata } from "./attachment-metadata.ts";
 
-export function jsonResponse(data, init = {}) {
+export function jsonResponse(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), {
     ...init,
     headers: {
@@ -10,15 +10,15 @@ export function jsonResponse(data, init = {}) {
   });
 }
 
-export function errorResponse(message, status = 400) {
+export function errorResponse(message: string, status = 400): Response {
   return jsonResponse({ error: message }, { status });
 }
 
-export function v1ErrorResponse(code, message, status = 400) {
+export function v1ErrorResponse(code: string, message: string, status = 400): Response {
   return jsonResponse({ error: { code, message } }, { status });
 }
 
-export function errorCodeForStatus(status) {
+export function errorCodeForStatus(status: number): string {
   if (status === 401) return 'authentication_required';
   if (status === 403) return 'forbidden';
   if (status === 404) return 'not_found';
@@ -30,16 +30,19 @@ export function errorCodeForStatus(status) {
 
 export const MAX_JSON_BODY_SIZE = 10 * 1024 * 1024;
 
-export function requestBodyTooLarge(request, maxBytes = MAX_JSON_BODY_SIZE) {
+export function requestBodyTooLarge(request: Request, maxBytes = MAX_JSON_BODY_SIZE): boolean {
   const contentLength = Number(request.headers.get('content-length') || 0);
   return Number.isFinite(contentLength) && contentLength > maxBytes;
 }
 
-export function parseJsonRequest(request) {
-  return request.json().catch(() => ({}));
+/**
+ * 请求体是不可信输入，默认形状保持宽松；需要具体结构时由调用方传入类型参数。
+ */
+export function parseJsonRequest<T = Record<string, unknown>>(request: Request): Promise<T> {
+  return request.json().catch(() => ({})) as Promise<T>;
 }
 
-export function sanitizeLimit(value, fallback = 30, max = 100) {
+export function sanitizeLimit(value: unknown, fallback = 30, max = 100): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return fallback;
@@ -47,7 +50,7 @@ export function sanitizeLimit(value, fallback = 30, max = 100) {
   return Math.min(parsed, max);
 }
 
-function keyBelongsToOwner(key, ownerUserId) {
+function keyBelongsToOwner(key: string, ownerUserId: number | string | null | undefined): boolean {
   if (ownerUserId === undefined || ownerUserId === null) {
     return true;
   }
@@ -56,36 +59,52 @@ function keyBelongsToOwner(key, ownerUserId) {
   return Number.isFinite(Number(ownerUserId)) && String(key || '').startsWith(ownerPrefix);
 }
 
-export function pickAttachment(payload, options = {}) {
+/** 客户端提交的附件载荷经校验后的规范形状。 */
+export interface PickedAttachment {
+  key: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  kind?: "voice" | "audio";
+  durationMs?: number;
+  waveform?: number[];
+}
+
+export function pickAttachment(
+  payload: unknown,
+  options: { ownerUserId?: number | string | null } = {},
+): PickedAttachment | null {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
 
-  if (!payload.key || !payload.name || !payload.type) {
+  const candidate = payload as { key?: unknown; name?: unknown; type?: unknown; size?: unknown };
+  if (!candidate.key || !candidate.name || !candidate.type) {
     return null;
   }
 
-  const key = String(payload.key);
+  const key = String(candidate.key);
   if (!keyBelongsToOwner(key, options.ownerUserId)) {
     return null;
   }
 
-	const type = String(payload.type);
-	return {
-		key,
-		name: String(payload.name),
-		type,
-		size: Number(payload.size) || 0,
-		url: `/files/${encodeURIComponent(key)}`,
-		...normalizeAudioAttachmentMetadata(payload, type),
-	};
+  const type = String(candidate.type);
+  return {
+    key,
+    name: String(candidate.name),
+    type,
+    size: Number(candidate.size) || 0,
+    url: `/files/${encodeURIComponent(key)}`,
+    ...normalizeAudioAttachmentMetadata(candidate, type),
+  };
 }
 
-export function publicFileUrl(key) {
+export function publicFileUrl(key: string | number): string {
   return `/files/${encodeURIComponent(key)}`;
 }
 
-export function nextDailyUtcHour(hour) {
+export function nextDailyUtcHour(hour: number): Date {
   const target = new Date();
   target.setUTCMinutes(0, 0, 0);
   target.setUTCHours(hour);
@@ -95,7 +114,7 @@ export function nextDailyUtcHour(hour) {
   return target;
 }
 
-export function randomToken(byteLength = 24) {
+export function randomToken(byteLength = 24): string {
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
   const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');

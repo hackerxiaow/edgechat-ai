@@ -1,6 +1,6 @@
 import type { Context, Hono } from 'hono';
 import type { AppEnv } from '../types.ts';
-import { verifyPassword } from '../auth.js';
+import { verifyPassword } from '../auth.ts';
 import { saveUploadedFile } from './upload.ts';
 import {
   getRoomSyncCursor,
@@ -15,10 +15,11 @@ import { authMiddleware } from '../middleware.ts';
 import {
   createMobileDeviceSession,
   refreshMobileDeviceSession,
-  revokeMobileDeviceSession
-} from '../mobile-session.js';
-import { issueRealtimeTicket } from '../realtime-tickets.js';
-import { authorizeRoom, isRoomKind } from '../room-access.js';
+  revokeMobileDeviceSession,
+  type MobileDeviceInput
+} from '../mobile-session.ts';
+import { issueRealtimeTicket } from '../realtime-tickets.ts';
+import { authorizeRoom, isRoomKind } from '../room-access.ts';
 import { markRoomRead } from '../data/unread.ts';
 import { isUserDisabled } from '../user-status.ts';
 import {
@@ -27,7 +28,7 @@ import {
   requestBodyTooLarge,
   sanitizeLimit,
   v1ErrorResponse
-} from '../utils.js';
+} from '../utils.ts';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -115,7 +116,11 @@ export function registerV1Routes(app: Hono<AppEnv>) {
     ) {
       return v1ErrorResponse('invalid_credentials', '账号或密码错误', 401);
     }
-    const result = await createMobileDeviceSession(c.env, user, payload.device);
+    const result = await createMobileDeviceSession(
+      c.env,
+      user,
+      payload.device as MobileDeviceInput | null | undefined
+    );
     return c.json(result);
   });
 
@@ -205,7 +210,13 @@ export function registerV1Routes(app: Hono<AppEnv>) {
 
   app.post('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {
     const { session, room } = await requireRoom(c);
-    const payload = await parseJsonRequest(c.req.raw);
+    const payload = await parseJsonRequest<{
+      clientMessageId?: string;
+      content?: string;
+      attachment?: unknown;
+      mentionUserIds?: unknown;
+      replyMessageId?: unknown;
+    }>(c.req.raw);
     if (!isUuid(payload.clientMessageId)) {
       return v1ErrorResponse('client_message_id_invalid', 'clientMessageId 必须是 UUID');
     }
@@ -215,7 +226,7 @@ export function registerV1Routes(app: Hono<AppEnv>) {
       action: {
         type: 'send',
         clientMessageId: payload.clientMessageId,
-			content: payload.content,
+			content: String(payload.content ?? ''),
 				attachment: payload.attachment || null,
 				mentionUserIds: payload.mentionUserIds || [],
 				replyMessageId: payload.replyMessageId ?? null

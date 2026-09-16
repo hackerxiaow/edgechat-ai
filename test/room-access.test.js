@@ -9,7 +9,7 @@ import {
 	getChannelById,
 	getChannelMembership,
 	isRoomKind,
-} from "../worker/src/room-access.js";
+} from "../worker/src/room-access.ts";
 
 function createQueryQueue(resultSets = []) {
 	const calls = [];

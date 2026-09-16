@@ -11,7 +11,7 @@ import {
 import {
 	MessageSubmissionError,
 	submitRoomMessage,
-} from "../worker/src/message-submission.js";
+} from "../worker/src/message-submission.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

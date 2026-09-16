@@ -5,7 +5,7 @@ import { softDeleteMessage } from "../worker/src/data/messages.ts";
 import {
 	createMessageDeletion,
 	MessageDeletionError,
-} from "../worker/src/message-deletion.js";
+} from "../worker/src/message-deletion.ts";
 
 function createMutationDb(changes = 1) {
 	const capture = { sql: "", binds: [] };

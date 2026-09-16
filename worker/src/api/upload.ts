@@ -9,7 +9,7 @@ import {
 import { decryptAttachment, encryptAttachment } from '../encryption.js';
 import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.ts';
 import { validateSession } from '../session.ts';
-import { errorResponse, requestBodyTooLarge } from '../utils.js';
+import { errorResponse, requestBodyTooLarge } from '../utils.ts';
 
 const FILE_RESPONSE_CACHE_CONTROL = 'private, no-store';
 const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;

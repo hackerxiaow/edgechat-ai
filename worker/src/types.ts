@@ -44,6 +44,20 @@ export interface SessionUser {
   sessionVersion: number;
   /** 仅移动端设备会话存在。 */
   deviceSessionId?: string;
+  /** 可选的显式过期时间；缺省时按 SESSION_TTL_SECONDS 计算。 */
+  expiresAt?: string;
+  /** 移动端设备会话标记为 'mobile'；网页会话不设置。 */
+  sessionKind?: string;
+}
+
+/** 会话消息操作的统一入参：谁在哪个房间里做什么。 */
+export interface RoomMeta {
+  principal: SessionUser;
+  room: {
+    id: number | string;
+    kind: string;
+    name?: string;
+  };
 }
 
 export interface AppVariables {

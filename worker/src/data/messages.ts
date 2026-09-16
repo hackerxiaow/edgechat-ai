@@ -1,6 +1,6 @@
 import { decryptMessageContent, encryptMessageContent } from "../encryption.js";
 import type { AppBindings } from "../types.ts";
-import { pickAttachment, publicFileUrl } from "../utils.js";
+import { pickAttachment, publicFileUrl } from "../utils.ts";
 import { normalizeMentionUserIds } from "./mentions.ts";
 import { fileBelongsToUser, isR2ObjectUnavailableError } from "./uploaded-files.ts";
 

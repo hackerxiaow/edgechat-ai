@@ -3,8 +3,8 @@ import type { AppEnv } from '../types.ts';
 import { listMessages } from '../data/messages.ts';
 import { getPinnedMessage } from '../data/pins.ts';
 import { markRoomRead } from '../data/unread.ts';
-import { authorizeRoom, isRoomKind } from '../room-access.js';
-import { errorResponse, parseJsonRequest, sanitizeLimit } from '../utils.js';
+import { authorizeRoom, isRoomKind } from '../room-access.ts';
+import { errorResponse, parseJsonRequest, sanitizeLimit } from '../utils.ts';
 
 export function registerMessageRoutes(app: Hono<AppEnv>) {
   app.get('/api/messages', async (c) => {

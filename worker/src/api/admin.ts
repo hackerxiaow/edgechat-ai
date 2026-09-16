@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import type { AppEnv } from '../types.ts';
-import { hashPassword } from '../auth.js';
+import { hashPassword } from '../auth.ts';
 import { listAdminChannels } from '../data/channels.ts';
 import { listAdminDms } from '../data/dm-queries.ts';
 import { ensureGeneralChannelMembership } from '../data/general-channel.ts';
@@ -15,7 +15,7 @@ import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
 import { listAdminUsers, listStorageOwners, type StorageOwner } from '../data/users.ts';
 import { ApiError } from '../errors.ts';
 import { summarizeR2Objects } from '../storage-statistics.ts';
-import { errorResponse, parseJsonRequest, randomToken } from '../utils.js';
+import { errorResponse, parseJsonRequest, randomToken } from '../utils.ts';
 import { banExpiryFromMinutes } from '../user-status.ts';
 
 const STORAGE_SCAN_PAGE_SIZE = 1000;

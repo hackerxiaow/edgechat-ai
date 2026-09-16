@@ -1,10 +1,15 @@
+import type { Message, PersistMessageInput, PersistMessageResult } from "./data/messages.ts";
+import type { RoomMeta } from "./types.ts";
 import { insertMessage, insertMessageIdempotent } from "./data/messages.ts";
 import { resolveMessageMentionUserIds } from "./data/mentions.ts";
-import { resolveMessageReply } from "./data/replies.ts";
+import { resolveMessageReply, type ReplyReference } from "./data/replies.ts";
 import { getDirectMessageBlockStatus } from "./data/user-blocks.ts";
 
 export class MessageSubmissionError extends Error {
-	constructor(message, code = "invalid_request", status = 400) {
+	code: string;
+	status: number;
+
+	constructor(message: string, code = "invalid_request", status = 400) {
 		super(message);
 		this.name = "MessageSubmissionError";
 		this.code = code;
@@ -12,13 +17,66 @@ export class MessageSubmissionError extends Error {
 	}
 }
 
+export interface MessageSubmissionPayload {
+	content?: string;
+	attachment?: unknown;
+	mentionUserIds?: unknown;
+	replyMessageId?: unknown;
+	clientMessageId?: string | null;
+}
+
+export interface MessageSubmissionResult {
+	message: Message | null;
+	created: boolean;
+	replyToSenderId: number | null;
+	packet: string;
+}
+
+interface DmBlockStatus {
+	blockedByPeer?: boolean;
+	blockedBySender?: boolean;
+}
+
+type PersistMessageFn = (
+	env: { DB: D1Database },
+	payload: PersistMessageInput,
+) => Promise<Message | null | PersistMessageResult>;
+type ResolveMentionsFn = (
+	db: D1Database,
+	args: {
+		channelId: number | string;
+		roomKind: string;
+		senderId: number | string;
+		content: string;
+		candidateUserIds: unknown;
+	},
+) => Promise<number[]>;
+type ResolveReplyFn = (
+	db: D1Database,
+	args: { channelId: number | string; replyMessageId: unknown },
+) => Promise<ReplyReference>;
+type DmBlockStatusFn = (
+	db: D1Database,
+	channelId: number,
+	senderId: number,
+) => Promise<DmBlockStatus>;
+
 export function createMessageSubmission({
 	persistMessage = insertMessage,
 	resolveMentions = resolveMessageMentionUserIds,
 	resolveReply = resolveMessageReply,
-	resolveDmBlockStatus = getDirectMessageBlockStatus,
+	resolveDmBlockStatus = getDirectMessageBlockStatus as DmBlockStatusFn,
+}: {
+	persistMessage?: PersistMessageFn;
+	resolveMentions?: ResolveMentionsFn;
+	resolveReply?: ResolveReplyFn;
+	resolveDmBlockStatus?: DmBlockStatusFn;
 } = {}) {
-	return async function submitRoomMessage(env, meta, payload) {
+	return async function submitRoomMessage(
+		env: { DB: D1Database },
+		meta: RoomMeta,
+		payload: MessageSubmissionPayload,
+	): Promise<MessageSubmissionResult> {
 		try {
 			if (meta.room.kind === "dm") {
 				const blockStatus = await resolveDmBlockStatus(
@@ -46,7 +104,7 @@ export function createMessageSubmission({
 					channelId: meta.room.id,
 					roomKind: meta.room.kind,
 					senderId: meta.principal.userId,
-					content: payload.content,
+					content: String(payload.content ?? ""),
 					candidateUserIds: payload.mentionUserIds,
 				}),
 				resolveReply(env.DB, {
@@ -54,10 +112,10 @@ export function createMessageSubmission({
 					replyMessageId: payload.replyMessageId,
 				}),
 			]);
-			const persistencePayload = {
+			const persistencePayload: PersistMessageInput = {
 				channelId: meta.room.id,
 				senderId: meta.principal.userId,
-				content: payload.content,
+				content: String(payload.content ?? ""),
 				attachment: payload.attachment,
 				mentionUserIds,
 			};
@@ -69,8 +127,10 @@ export function createMessageSubmission({
 				persistencePayload.clientMessageId = payload.clientMessageId;
 			}
 			const persisted = await persistMessage(env, persistencePayload);
-			const message = persisted?.message || persisted;
-			const created = persisted?.message ? persisted.created !== false : true;
+			const message = (persisted as PersistMessageResult)?.message || (persisted as Message | null);
+			const created = (persisted as PersistMessageResult)?.message
+				? (persisted as PersistMessageResult).created !== false
+				: true;
 			return {
 				message,
 				created,
@@ -78,26 +138,27 @@ export function createMessageSubmission({
 				packet: JSON.stringify({ protocolVersion: 1, type: "message", message }),
 			};
 		} catch (error) {
+			const errorMessage = String((error as { message?: unknown })?.message || "");
 			if (
-				error?.message === "Invalid attachment" ||
-				error?.message === "Attachment is not available"
+				errorMessage === "Invalid attachment" ||
+				errorMessage === "Attachment is not available"
 			) {
 				throw new MessageSubmissionError(
 					"附件不存在、无权使用或正在清理，请重新上传",
 					"attachment_unavailable",
-			);
+				);
 			}
-			if (error?.message === "Message content cannot be empty") {
+			if (errorMessage === "Message content cannot be empty") {
 				throw new MessageSubmissionError("消息内容不能为空");
 			}
-			if (error?.message === "Message idempotency key was already consumed") {
+			if (errorMessage === "Message idempotency key was already consumed") {
 				throw new MessageSubmissionError(
 					"该消息已删除，不能使用相同的 clientMessageId 再次发送",
 					"client_message_id_consumed",
 					409,
 				);
 			}
-			if (error?.message === "Reply message is not available") {
+			if (errorMessage === "Reply message is not available") {
 				throw new MessageSubmissionError(
 					"回复的消息不存在或已删除",
 					"reply_message_unavailable",

@@ -9,7 +9,7 @@ import {
 	MessagePinningError,
 	pinRoomMessage,
 	unpinRoomMessage,
-} from "../worker/src/message-pinning.js";
+} from "../worker/src/message-pinning.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

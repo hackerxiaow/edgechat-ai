@@ -1,5 +1,5 @@
 import type { UserProfile, UserSummary } from "../../../shared/user-profile.ts";
-import { publicFileUrl } from "../utils.js";
+import { publicFileUrl } from "../utils.ts";
 import { activeUserSql, projectUserBan } from "../user-status.ts";
 
 /** users 表的完整行；`SELECT *` 的调用方（登录、会话校验）需要全部字段。 */

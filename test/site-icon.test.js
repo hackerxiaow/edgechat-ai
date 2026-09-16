@@ -10,7 +10,7 @@ import { runScheduledGc } from "../worker/src/gc.js";
 import {
 	classifyStoredSiteIcon,
 	normalizeSiteIconForStorage,
-} from "../worker/src/site-icon.js";
+} from "../worker/src/site-icon.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

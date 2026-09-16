@@ -1,21 +1,60 @@
+import type { RoomMeta, SessionUser } from "./types.ts";
 import { cleanupR2Keys } from "./gc.js";
-import { getMessageDeletionTarget, softDeleteMessage } from "./data/messages.ts";
-import { authorizeMessageModeration } from "./room-access.js";
+import {
+	getMessageDeletionTarget,
+	softDeleteMessage,
+	type MessageDeletionTarget,
+} from "./data/messages.ts";
+import { authorizeMessageModeration } from "./room-access.ts";
 
 export class MessageDeletionError extends Error {
-	constructor(message) {
+	code?: string;
+	status?: number;
+
+	constructor(message: string) {
 		super(message);
 		this.name = "MessageDeletionError";
 	}
 }
 
+export interface MessageDeletionResult {
+	messageId: number;
+	packet: string;
+	cleanupPromise: Promise<unknown> | null;
+}
+
+type AuthorizeFn = (
+	db: D1Database,
+	principal: SessionUser,
+	kind: string,
+	roomId: number | string,
+) => Promise<{ ok: boolean }>;
+type PersistDeletionFn = (
+	db: D1Database,
+	args: { channelId: number | string; messageId: number },
+) => Promise<boolean>;
+type GetDeletionTargetFn = (
+	db: D1Database,
+	messageId: number,
+) => Promise<MessageDeletionTarget | null>;
+type CleanupFn = (env: unknown, keys: string[]) => Promise<unknown>;
+
 export function createMessageDeletion({
-	authorize = authorizeMessageModeration,
+	authorize = authorizeMessageModeration as AuthorizeFn,
 	persistDeletion = softDeleteMessage,
 	getDeletionTarget = getMessageDeletionTarget,
 	cleanupAttachments = cleanupR2Keys,
+}: {
+	authorize?: AuthorizeFn;
+	persistDeletion?: PersistDeletionFn;
+	getDeletionTarget?: GetDeletionTargetFn;
+	cleanupAttachments?: CleanupFn;
 } = {}) {
-	return async function deleteRoomMessage(env, meta, payload) {
+	return async function deleteRoomMessage(
+		env: { DB: D1Database },
+		meta: RoomMeta,
+		payload: { messageId: unknown },
+	): Promise<MessageDeletionResult> {
 		const messageId = Number(payload.messageId);
 		if (!Number.isInteger(messageId) || messageId <= 0) {
 			throw new MessageDeletionError("消息不存在");

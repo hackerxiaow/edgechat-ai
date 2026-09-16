@@ -7,7 +7,7 @@ import {
   isConfiguredAdminUsername,
   putSession,
   verifyPassword
-} from './auth.js';
+} from './auth.ts';
 import { listVisibleChannels } from './data/channels.ts';
 import { listUserDms } from './data/dm-queries.ts';
 import { ensureGeneralChannelMembership } from './data/general-channel.ts';
@@ -34,14 +34,14 @@ import {
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
 import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.ts';
-import { updateCurrentDeviceSessionVersion } from './mobile-session.js';
+import { updateCurrentDeviceSessionVersion } from './mobile-session.ts';
 import {
   errorCodeForStatus,
   errorResponse,
   parseJsonRequest,
   requestBodyTooLarge,
   v1ErrorResponse
-} from './utils.js';
+} from './utils.ts';
 
 const app = new Hono();
 

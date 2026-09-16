@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import initSqlJs from "sql.js";
-import { createSession, hashPassword } from "../worker/src/auth.js";
+import { createSession, hashPassword } from "../worker/src/auth.ts";
 import worker from "../worker/src/index.js";
 import { D1_MIGRATIONS } from "../.github/scripts/d1-migration-manifest.mjs";
 import { buildD1MigrationPlan } from "../.github/scripts/d1-migration-plan.mjs";

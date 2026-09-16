@@ -6,7 +6,7 @@ import initSqlJs from "sql.js";
 import { insertMessage } from "../worker/src/data/messages.ts";
 import { canAccessFile } from "../worker/src/data/uploaded-files.ts";
 import { ORPHAN_UPLOAD_QUERY, runScheduledGc } from "../worker/src/gc.js";
-import { createMessageSubmission } from "../worker/src/message-submission.js";
+import { createMessageSubmission } from "../worker/src/message-submission.ts";
 import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();

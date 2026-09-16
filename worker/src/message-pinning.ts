@@ -1,14 +1,34 @@
+import type { Message } from "./data/messages.ts";
+import type { RoomMeta, SessionUser } from "./types.ts";
 import { getPinnedMessage, pinMessage, unpinMessage } from "./data/pins.ts";
-import { authorizeChannelManagement } from "./room-access.js";
+import { authorizeChannelManagement } from "./room-access.ts";
 
 export class MessagePinningError extends Error {
-	constructor(message) {
+	code?: string;
+	status?: number;
+
+	constructor(message: string) {
 		super(message);
 		this.name = "MessagePinningError";
 	}
 }
 
-function normalizeMessageId(payload) {
+type PinAuthorizeFn = (
+	db: D1Database,
+	principal: SessionUser,
+	roomId: number | string,
+) => Promise<{ ok: boolean; identity: { userId: number | string } }>;
+type PersistPinFn = (
+	db: D1Database,
+	args: { channelId: number | string; messageId: number; pinnedBy: number | string },
+) => Promise<boolean>;
+type PersistUnpinFn = (
+	db: D1Database,
+	args: { channelId: number | string; messageId: number },
+) => Promise<boolean>;
+type LoadPinnedMessageFn = (env: unknown, roomId: number | string) => Promise<Message | null>;
+
+function normalizeMessageId(payload: { messageId?: unknown }): number {
 	const messageId = Number(payload.messageId);
 	if (!Number.isInteger(messageId) || messageId <= 0) {
 		throw new MessagePinningError("消息不存在");
@@ -16,7 +36,11 @@ function normalizeMessageId(payload) {
 	return messageId;
 }
 
-async function requirePinPermission(authorize, env, meta) {
+async function requirePinPermission(
+	authorize: PinAuthorizeFn,
+	env: { DB: D1Database },
+	meta: RoomMeta,
+) {
 	const access = await authorize(env.DB, meta.principal, meta.room.id);
 	if (!access.ok) {
 		throw new MessagePinningError("无权管理置顶消息");
@@ -25,11 +49,19 @@ async function requirePinPermission(authorize, env, meta) {
 }
 
 export function createMessagePinning({
-	authorize = authorizeChannelManagement,
+	authorize = authorizeChannelManagement as PinAuthorizeFn,
 	persistPin = pinMessage,
-	loadPinnedMessage = getPinnedMessage,
+	loadPinnedMessage = getPinnedMessage as LoadPinnedMessageFn,
+}: {
+	authorize?: PinAuthorizeFn;
+	persistPin?: PersistPinFn;
+	loadPinnedMessage?: LoadPinnedMessageFn;
 } = {}) {
-	return async function pinRoomMessage(env, meta, payload) {
+	return async function pinRoomMessage(
+		env: { DB: D1Database },
+		meta: RoomMeta,
+		payload: { messageId?: unknown },
+	) {
 		const messageId = normalizeMessageId(payload);
 		const access = await requirePinPermission(authorize, env, meta);
 		const pinned = await persistPin(env.DB, {
@@ -53,10 +85,17 @@ export function createMessagePinning({
 }
 
 export function createMessageUnpinning({
-	authorize = authorizeChannelManagement,
+	authorize = authorizeChannelManagement as PinAuthorizeFn,
 	persistUnpin = unpinMessage,
+}: {
+	authorize?: PinAuthorizeFn;
+	persistUnpin?: PersistUnpinFn;
 } = {}) {
-	return async function unpinRoomMessage(env, meta, payload) {
+	return async function unpinRoomMessage(
+		env: { DB: D1Database },
+		meta: RoomMeta,
+		payload: { messageId?: unknown },
+	) {
 		const messageId = normalizeMessageId(payload);
 		await requirePinPermission(authorize, env, meta);
 		const unpinned = await persistUnpin(env.DB, {

@@ -4,7 +4,7 @@ import test from "node:test";
 import {
 	MessageSubmissionError,
 	createMessageSubmission,
-} from "../worker/src/message-submission.js";
+} from "../worker/src/message-submission.ts";
 
 test("消息提交 module 统一持久化参数与广播 packet", async () => {
 	const calls = [];

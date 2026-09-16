@@ -1,16 +1,39 @@
+import type { AppBindings, SessionUser } from './types.ts';
 import { decryptSecretValue, encryptSecretValue } from './encryption.js';
 import { ApiError } from './errors.ts';
-import { hashOpaqueToken } from './mobile-session.js';
+import { hashOpaqueToken } from './mobile-session.ts';
 import { validateSession } from './session.ts';
-import { randomToken } from './utils.js';
+import { randomToken } from './utils.ts';
 
 export const REALTIME_TICKET_TTL_SECONDS = 60;
 
-function ticketContext(tokenHash) {
+export interface RealtimeTicketTarget {
+  scope: 'inbox' | 'room';
+  roomKind?: string | null;
+  roomId?: number | string | null;
+}
+
+export interface IssuedRealtimeTicket {
+  ticket: string;
+  expiresAt: string;
+}
+
+export interface ConsumedRealtimeTicket {
+  session: SessionUser;
+  scope: string;
+  roomKind: string;
+  roomId: number | null;
+}
+
+function ticketContext(tokenHash: string): string {
   return `realtime-ticket:${tokenHash}`;
 }
 
-export async function issueRealtimeTicket(env, session, target) {
+export async function issueRealtimeTicket(
+  env: Pick<AppBindings, 'DB'>,
+  session: SessionUser | null | undefined,
+  target: RealtimeTicketTarget,
+): Promise<IssuedRealtimeTicket> {
   if (!session?.deviceSessionId || session.sessionKind !== 'mobile') {
     throw new ApiError('当前会话不支持实时票据', 400, 'mobile_session_required');
   }
@@ -45,7 +68,19 @@ export async function issueRealtimeTicket(env, session, target) {
   return { ticket, expiresAt: `${expiresAt.replace(' ', 'T')}Z` };
 }
 
-export async function consumeRealtimeTicket(env, ticket) {
+interface RealtimeTicketRow {
+  access_token_ciphertext: string;
+  user_id: number;
+  device_session_id: string;
+  scope: string;
+  room_kind: string | null;
+  room_id: number | null;
+}
+
+export async function consumeRealtimeTicket(
+  env: Pick<AppBindings, 'DB'>,
+  ticket: unknown,
+): Promise<ConsumedRealtimeTicket | null> {
   const cleanTicket = String(ticket || '').trim();
   if (!cleanTicket) return null;
   const tokenHash = await hashOpaqueToken(cleanTicket);
@@ -59,7 +94,7 @@ export async function consumeRealtimeTicket(env, ticket) {
                scope, room_kind, room_id`
   )
     .bind(tokenHash)
-    .all();
+    .all<RealtimeTicketRow>();
   const row = results[0];
   if (!row) return null;
 

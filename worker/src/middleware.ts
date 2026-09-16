@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import type { AppEnv } from './types.ts';
-import { errorResponse, errorCodeForStatus, v1ErrorResponse } from './utils.js';
+import { errorResponse, errorCodeForStatus, v1ErrorResponse } from './utils.ts';
 import { validateSession } from './session.ts';
 
 function extractToken(request: Request): string {

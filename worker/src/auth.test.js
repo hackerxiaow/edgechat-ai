@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hashPassword, verifyPassword } from './auth.js';
+import { hashPassword, verifyPassword } from './auth.ts';
 
 const password = 'correct horse battery staple';
 

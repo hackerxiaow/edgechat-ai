@@ -1,5 +1,5 @@
 import type { AppBindings, SessionUser } from './types.ts';
-import { deleteSession, getSession, isAdminUser, putSession } from './auth.js';
+import { deleteSession, getSession, isAdminUser, putSession } from './auth.ts';
 import { isUserDisabled } from './user-status.ts';
 
 type SessionEnv = Pick<AppBindings, 'DB' | 'SESSIONS'>;
