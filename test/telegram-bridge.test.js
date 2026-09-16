@@ -12,22 +12,22 @@ import {
 	encryptMessageContent,
 	encryptSecretValue,
 } from "../worker/src/encryption.js";
-import { parseTelegramMessageUpdate } from "../worker/src/integrations/telegram/parser.js";
+import { parseTelegramMessageUpdate } from "../worker/src/integrations/telegram/parser.ts";
 import {
 	formatTelegramMessage,
 	ingestTelegramMessage,
 	splitTelegramFormattedMessage,
-} from "../worker/src/integrations/telegram/bridge.js";
+} from "../worker/src/integrations/telegram/bridge.ts";
 import {
 	sendTelegramMedia,
 	sendTelegramText,
-} from "../worker/src/integrations/telegram/client.js";
+} from "../worker/src/integrations/telegram/client.ts";
 import {
 	importTelegramAttachment,
 	loadEdgeChatAttachment,
 	TELEGRAM_BRIDGE_FILE_LIMIT,
 	TELEGRAM_FILE_SKIP_REASON,
-} from "../worker/src/integrations/telegram/files.js";
+} from "../worker/src/integrations/telegram/files.ts";
 import worker from "../worker/src/index.js";
 
 const keyring = JSON.stringify({

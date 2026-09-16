@@ -10,15 +10,15 @@ import {
 	saveTelegramBridgeConfig,
 	updateTelegramMapping,
 } from "../data/telegram.ts";
-import { loadTelegramUserAvatar } from "../integrations/telegram/avatar.js";
+import { loadTelegramUserAvatar } from "../integrations/telegram/avatar.ts";
 import {
 	getTelegramBot,
 	getTelegramChat,
 	setTelegramWebhook,
 	TelegramApiError,
-} from "../integrations/telegram/client.js";
-import { ingestTelegramMessage } from "../integrations/telegram/bridge.js";
-import { parseTelegramMessageUpdate } from "../integrations/telegram/parser.js";
+} from "../integrations/telegram/client.ts";
+import { ingestTelegramMessage } from "../integrations/telegram/bridge.ts";
+import { parseTelegramMessageUpdate } from "../integrations/telegram/parser.ts";
 import { errorResponse, parseJsonRequest, randomToken } from "../utils.js";
 
 function webhookUrl(requestUrl: string): string {

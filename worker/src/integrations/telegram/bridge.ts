@@ -1,27 +1,34 @@
 import {
 	getTelegramCredentials,
 	listEnabledTelegramMappingsForChannel,
+	type TelegramMapping,
 } from "../../data/telegram.ts";
 import { isGroupChannelKind } from "../../../../shared/group-channel.ts";
-import { getMessageBySource } from "../../data/messages.ts";
+import { getMessageBySource, type Message } from "../../data/messages.ts";
 import {
 	findMessageReplyBySource,
 	getMessageSourceReference,
+	type MessageSourceReference,
 } from "../../data/replies.ts";
 import { submitExternalMessage } from "../../external-message-submission.js";
-import { sendTelegramMedia, sendTelegramText } from "./client.js";
+import type { AppBindings } from "../../types.ts";
+import { sendTelegramMedia, sendTelegramText } from "./client.ts";
 import {
 	deleteImportedTelegramAttachment,
 	importTelegramAttachment,
 	loadEdgeChatAttachment,
 	TELEGRAM_FILE_SKIP_REASON,
-} from "./files.js";
+	type ImportedTelegramAttachment,
+} from "./files.ts";
+import type { TelegramParsedMessage } from "./parser.ts";
 
-function logBridgeFailure(message, data) {
+type BridgeEnv = Pick<AppBindings, "DB" | "FILES">;
+
+function logBridgeFailure(message: string, data: Record<string, unknown>): void {
 	console.warn(JSON.stringify({ message, ...data }));
 }
 
-function escapeTelegramHtml(value) {
+function escapeTelegramHtml(value: unknown): string {
 	return String(value || "")
 		.replaceAll("&", "&amp;")
 		.replaceAll("<", "&lt;")
@@ -29,18 +36,22 @@ function escapeTelegramHtml(value) {
 		.replaceAll('"', "&quot;");
 }
 
-export function formatTelegramMessage(displayName, content = "") {
+export function formatTelegramMessage(displayName: string, content = ""): string {
 	const sender = `<b>${escapeTelegramHtml(displayName)}:</b>`;
 	const body = escapeTelegramHtml(content);
 	return body ? `${sender}\n${body}` : sender;
 }
 
-export function splitTelegramFormattedMessage(displayName, content, limit) {
+export function splitTelegramFormattedMessage(
+	displayName: string,
+	content: string,
+	limit: number,
+): string[] {
 	const characters = Array.from(String(content || ""));
 	if (!characters.length) return [formatTelegramMessage(displayName)];
 	const sender = formatTelegramMessage(displayName);
 	const prefix = `${sender}\n`;
-	const chunks = [];
+	const chunks: string[] = [];
 	let current = "";
 	for (const character of characters) {
 		const escaped = escapeTelegramHtml(character);
@@ -55,7 +66,7 @@ export function splitTelegramFormattedMessage(displayName, content, limit) {
 	return chunks;
 }
 
-function telegramMediaKind(contentType, attachmentKind) {
+function telegramMediaKind(contentType: string, attachmentKind?: string): string {
 	if (attachmentKind === "voice") return "voice";
 	if (contentType.startsWith("image/")) return "photo";
 	if (contentType.startsWith("video/")) return "video";
@@ -63,7 +74,13 @@ function telegramMediaKind(contentType, attachmentKind) {
 	return "document";
 }
 
-async function sendTextMessage(botToken, chatId, displayName, content, replyToMessageId = null) {
+async function sendTextMessage(
+	botToken: string,
+	chatId: string | number,
+	displayName: string,
+	content: string,
+	replyToMessageId: number | string | null = null,
+): Promise<void> {
 	const chunks = splitTelegramFormattedMessage(displayName, content, 4096);
 	for (const [index, chunk] of chunks.entries()) {
 		await sendTelegramText(botToken, {
@@ -74,7 +91,13 @@ async function sendTextMessage(botToken, chatId, displayName, content, replyToMe
 	}
 }
 
-async function sendMessageToTelegram(env, botToken, mapping, message, replyToMessageId = null) {
+async function sendMessageToTelegram(
+	env: BridgeEnv,
+	botToken: string,
+	mapping: TelegramMapping,
+	message: Message,
+	replyToMessageId: number | null = null,
+): Promise<void> {
 	const displayName = message.sender.displayName;
 	if (!message.attachment) {
 		if (message.content) {
@@ -125,7 +148,10 @@ async function sendMessageToTelegram(env, botToken, mapping, message, replyToMes
 	}
 }
 
-function telegramReplyMessageId(reference, telegramChatId) {
+function telegramReplyMessageId(
+	reference: MessageSourceReference | null,
+	telegramChatId: string,
+): number | null {
 	if (reference?.source !== "telegram") return null;
 	const prefix = `${telegramChatId}:`;
 	if (!reference.sourceMessageId.startsWith(prefix)) return null;
@@ -133,7 +159,10 @@ function telegramReplyMessageId(reference, telegramChatId) {
 	return Number.isInteger(messageId) && messageId > 0 ? messageId : null;
 }
 
-export async function forwardEdgeChatMessageToTelegram(env, { room, message }) {
+export async function forwardEdgeChatMessageToTelegram(
+	env: BridgeEnv,
+	{ room, message }: { room: { id: number | string; kind: string; name?: string }; message: Message },
+): Promise<void> {
 	if (!isGroupChannelKind(room.kind) || message.source === "telegram") {
 		return;
 	}
@@ -180,7 +209,18 @@ export async function forwardEdgeChatMessageToTelegram(env, { room, message }) {
 	}
 }
 
-export async function ingestTelegramMessage(env, { mapping, telegramMessage, botToken }) {
+export async function ingestTelegramMessage(
+	env: BridgeEnv,
+	{
+		mapping,
+		telegramMessage,
+		botToken,
+	}: {
+		mapping: TelegramMapping;
+		telegramMessage: TelegramParsedMessage;
+		botToken: string;
+	},
+) {
 	const existing = await getMessageBySource(
 		env,
 		"telegram",
@@ -195,7 +235,7 @@ export async function ingestTelegramMessage(env, { mapping, telegramMessage, bot
 		})
 		: null;
 
-	let imported = { attachment: null, skipReason: null };
+	let imported: ImportedTelegramAttachment = { attachment: null, skipReason: null };
 	if (telegramMessage.attachment) {
 		if (!botToken) throw new Error("Telegram Bridge 未配置");
 		imported = await importTelegramAttachment(env, {

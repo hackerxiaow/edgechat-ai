@@ -4,27 +4,78 @@ import {
 	sanitizeFilename,
 } from "../../attachment-metadata.js";
 import { decryptAttachment, encryptAttachment } from "../../encryption.js";
-import { downloadTelegramFile, getTelegramFile } from "./client.js";
+import type { AppBindings } from "../../types.ts";
+import { downloadTelegramFile, getTelegramFile } from "./client.ts";
+import type { TelegramAttachmentInput } from "./parser.ts";
 
 export const TELEGRAM_BRIDGE_FILE_LIMIT = 16 * 1024 * 1024;
-export const TELEGRAM_FILE_SKIP_REASON = Object.freeze({
-	TOO_LARGE: "too_large",
-	STORAGE_UNAVAILABLE: "storage_unavailable",
-	NOT_FOUND: "not_found",
-});
+
+export type TelegramFileSkipReason = "too_large" | "storage_unavailable" | "not_found";
+
+export const TELEGRAM_FILE_SKIP_REASON: Readonly<Record<string, TelegramFileSkipReason>> =
+	Object.freeze({
+		TOO_LARGE: "too_large",
+		STORAGE_UNAVAILABLE: "storage_unavailable",
+		NOT_FOUND: "not_found",
+	});
+
 const FILE_RESPONSE_CACHE_CONTROL = "private, no-store";
 
-function telegramObjectKey({ telegramChatId, telegramMessageId, filename }) {
+/** 消息附件形状；voice/audio 会额外带时长与波形。 */
+export interface MessageAttachmentLike {
+	key: string;
+	name: string;
+	type: string;
+	size: number;
+	kind?: string;
+	durationMs?: number;
+	waveform?: number[];
+}
+
+export interface ImportedTelegramAttachment {
+	attachment: MessageAttachmentLike | null;
+	skipReason: TelegramFileSkipReason | null;
+}
+
+export interface LoadedEdgeChatAttachment {
+	file: {
+		bytes: Uint8Array;
+		name: string;
+		type: string;
+		size: number;
+		kind?: string;
+		durationMs: number;
+	} | null;
+	skipReason: TelegramFileSkipReason | null;
+}
+
+function telegramObjectKey({
+	telegramChatId,
+	telegramMessageId,
+	filename,
+}: {
+	telegramChatId: string;
+	telegramMessageId: number;
+	filename: string;
+}): string {
 	const extension = safeFilenameExtension(filename);
 	return `telegram/${telegramChatId}/${telegramMessageId}-${crypto.randomUUID()}${extension}`;
 }
 
-export async function importTelegramAttachment(env, {
-	botToken,
-	telegramChatId,
-	telegramMessageId,
-	attachment,
-}) {
+export async function importTelegramAttachment(
+	env: Pick<AppBindings, "DB" | "FILES">,
+	{
+		botToken,
+		telegramChatId,
+		telegramMessageId,
+		attachment,
+	}: {
+		botToken: string;
+		telegramChatId: string;
+		telegramMessageId: number;
+		attachment: TelegramAttachmentInput | null;
+	},
+): Promise<ImportedTelegramAttachment> {
 	if (!attachment) return { attachment: null, skipReason: null };
 	if (!env.FILES) {
 		return {
@@ -43,7 +94,7 @@ export async function importTelegramAttachment(env, {
 	}
 	const bytes = await downloadTelegramFile(
 		botToken,
-		telegramFile.file_path,
+		String(telegramFile.file_path || ""),
 		TELEGRAM_BRIDGE_FILE_LIMIT,
 	);
 	const name = sanitizeFilename(attachment.fileName);
@@ -73,7 +124,10 @@ export async function importTelegramAttachment(env, {
 	};
 }
 
-export async function loadEdgeChatAttachment(env, attachment) {
+export async function loadEdgeChatAttachment(
+	env: Pick<AppBindings, "DB" | "FILES">,
+	attachment: MessageAttachmentLike | null | undefined,
+): Promise<LoadedEdgeChatAttachment> {
 	if (!attachment) {
 		return { file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.NOT_FOUND };
 	}
@@ -107,7 +161,10 @@ export async function loadEdgeChatAttachment(env, attachment) {
 	};
 }
 
-export async function deleteImportedTelegramAttachment(env, attachment) {
+export async function deleteImportedTelegramAttachment(
+	env: Pick<AppBindings, "DB" | "FILES">,
+	attachment: MessageAttachmentLike | null | undefined,
+): Promise<void> {
 	if (!attachment?.key || !env.FILES) return;
 	try {
 		await env.FILES.delete(attachment.key);

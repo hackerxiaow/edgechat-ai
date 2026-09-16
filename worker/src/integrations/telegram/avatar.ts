@@ -3,11 +3,17 @@ import {
 	getTelegramFile,
 	getTelegramUserProfilePhotos,
 	TelegramApiError,
-} from "./client.js";
+	type TelegramPhotoSize,
+} from "./client.ts";
 
 export const TELEGRAM_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
-function largestPhotoSize(photoSizes) {
+export interface TelegramAvatar {
+	bytes: Uint8Array;
+	contentType: string;
+}
+
+function largestPhotoSize(photoSizes: TelegramPhotoSize[]): TelegramPhotoSize {
 	return photoSizes.reduce((largest, current) => {
 		const largestArea = Number(largest.width || 0) * Number(largest.height || 0);
 		const currentArea = Number(current.width || 0) * Number(current.height || 0);
@@ -20,14 +26,17 @@ function largestPhotoSize(photoSizes) {
 	});
 }
 
-function avatarContentType(filePath) {
+function avatarContentType(filePath: string | undefined): string {
 	const path = String(filePath || "").toLowerCase();
 	if (path.endsWith(".png")) return "image/png";
 	if (path.endsWith(".webp")) return "image/webp";
 	return "image/jpeg";
 }
 
-export async function loadTelegramUserAvatar(botToken, userId) {
+export async function loadTelegramUserAvatar(
+	botToken: string,
+	userId: string,
+): Promise<TelegramAvatar | null> {
 	const profilePhotos = await getTelegramUserProfilePhotos(botToken, userId);
 	const photoSizes = profilePhotos?.photos?.[0] || [];
 	if (!photoSizes.length) return null;
@@ -39,7 +48,7 @@ export async function loadTelegramUserAvatar(botToken, userId) {
 	}
 	const bytes = await downloadTelegramFile(
 		botToken,
-		telegramFile.file_path,
+		String(telegramFile.file_path || ""),
 		TELEGRAM_AVATAR_MAX_BYTES,
 	);
 	return {

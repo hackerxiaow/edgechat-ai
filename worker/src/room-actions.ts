@@ -3,8 +3,8 @@ import { authorizeRoom } from './room-access.js';
 import { submitRoomMessageIdempotent } from './message-submission.js';
 import { deleteRoomMessage } from './message-deletion.js';
 import { pinRoomMessage, unpinRoomMessage } from './message-pinning.js';
-import { forwardEdgeChatMessageToTelegram } from './integrations/telegram/bridge.js';
-import { processAiBotResponse } from './integrations/ai-bot.js';
+import { forwardEdgeChatMessageToTelegram } from './integrations/telegram/bridge.ts';
+import { processAiBotResponse } from './integrations/ai-bot.ts';
 
 export interface RoomAction {
 	type: 'send' | 'delete_message' | 'pin_message' | 'unpin_message';
