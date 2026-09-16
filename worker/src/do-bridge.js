@@ -132,8 +132,10 @@ export async function submitClientRoomAction(env, { room, principal, action, ctx
 				broadcast: async () => {},
 				runMessageProjections: () => {}
 			};
-			// 在无状态 Pages 模式下直接等待生成，gemini-3.6 仅需 300ms，确保回复 100% 成功写入 D1
-			await processAiBotResponse(dummyRoom, { room: access.room, message: result.message }).catch(console.error);
+			const aiTask = processAiBotResponse(dummyRoom, { room: access.room, message: result.message }).catch(console.error);
+			if (ctx && typeof ctx.waitUntil === 'function') {
+				ctx.waitUntil(aiTask);
+			}
 		}
 		return Response.json({ created: result.created, message: result.message });
 	}
