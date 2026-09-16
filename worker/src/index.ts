@@ -344,7 +344,8 @@ export default {
     }
     return response;
   },
-  // Workers 部署仍可用 Cron Triggers 直连同一条 GC。
+  // 保留 scheduled 入口：本地 wrangler 可以用 /cdn-cgi/handler/scheduled 手动跑一次，
+  // 未来若重新启用定时触发器也应复用同一条 GC，而不是另写一份清理逻辑。
   async scheduled(
     _controller: ScheduledController,
     env: AppEnv['Bindings'],
