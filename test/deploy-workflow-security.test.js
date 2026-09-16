@@ -109,6 +109,19 @@ test("Pages 部署不再声明 KV、R2 或 Durable Object 绑定", () => {
 	assert.match(script, /ensurePagesProject/);
 
 	assert.doesNotMatch(workflow, /wrangler\.ci\.toml|wrangler\.example\.toml|--secrets-file/);
-	assert.match(workflow, /--config wrangler\.pages\.toml/);
-	assert.match(workflow, /wrangler pages deploy frontend\/dist/);
+	// D1 命令接受 --config，Pages 部署命令不接受（传了会直接报错），两者规则不同。
+	assert.match(getStep("Apply D1 migrations"), /--config wrangler\.pages\.toml/);
+	// 只校验命令本身：步骤里的注释需要说明为什么不传 --config。
+	const deployCommand =
+		getStep("Deploy Pages")
+			.split("\n")
+			.find((line) => line.trim().startsWith("run: ")) || "";
+	assert.match(deployCommand, /wrangler pages deploy frontend\/dist --project-name/);
+	assert.doesNotMatch(deployCommand, /--config/);
+
+	const pagesScript = JSON.parse(
+		readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+	).scripts["deploy:pages"];
+	assert.match(pagesScript, /wrangler pages deploy frontend\/dist --project-name/);
+	assert.doesNotMatch(pagesScript, /--config/);
 });

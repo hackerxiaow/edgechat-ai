@@ -1,5 +1,7 @@
-# Cloudflare Pages 生产配置：静态资产在 frontend/dist，接口与附件由 _worker.js 处理。
-# 迁移、后台任务与密钥都由 .github/workflows/deploy-pages.yml 走同一条 D1 路径。
+# Cloudflare Pages 生产配置：D1 绑定与部署变量的唯一来源。
+# 注意：`wrangler pages deploy` 不接受自定义配置路径（--config 会直接报错），
+# 所以部署命令只传目录与 --project-name；需要这份配置的是 `wrangler d1 execute`
+# 之类的命令，它们允许 --config。变量本身以 Cloudflare 项目上的设置为准。
 name = "edgechat"
 pages_build_output_dir = "frontend/dist"
 compatibility_date = "2026-04-05"
