@@ -34,6 +34,7 @@ import {
   registerTelegramPublicRoutes
 } from './api/telegram.ts';
 import { runLazyScheduledGc, runScheduledGc, shouldProbeScheduledGc } from './gc.ts';
+import { checkDeploymentHealth, isDeepHealthProbe } from './health.ts';
 import { isUserDisabled } from './user-status.ts';
 import type { AppEnv, SessionUser } from './types.ts';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.ts';
@@ -65,7 +66,15 @@ app.use('/api/*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
-app.get('/api/health', (c) => c.json({ ok: true }));
+// 浅探测只回常量，供 CDN/负载均衡做存活检查；
+// ?deep=1 会真的跑一遍 D1、迁移、密钥与惰性 GC，供外部监控告警。
+app.get('/api/health', async (c) => {
+  if (!isDeepHealthProbe(c.req.raw)) {
+    return c.json({ ok: true });
+  }
+  const health = await checkDeploymentHealth(c.env);
+  return c.json({ ok: health.ok, failed: health.failed }, health.ok ? 200 : 503);
+});
 
 app.get('/api/site', async (c) => {
   const site = await getSiteSettings(c.env.DB);
