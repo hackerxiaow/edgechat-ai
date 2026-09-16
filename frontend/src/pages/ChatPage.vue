@@ -1020,7 +1020,8 @@ onBeforeUnmount(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--chat-paper);
+  /* 侧栏自身已是玻璃面板，内部再铺一层底色会叠加成不透明。 */
+  background: transparent;
   overflow: hidden;
 }
 
@@ -1030,7 +1031,8 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   min-height: 84px;
   padding: 20px 24px 16px;
-  background: var(--chat-paper);
+  /* 同上：由 .left-sidebar 统一提供玻璃背景。 */
+  background: transparent;
 }
 
 .header-action.mobile-menu-action {

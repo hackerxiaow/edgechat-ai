@@ -22,11 +22,14 @@
   border: 0;
   background: transparent;
   color: var(--admin-brand);
-  font-size: 1.6rem;
+  /* 侧栏宽 236px，1.6rem 会让 "Edgechat Admin" 溢出并顶破布局。 */
+  font-size: 1.15rem;
   font-weight: 750;
   letter-spacing: 0;
-  line-height: 1;
+  line-height: 1.15;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-brand:focus-visible,
@@ -118,6 +121,15 @@
   gap: var(--admin-space-xs);
   padding-inline: var(--admin-space-sm);
   font-size: 0.92rem;
+  min-width: 0;
+}
+
+.admin-nav-item span,
+.admin-nav-subitem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-nav-item:hover,

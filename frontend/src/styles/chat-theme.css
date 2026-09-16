@@ -2,7 +2,7 @@
  * 聊天工作区现在已与前台登录页完全打通玻璃拟态设计语言
  */
 :root {
-  --chat-paper: rgba(255, 255, 255, 0.66);
+  --chat-paper: rgba(255, 255, 255, 0.88);
   --chat-canvas: transparent;
   --chat-rail: var(--surface-1);
   --chat-hover: var(--surface-0);
@@ -40,7 +40,7 @@
 html[data-theme="dark"],
 html.dark,
 [data-theme="dark"] {
-  --chat-paper: rgba(20, 32, 46, 0.7) !important;
+  --chat-paper: rgba(20, 32, 46, 0.88) !important;
   --chat-canvas: transparent !important;
   --chat-rail: var(--surface-1) !important;
   --chat-hover: var(--surface-0) !important;
@@ -127,33 +127,33 @@ html.dark .chat-layout {
 }
 
 /* 侧边栏和头部毛玻璃化 */
+/* 与登录卡片同一套配方：同一个 --surface-2 底色 + --blur-lg 模糊，
+   保证聊天页和首页看起来是同一个材质。 */
 .left-sidebar,
 .right-sidebar,
-.sidebar-header,
 .chat-header,
 .composer-form {
-  background-color: var(--chat-paper) !important;
-  -webkit-backdrop-filter: var(--blur-md) !important;
-  backdrop-filter: var(--blur-md) !important;
+  background-color: var(--surface-2) !important;
+  -webkit-backdrop-filter: var(--blur-lg) !important;
+  backdrop-filter: var(--blur-lg) !important;
   border-color: var(--line-soft) !important;
   color: var(--text) !important;
 }
 
-html[data-theme="dark"] .left-sidebar,
-html.dark .left-sidebar,
-html[data-theme="dark"] .right-sidebar,
-html.dark .right-sidebar,
+/* 被外层玻璃覆盖的嵌套元素必须保持透明；选择器要带上 html.dark 前缀，
+   否则优先级低于上面的深色规则。 */
+.sidebar-header,
+.left-sidebar .sidebar-inner,
+.right-sidebar .right-sidebar-inner,
 html[data-theme="dark"] .sidebar-header,
 html.dark .sidebar-header,
-html[data-theme="dark"] .chat-header,
-html.dark .chat-header,
-html[data-theme="dark"] .composer-form,
-html.dark .composer-form {
-  background-color: var(--chat-paper) !important;
-  -webkit-backdrop-filter: var(--blur-md) !important;
-  backdrop-filter: var(--blur-md) !important;
-  border-color: var(--line-soft) !important;
-  color: var(--text) !important;
+html[data-theme="dark"] .left-sidebar .sidebar-inner,
+html.dark .left-sidebar .sidebar-inner,
+html[data-theme="dark"] .right-sidebar .right-sidebar-inner,
+html.dark .right-sidebar .right-sidebar-inner {
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* 聊天气泡 */

@@ -21,10 +21,11 @@
   background: transparent;
 }
 
-/* 结构性面板统一毛玻璃 */
+/* 只让「真正的卡片」承担玻璃。.admin-section / .admin-section__header 是
+   分组容器，若也上玻璃就会和内部的 .ui-surface 叠加，0.72 叠两层已接近不透明，
+   玻璃效果消失、暗色下发闷。 */
 .admin-sidebar,
 .admin-topbar,
-.admin-section,
 .admin-panel,
 .ui-surface {
   background: var(--admin-panel);
@@ -38,6 +39,81 @@
 .ui-surface--strong {
   background: var(--admin-panel);
   border-color: var(--admin-border);
+}
+
+/* 分组容器与已承载玻璃的侧栏内部一律透明，保证每张卡片只有一层玻璃。
+   .admin-section__header 必须带 .admin-page 前缀才能压过 content.css 的同名规则。 */
+.admin-section,
+.admin-section__body,
+.admin-sidebar__brand-row,
+.admin-nav,
+.admin-sidebar .admin-brand {
+  background: transparent !important;
+}
+
+.admin-page .admin-section__header {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* 侧栏内部元素不再自带底色，避免和侧栏玻璃叠加 */
+.admin-sidebar button,
+.admin-sidebar a {
+  background-color: transparent;
+}
+
+.admin-sidebar button:hover,
+.admin-sidebar a:hover {
+  background-color: var(--admin-active);
+}
+
+.admin-nav-item--active,
+.admin-nav-subitem--active {
+  background-color: var(--admin-active);
+}
+
+/* 语言切换与主题按钮沿用全局玻璃令牌，暗色下不再是一块刺眼的白块。 */
+.admin-topbar .language-switch {
+  background: var(--admin-active) !important;
+  border-color: var(--admin-border) !important;
+  color: var(--admin-text) !important;
+  box-shadow: none !important;
+}
+
+.admin-topbar .language-switch:hover {
+  background: var(--admin-panel);
+}
+
+.admin-topbar .language-switch__menu {
+  background: var(--admin-panel);
+  border-color: var(--admin-border);
+  -webkit-backdrop-filter: var(--blur-md, blur(12px));
+  backdrop-filter: var(--blur-md, blur(12px));
+}
+
+.admin-topbar .language-switch__option {
+  color: var(--admin-text);
+}
+
+/* 顶栏主按钮：原来用 ink/panel 反色配对，暗色下 ink 变浅导致按钮变成亮块。
+   改用品牌色，两种模式下语义一致。 */
+.admin-topbar__settings {
+  background: var(--admin-brand) !important;
+  border-color: var(--admin-brand) !important;
+  color: #ffffff !important;
+}
+
+.admin-topbar__settings:hover,
+.admin-topbar__settings:active {
+  background: var(--admin-ink-hover) !important;
+  border-color: var(--admin-ink-hover) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .admin-topbar__settings:hover,
+html.dark .admin-topbar__settings:hover {
+  background: #5b9ce2 !important;
+  border-color: #5b9ce2 !important;
 }
 
 .ui-surface--strong {
@@ -67,4 +143,43 @@ html.dark textarea {
   background: rgba(9, 18, 28, 0.55);
   border-color: var(--admin-border);
   color: var(--admin-text);
+}
+
+
+/* ================================================
+   收窄侧栏后的文字排布
+   ================================================ */
+
+/* 侧栏从 296px 收到 236px 后，英文导航标签（如 "Registration invites"）
+   放不下一行。这里改为换行显示，而不是截断成 "Registration invi…"。 */
+.admin-nav-item,
+.admin-nav-subitem {
+  align-items: center;
+}
+
+.admin-nav-item span,
+.admin-nav-subitem span {
+  min-width: 0;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  text-overflow: clip !important;
+  line-height: 1.25;
+}
+
+/* 底部身份块同理：窄列里 "Super administrator" 会被切成两行而不是省略号。 */
+.admin-identity strong,
+.admin-identity span {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  text-overflow: clip !important;
+  line-height: 1.25;
+}
+
+.admin-identity {
+  align-items: flex-start;
+}
+
+.admin-identity > svg {
+  margin-top: 2px;
+  flex-shrink: 0;
 }
