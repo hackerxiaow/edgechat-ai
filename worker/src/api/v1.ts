@@ -22,6 +22,7 @@ import { issueRealtimeTicket } from '../realtime-tickets.ts';
 import { authorizeRoom, isRoomKind } from '../room-access.ts';
 import { markRoomRead } from '../data/unread.ts';
 import { listRoomTypingUsers, setRoomTyping } from '../data/typing.ts';
+import { touchPresence } from '../data/presence.ts';
 import { isUserDisabled } from '../user-status.ts';
 import {
   errorCodeForStatus,
@@ -265,6 +266,12 @@ export function registerV1Routes(app: Hono<AppEnv>) {
       messageId
     });
     return c.json({ ok: true, lastReadMessageId });
+  });
+
+  // 在线心跳：客户端约每 60 秒上报一次，服务端还会按半个窗口去重写入。
+  app.post('/api/v1/presence', authMiddleware, async (c) => {
+    await touchPresence(c.env.DB, c.get('session').userId);
+    return c.json({ ok: true });
   });
 
   app.post('/api/v1/rooms/:kind/:id/typing', authMiddleware, async (c) => {

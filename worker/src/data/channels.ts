@@ -1,4 +1,5 @@
 import { publicFileUrl } from "../utils.ts";
+import { PRESENCE_TTL_SECONDS } from "./presence.ts";
 
 export interface VisibleChannel {
 	id: number;
@@ -40,6 +41,7 @@ export interface ChannelMember {
 	avatarUrl: string;
 	role: string;
 	joinedAt: string;
+	online: boolean;
 }
 
 interface VisibleChannelRow {
@@ -73,6 +75,7 @@ interface AdminChannelRow {
 }
 
 interface ChannelMemberRow {
+	online: number;
 	user_id: number;
 	role: string;
 	joined_at: string;
@@ -210,13 +213,15 @@ export async function listChannelMembers(
 ): Promise<ChannelMember[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT cm.user_id, cm.role, cm.joined_at, u.username, u.display_name, u.avatar_key
+			`SELECT cm.user_id, cm.role, cm.joined_at, u.username, u.display_name, u.avatar_key,
+			        (p.updated_at IS NOT NULL AND p.updated_at > datetime('now', ?)) AS online
 			 FROM channel_members cm
 			 JOIN users u ON u.id = cm.user_id
+			 LEFT JOIN user_presence p ON p.user_id = cm.user_id
 			 WHERE cm.channel_id = ? AND u.deleted_at IS NULL
 			 ORDER BY CASE cm.role WHEN 'owner' THEN 0 ELSE 1 END, u.display_name ASC`,
 		)
-		.bind(Number(channelId))
+		.bind(`-${PRESENCE_TTL_SECONDS} seconds`, Number(channelId))
 		.all<ChannelMemberRow>();
 	return results.map((row) => ({
 		id: Number(row.user_id),
@@ -225,5 +230,6 @@ export async function listChannelMembers(
 		avatarUrl: row.avatar_key ? publicFileUrl(row.avatar_key) : "",
 		role: row.role,
 		joinedAt: row.joined_at,
+		online: Number(row.online) === 1,
 	}));
 }

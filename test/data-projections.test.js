@@ -158,6 +158,7 @@ test("后台用户与频道成员 projection 保持稳定字段", async () => {
 			avatar_key: null,
 			role: "owner",
 			joined_at: "2026-07-23",
+			online: 1,
 		},
 	]);
 	assert.deepEqual((await listChannelMembers(members.db, "6"))[0], {
@@ -167,8 +168,12 @@ test("后台用户与频道成员 projection 保持稳定字段", async () => {
 		avatarUrl: "",
 		role: "owner",
 		joinedAt: "2026-07-23",
+		online: true,
 	});
-	assert.deepEqual(members.capture.binds, [6]);
+	// 绑定顺序：在线窗口（用于 LEFT JOIN 的判定）+ 频道 id
+	assert.equal(members.capture.binds.length, 2);
+	assert.match(String(members.capture.binds[0]), /^-\d+ seconds$/);
+	assert.equal(Number(members.capture.binds[1]), 6);
 });
 
 test("消息查询保持倒序 SQL、绑定顺序与升序 projection", async () => {

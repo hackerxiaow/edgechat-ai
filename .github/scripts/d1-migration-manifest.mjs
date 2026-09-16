@@ -215,9 +215,25 @@ export const D1_MIGRATIONS = [
 		artifacts: ["table:verification_codes", "index:idx_verification_codes_lookup"],
 	},
 	{
+		id: "2026-09-17-room-typing-external",
+		file: "worker/migrations/2026-09-17-room-typing-external.sql",
+		// 只登记这次真正新增的列：表本身在上一迁移里已存在，
+		// 若把 table:room_typing 也列进来会被判为 baseline 而跳过重建。
+		artifacts: [
+			"column:room_typing.typer_key",
+			"column:room_typing.display_name",
+			"column:room_typing.avatar_url",
+		],
+	},
+	{
 		id: "2026-09-17-room-typing",
 		file: "worker/migrations/2026-09-17-room-typing.sql",
 		artifacts: ["table:room_typing", "index:idx_room_typing_channel_updated"],
+	},
+	{
+		id: "2026-09-17-user-presence",
+		file: "worker/migrations/2026-09-17-user-presence.sql",
+		artifacts: ["table:user_presence", "index:idx_user_presence_updated"],
 	},
 ];
 

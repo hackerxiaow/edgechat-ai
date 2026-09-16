@@ -167,6 +167,9 @@ export default {
     const query = new URLSearchParams(cursor ? { cursor: String(cursor) } : {});
     return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/sync?${query.toString()}`);
   },
+  sendPresence() {
+    return request('/v1/presence', { method: 'POST' });
+  },
   setRoomTyping(kind, roomId, typing) {
     return request(`/v1/rooms/${encodeURIComponent(kind)}/${encodeURIComponent(roomId)}/typing`, {
       method: 'POST',

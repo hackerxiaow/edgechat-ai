@@ -3,6 +3,7 @@ import { ArrowLeft, Ban, Bell, BellOff, ContactRound, Menu, MessageCircle, Setti
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '../composables/useTheme.js';
+import { usePresence } from '../composables/usePresence.js';
 import {
   consumeNativeRoomTarget,
   NATIVE_ROOM_OPEN_EVENT
@@ -48,6 +49,7 @@ import { useI18n } from '../i18n.js';
 
 const router = useRouter();
 const { isDark, toggleTheme } = useTheme();
+usePresence();
 const route = useRoute();
 const { formatTime: formatLocaleTime, t } = useI18n();
 const error = ref('');
@@ -176,7 +178,15 @@ const { connectUnreadInbox, disconnectUnreadInbox } = useUnreadInbox({
 });
 
 const wsConnected = computed(() => wsStatus.value === 'open');
-const activeRoomSubtitle = computed(() => roomSubtitle(activeRoom.value, wsConnected.value));
+const activeRoomSubtitle = computed(() => {
+  const room = activeRoom.value;
+  // 群组优先显示成员/在线人数，私聊沿用原来的状态文案。
+  if (room?.kind !== 'dm' && groupMembers.value.length) {
+    const onlineCount = groupMembers.value.filter((member) => member.online).length;
+    return t('chat.memberCountOnline', { total: groupMembers.value.length, online: onlineCount });
+  }
+  return roomSubtitle(room, wsConnected.value);
+});
 const canModerateMessages = computed(() => {
   if (session.value?.isAdmin || canManageActiveRoom.value) return true;
   const msg = messageMenu.value?.message;
@@ -810,11 +820,14 @@ onBeforeUnmount(() => {
 			  />
 			  <MessageMarkdown
 				v-if="msg.content"
-				:content="msg.content"
+				:content="messageContent(msg)"
 				:mentions="msg.mentions"
 				:current-user-id="session?.userId"
+			  /><span
+				v-if="isStreamingMessage(msg)"
+				class="message-stream-caret"
+				aria-hidden="true"
 			  />
-              <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
               <span class="message-time">{{ formatBubbleTime(msg.createdAt) }}</span>
             </div>
           </article>
@@ -1534,6 +1547,29 @@ onBeforeUnmount(() => {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.15s;
+}
+
+/* 流式显现时的光标 */
+.message-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: stream-caret-blink 900ms steps(1, end) infinite;
+}
+
+@keyframes stream-caret-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-stream-caret {
+    animation: none;
+    opacity: 0.8;
+  }
 }
 
 .typing-dot:nth-child(4) {

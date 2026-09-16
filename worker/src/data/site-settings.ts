@@ -205,6 +205,19 @@ export async function updateSiteSettings(
 		);
 	}
 	if (input.maxFileSize !== undefined) {
+		// 上限取决于写入生效后是否配置了外部图床：配了就不再受 D1 单行限制。
+		// 同一次请求里同时改这两项时，以本次传入的图床地址为准。
+		const effectiveExternalUploadUrl =
+			input.externalUploadUrl !== undefined
+				? String(input.externalUploadUrl || "").trim()
+				: String(
+						(
+							await db
+								.prepare("SELECT setting_value FROM site_settings WHERE setting_key = ?")
+								.bind(RUNTIME_SETTING_KEYS.externalUploadUrl)
+								.first<{ setting_value: string }>()
+						)?.setting_value || "",
+					).trim();
 		statements.push(
 			upsert(
 				db,
@@ -212,7 +225,9 @@ export async function updateSiteSettings(
 				String(
 					toPositiveInteger(input.maxFileSize, defaults.maxFileSize, {
 						min: MIN_UPLOAD_BYTES,
-						max: MAX_UPLOAD_CEILING_BYTES,
+						max: effectiveExternalUploadUrl
+							? MAX_EXTERNAL_UPLOAD_CEILING_BYTES
+							: MAX_UPLOAD_CEILING_BYTES,
 					}),
 				),
 			),

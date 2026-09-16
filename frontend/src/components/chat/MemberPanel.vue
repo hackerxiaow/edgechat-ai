@@ -65,7 +65,17 @@ const emit = defineEmits(['close', 'update:inviteUserId', 'invite', 'remove-memb
           <UiAvatar :src="member.avatarUrl" :fallback="member.displayName" size="sm" />
         </button>
         <div class="member-chip__text">
-          <strong>{{ member.displayName }}</strong>
+          <strong>
+            <!-- 在线状态点：绿色在线、灰色离线 -->
+            <span
+              class="member-chip__presence"
+              :class="{ 'member-chip__presence--online': member.online }"
+              :title="member.online ? t('members.online') : t('members.offline')"
+              :aria-label="member.online ? t('members.online') : t('members.offline')"
+              role="status"
+            ></span>
+            {{ member.displayName }}
+          </strong>
           <span>@{{ member.username }}</span>
         </div>
         <div class="member-chip__actions">
@@ -103,6 +113,20 @@ const emit = defineEmits(['close', 'update:inviteUserId', 'invite', 'remove-memb
 </template>
 
 <style scoped>
+.member-chip__presence {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--chat-line, #d0d7de);
+  vertical-align: middle;
+}
+
+.member-chip__presence--online {
+  background: var(--chat-online, #34d399);
+}
+
 .chat-member-panel__close {
   display: inline-flex;
   align-items: center;

@@ -57,7 +57,11 @@ app.use('/api/*', async (c, next) => {
     const settings = await getRuntimeSettings(c.env.DB);
     if (requestBodyTooLarge(c.req.raw, settings.maxFileSize + UPLOAD_BODY_OVERHEAD_BYTES)) {
       // 提前拒绝超大请求体，避免 Worker 在 JSON 解析前消耗过多内存。
-      return errorResponse('请求体过大', 413);
+      // 提示里带上真实上限，否则用户只看到「请求体过大」不知道能传多大。
+      return errorResponse(
+        `文件大小不能超过 ${Math.round(settings.maxFileSize / 1024 / 1024)}MB`,
+        413
+      );
     }
   }
 

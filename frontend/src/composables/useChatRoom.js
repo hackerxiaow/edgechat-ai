@@ -32,6 +32,8 @@ export function useChatRoom({
 	const messagesEl = ref(null);
 	/** 当前房间里仍在输入的人（不含自己）。 */
 	const typingUsers = ref([]);
+	/** 刚通过同步游标到达的 AI 消息 id：这些消息在气泡里做打字机逐字显现。 */
+	const streamingMessageIds = ref([]);
 	let typingSentAt = 0;
 	let typingActive = false;
 	let messageLoadGeneration = 0;
@@ -63,6 +65,12 @@ export function useChatRoom({
 
 	function clearTyping() {
 		typingUsers.value = [];
+	}
+
+	function finishStreaming(messageId) {
+		streamingMessageIds.value = streamingMessageIds.value.filter(
+			(id) => Number(id) !== Number(messageId),
+		);
 	}
 
 	function isOwnMessage(message) {
@@ -196,6 +204,12 @@ export function useChatRoom({
 				return;
 			}
 			if ((payload.type === "message" || payload.type === "message_updated") && payload.message) {
+				if (payload.message.source === "ai") {
+					streamingMessageIds.value = [
+						...streamingMessageIds.value,
+						Number(payload.message.id),
+					];
+				}
 				upsertMessage(payload.message);
 				applyActiveRoomActivity(payload.message);
 				return;
@@ -524,6 +538,8 @@ export function useChatRoom({
 		typingUsers,
 		reportTyping,
 		clearTyping,
+		streamingMessageIds,
+		finishStreaming,
 		isOwnMessage,
 		loadMessages,
 		activateRoom,

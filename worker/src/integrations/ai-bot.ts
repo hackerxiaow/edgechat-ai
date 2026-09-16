@@ -1,6 +1,7 @@
 import type { Message } from '../data/messages.ts';
 import type { AppBindings } from '../types.ts';
 import { submitExternalMessage } from '../external-message-submission.ts';
+import { setExternalRoomTyping } from '../data/typing.ts';
 
 const AI_API_URL = 'https://api.seurl.eu.org/v1/chat/completions';
 // TODO: 迁移到 Worker Secret。当前保留源码内默认值以维持既有行为，
@@ -37,6 +38,24 @@ export async function processAiBotResponse(
 
 		const apiKey = String(env.AI_BOT_API_KEY || DEFAULT_AI_API_KEY);
 
+		const botIdentity = { id: 'zeroclaw', displayName: 'ZeroClaw' };
+		// 机器人也是「发送者」：生成期间上报正在输入，让客户端能看到指示器。
+		const reportBotTyping = (typing: boolean) =>
+			setExternalRoomTyping(env.DB, {
+				channelId: room.id,
+				externalId: botIdentity.id,
+				displayName: botIdentity.displayName,
+				typing
+			}).catch((error) => console.error('ai_bot_typing_failed', error));
+
+		await reportBotTyping(true);
+		try {
+			return await generateAndSubmit();
+		} finally {
+			await reportBotTyping(false);
+		}
+
+		async function generateAndSubmit(): Promise<void> {
 		// 1. 发起推理请求（直连 AI 网关，gemini-3.6 仅需 ~300ms 即可完成生成）
 		const res = await fetch(AI_API_URL, {
 			method: 'POST',
@@ -85,6 +104,7 @@ export async function processAiBotResponse(
 
 		// 纯 D1 部署没有实时推送，客户端轮询同步游标即可拿到这条回复。
 		await submitExternalMessage(env, { room, payload });
+		}
 	} catch (err) {
 		console.error('Failed to process AI bot response:', err);
 	}

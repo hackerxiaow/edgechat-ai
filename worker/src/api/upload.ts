@@ -125,10 +125,15 @@ async function uploadToExternalHost(uploadUrl: string, file: File): Promise<stri
     // 图床也可能直接返回纯文本直链。
   }
 
+  // 该图床返回 {"data":"https://..."}，data 是字符串而不是对象；
+  // 这里把常见的几种形状都覆盖到，避免因为返回结构差异导致整条上传失败。
+  const dataField = (parsed as { data?: unknown } | null)?.data;
   const candidates = [
     (parsed as { url?: unknown } | null)?.url,
-    (parsed as { data?: { url?: unknown } } | null)?.data?.url,
+    typeof dataField === 'string' ? dataField : null,
+    (dataField as { url?: unknown } | undefined)?.url,
     (parsed as { link?: unknown } | null)?.link,
+    (parsed as { path?: unknown } | null)?.path,
     parsed === null ? text : null
   ];
   const resolved = candidates
