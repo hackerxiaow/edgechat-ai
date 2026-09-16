@@ -1,8 +1,8 @@
-import { useTheme } from '../composables/useTheme.js';
 <script setup>
 import { ArrowLeft, Ban, Bell, BellOff, ContactRound, Menu, MessageCircle, Settings, UsersRound } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useTheme } from '../composables/useTheme.js';
 import {
   consumeNativeRoomTarget,
   NATIVE_ROOM_OPEN_EVENT
@@ -47,6 +47,7 @@ import { useUserProfile } from '../composables/useUserProfile.ts';
 import { useI18n } from '../i18n.js';
 
 const router = useRouter();
+const { isDark, toggleTheme } = useTheme();
 const route = useRoute();
 const { formatTime: formatLocaleTime, t } = useI18n();
 const error = ref('');

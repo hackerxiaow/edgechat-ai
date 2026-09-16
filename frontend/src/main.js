@@ -30,7 +30,7 @@ if (customBg) {
 
 initializeI18n().then(() => store.initialize()).finally(() => {
   useTheme();
-const app = createApp(App);
+  const app = createApp(App);
   app.use(router);
   app.mount('#app');
   void registerEdgeChatWebMcp();
