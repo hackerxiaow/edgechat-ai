@@ -504,30 +504,51 @@ const revealTimers = new Map();
 const STREAM_DURATION_MS = 1800;
 const STREAM_TICK_MS = 30;
 
+function stopStreaming(messageId) {
+  const id = Number(messageId);
+  const timer = revealTimers.get(id);
+  if (timer) {
+    clearInterval(timer);
+    revealTimers.delete(id);
+  }
+  // 关键：结束必须清掉状态。否则 isStreamingMessage 永远为真、光标一直闪；
+  // 而 messageContent 会一直按残留的进度切片，气泡可能停在空内容上。
+  delete revealedLength[id];
+}
+
+function beginStreaming(messageId) {
+  const id = Number(messageId);
+  if (revealTimers.has(id) || revealedLength[id] !== undefined) return;
+
+  const target = messages.value.find((item) => Number(item.id) === id);
+  const total = String(target?.content || '').length;
+  if (!total) {
+    // 消息还没进列表（或内容为空）就先不启动，交给下一次 watch 触发
+    if (!target) return;
+    stopStreaming(id);
+    finishStreaming(id);
+    return;
+  }
+
+  revealedLength[id] = 0;
+  const perTick = Math.max(1, Math.ceil(total / (STREAM_DURATION_MS / STREAM_TICK_MS)));
+  const timer = setInterval(() => {
+    const next = (revealedLength[id] || 0) + perTick;
+    if (next >= total) {
+      stopStreaming(id);
+      finishStreaming(id);
+      return;
+    }
+    revealedLength[id] = next;
+  }, STREAM_TICK_MS);
+  revealTimers.set(id, timer);
+}
+
 watch(streamingMessageIds, (ids) => {
   for (const rawId of ids) {
     const id = Number(rawId);
-    if (revealTimers.has(id)) continue;
-    const target = messages.value.find((item) => Number(item.id) === id);
-    const total = String(target?.content || '').length;
-    if (!total) {
-      finishStreaming(id);
-      continue;
-    }
-    revealedLength[id] = 0;
-    const perTick = Math.max(1, Math.ceil(total / (STREAM_DURATION_MS / STREAM_TICK_MS)));
-    const timer = setInterval(() => {
-      const next = (revealedLength[id] || 0) + perTick;
-      if (next >= total) {
-        revealedLength[id] = total;
-        clearInterval(timer);
-        revealTimers.delete(id);
-        finishStreaming(id);
-        return;
-      }
-      revealedLength[id] = next;
-    }, STREAM_TICK_MS);
-    revealTimers.set(id, timer);
+    // 等一拍再启动：消息先 upsert 进列表，这里才拿得到正文长度。
+    nextTick(() => beginStreaming(id));
   }
 });
 
@@ -542,8 +563,12 @@ function isStreamingMessage(message) {
 
 function messageContent(message) {
   const shown = revealedLength[message.id];
+  // 未在显现中（含显现已结束）一律返回完整正文
   if (shown === undefined) return message.content;
-  return String(message.content || '').slice(0, shown);
+  const full = String(message.content || '');
+  // 兜底：进度异常时宁可显示全文，也不要留一个空气泡
+  if (shown <= 0) return '';
+  return full.slice(0, shown);
 }
 
 // 群组把发言权限设为「仅群主和管理员」时，普通成员的输入框整体禁用。
