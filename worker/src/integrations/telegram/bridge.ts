@@ -22,7 +22,7 @@ import {
 } from "./files.ts";
 import type { TelegramParsedMessage } from "./parser.ts";
 
-type BridgeEnv = Pick<AppBindings, "DB" | "FILES">;
+type BridgeEnv = Pick<AppBindings, "DB">;
 
 function logBridgeFailure(message: string, data: Record<string, unknown>): void {
 	console.warn(JSON.stringify({ message, ...data }));
@@ -250,7 +250,7 @@ export async function ingestTelegramMessage(
 		imported.skipReason === TELEGRAM_FILE_SKIP_REASON.TOO_LARGE
 			? "附件超过 16 MB，未同步"
 			: imported.skipReason === TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE
-				? "当前部署未启用文件存储，附件未同步"
+				? "Telegram 附件需要对象存储，当前 D1 单存储部署不导入附件"
 				: "";
 	const content = [telegramMessage.content, attachmentNotice].filter(Boolean).join("\n\n");
 	try {

@@ -188,7 +188,12 @@ test('客户端消息和附件重试复用同一服务端记录', async () => {
   assert.equal(firstUpload.created, true);
   assert.equal(retryUpload.created, false);
 	assert.equal(retryUpload.file.key, firstUpload.file.key);
-	assert.equal(env.FILES.files.size, 1);
+	// 重试复用同一行，D1 里只有一条该 clientUploadId 的上传记录
+	assert.equal(
+		database.exec('SELECT COUNT(*) FROM uploaded_files WHERE client_upload_id = ?', [uploadId])[0]
+			.values[0][0],
+		1
+	);
 	const voiceUpload = await saveUploadedFile(
 		env,
 		{ userId: user.id },

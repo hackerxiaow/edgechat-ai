@@ -4,8 +4,6 @@ import { inspectSchema, type SchemaQuery } from './schema-contract.ts';
 // 只依赖实际探测到的能力，便于注入最小替身；D1 的 results 在边界处收窄。
 interface MaintenanceEnv {
   DB?: Pick<D1Database, 'prepare'>;
-  SESSIONS?: Pick<KVNamespace, 'get'>;
-  FILES?: Pick<R2Bucket, 'list'>;
   [key: string]: unknown;
 }
 type CheckStatus = 'ok' | 'error' | 'missing' | 'disabled' | 'blocked';
@@ -65,13 +63,10 @@ export async function runSystemCheck(env: MaintenanceEnv, { timeoutMs = 8000 } =
     }, timeoutMs);
     return [connectivity, schema];
   };
-  const [dbChecks, kv, r2] = await Promise.all([
-    database(),
-    env.SESSIONS ? probe('sessions', async () => { await env.SESSIONS?.get('__edgechat_health__'); return {}; }, timeoutMs) : absent('sessions'),
-    env.FILES ? probe('files', async () => { await env.FILES?.list({ limit: 1 }); return {}; }, timeoutMs) : absent('files', true)
-  ]);
+  const dbChecks = await database();
   const environment = inspectEnvironment(env);
-  const checks: Check[] = [...dbChecks, kv, r2, {
+  // D1 单存储：只探活数据库与必要环境变量，不再有 KV / R2 绑定可查。
+  const checks: Check[] = [...dbChecks, {
     id: 'environment', status: environment.some((item) => item.required && !item.present) ? 'missing' : 'ok',
     code: 'presence_only', durationMs: 0
   }];

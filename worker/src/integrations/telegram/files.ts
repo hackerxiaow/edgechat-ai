@@ -1,11 +1,9 @@
 import {
 	normalizeContentType,
-	safeFilenameExtension,
 	sanitizeFilename,
 } from "../../attachment-metadata.ts";
-import { decryptAttachment, encryptAttachment } from "../../encryption.ts";
+import { decryptAttachment } from "../../encryption.ts";
 import type { AppBindings } from "../../types.ts";
-import { downloadTelegramFile, getTelegramFile } from "./client.ts";
 import type { TelegramAttachmentInput } from "./parser.ts";
 
 export const TELEGRAM_BRIDGE_FILE_LIMIT = 16 * 1024 * 1024;
@@ -18,8 +16,6 @@ export const TELEGRAM_FILE_SKIP_REASON: Readonly<Record<string, TelegramFileSkip
 		STORAGE_UNAVAILABLE: "storage_unavailable",
 		NOT_FOUND: "not_found",
 	});
-
-const FILE_RESPONSE_CACHE_CONTROL = "private, no-store";
 
 /** 消息附件形状；voice/audio 会额外带时长与波形。 */
 export interface MessageAttachmentLike {
@@ -49,25 +45,19 @@ export interface LoadedEdgeChatAttachment {
 	skipReason: TelegramFileSkipReason | null;
 }
 
-function telegramObjectKey({
-	telegramChatId,
-	telegramMessageId,
-	filename,
-}: {
-	telegramChatId: string;
-	telegramMessageId: number;
-	filename: string;
-}): string {
-	const extension = safeFilenameExtension(filename);
-	return `telegram/${telegramChatId}/${telegramMessageId}-${crypto.randomUUID()}${extension}`;
+interface StoredFileRow {
+	filename: string | null;
+	content_type: string | null;
+	data: ArrayBuffer | Uint8Array | null;
 }
 
+/**
+ * D1 单存储下附件正文只能归属到某个本地账号，Telegram 入站消息没有对应的
+ * 本地用户，因此不再导入附件，只保留文本与通知。
+ */
 export async function importTelegramAttachment(
-	env: Pick<AppBindings, "DB" | "FILES">,
+	_env: Pick<AppBindings, "DB">,
 	{
-		botToken,
-		telegramChatId,
-		telegramMessageId,
 		attachment,
 	}: {
 		botToken: string;
@@ -77,55 +67,12 @@ export async function importTelegramAttachment(
 	},
 ): Promise<ImportedTelegramAttachment> {
 	if (!attachment) return { attachment: null, skipReason: null };
-	if (!env.FILES) {
-		return {
-			attachment: null,
-			skipReason: TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE,
-		};
-	}
-	if (attachment.fileSize > TELEGRAM_BRIDGE_FILE_LIMIT) {
-		return { attachment: null, skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE };
-	}
-
-	const telegramFile = await getTelegramFile(botToken, attachment.fileId);
-	const resolvedSize = Number(telegramFile.file_size || attachment.fileSize || 0);
-	if (resolvedSize > TELEGRAM_BRIDGE_FILE_LIMIT) {
-		return { attachment: null, skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE };
-	}
-	const bytes = await downloadTelegramFile(
-		botToken,
-		String(telegramFile.file_path || ""),
-		TELEGRAM_BRIDGE_FILE_LIMIT,
-	);
-	const name = sanitizeFilename(attachment.fileName);
-	const type = normalizeContentType(attachment.mimeType) || "application/octet-stream";
-	const key = telegramObjectKey({ telegramChatId, telegramMessageId, filename: name });
-	// Telegram 只负责传输，正式附件在进入消息前即转换为 EdgeChat 自有加密 R2 对象。
-	const encrypted = await encryptAttachment(env, bytes, key);
-	await env.FILES.put(key, encrypted, {
-		httpMetadata: { contentType: type, cacheControl: FILE_RESPONSE_CACHE_CONTROL },
-		customMetadata: { filename: name, edgechatEncryption: "v1", source: "telegram" },
-	});
-	return {
-		attachment: {
-			key,
-			name,
-			type,
-			size: bytes.byteLength,
-				...(attachment.kind === "voice" || attachment.kind === "audio"
-					? {
-						kind: attachment.kind,
-						durationMs: attachment.durationMs || 0,
-						...(attachment.kind === "voice" ? { waveform: [] } : {}),
-					}
-					: {}),
-		},
-		skipReason: null,
-	};
+	return { attachment: null, skipReason: TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE };
 }
 
+/** 出站方向：EdgeChat 的附件正文存在 D1，直接读出来交给 Telegram。 */
 export async function loadEdgeChatAttachment(
-	env: Pick<AppBindings, "DB" | "FILES">,
+	env: Pick<AppBindings, "DB">,
 	attachment: MessageAttachmentLike | null | undefined,
 ): Promise<LoadedEdgeChatAttachment> {
 	if (!attachment) {
@@ -134,45 +81,38 @@ export async function loadEdgeChatAttachment(
 	if (Number(attachment.size) > TELEGRAM_BRIDGE_FILE_LIMIT) {
 		return { file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE };
 	}
-	if (!env.FILES) {
-		return {
-			file: null,
-			skipReason: TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE,
-		};
-	}
-	const object = await env.FILES.get(attachment.key);
-	if (!object) {
+
+	const row = await env.DB.prepare(
+		"SELECT filename, content_type, data FROM uploaded_files WHERE object_key = ? LIMIT 1",
+	)
+		.bind(String(attachment.key))
+		.first<StoredFileRow>();
+	if (!row?.data) {
 		return { file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.NOT_FOUND };
 	}
-	const decrypted = await decryptAttachment(env, await object.arrayBuffer(), attachment.key);
-	if (decrypted.bytes.byteLength > TELEGRAM_BRIDGE_FILE_LIMIT) {
+
+	const raw = row.data instanceof Uint8Array ? row.data : new Uint8Array(row.data);
+	// 附件正文在 D1 里是绑定对象键的加密信封，发送前解密。
+	const { bytes } = await decryptAttachment(env, raw, String(attachment.key));
+	if (bytes.byteLength > TELEGRAM_BRIDGE_FILE_LIMIT) {
 		return { file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE };
 	}
+
 	return {
 		file: {
-			bytes: decrypted.bytes,
+			bytes,
 			name: sanitizeFilename(attachment.name),
-				type: normalizeContentType(attachment.type) || "application/octet-stream",
-				size: decrypted.bytes.byteLength,
-				kind: attachment.kind,
-				durationMs: Number(attachment.durationMs || 0),
-			},
+			type: normalizeContentType(attachment.type) || "application/octet-stream",
+			size: bytes.byteLength,
+			kind: attachment.kind,
+			durationMs: Number(attachment.durationMs || 0),
+		},
 		skipReason: null,
 	};
 }
 
+/** 入站附件不再落库，因此没有需要回收的孤儿对象。 */
 export async function deleteImportedTelegramAttachment(
-	env: Pick<AppBindings, "DB" | "FILES">,
-	attachment: MessageAttachmentLike | null | undefined,
-): Promise<void> {
-	if (!attachment?.key || !env.FILES) return;
-	try {
-		await env.FILES.delete(attachment.key);
-	} catch (error) {
-		console.warn(JSON.stringify({
-			message: "telegram orphan attachment delete failed",
-			objectKey: attachment.key,
-			error: error instanceof Error ? error.message : String(error),
-		}));
-	}
-}
+	_env: Pick<AppBindings, "DB">,
+	_attachment: MessageAttachmentLike | null | undefined,
+): Promise<void> {}

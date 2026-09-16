@@ -4,7 +4,7 @@ const encoder = new TextEncoder();
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-type SessionEnv = Pick<AppBindings, 'DB' | 'SESSIONS'>;
+type SessionEnv = Pick<AppBindings, 'DB'>;
 
 /** createSession 需要的最小用户形状，data/users.ts 的 UserRow 满足它。 */
 export interface SessionUserInput {
@@ -124,22 +124,14 @@ export async function putSession(
   session: SessionUser,
   { ttlSeconds = SESSION_TTL_SECONDS }: { ttlSeconds?: number } = {},
 ): Promise<void> {
-  if (env.DB) {
-    const ttl = resolveSessionTtl(session, ttlSeconds);
-    const expiresAt = Math.floor(Date.now() / 1000) + ttl;
-    const data = JSON.stringify(session);
-    await env.DB.prepare(
-      `INSERT INTO sessions (token, user_id, data, expires_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(token) DO UPDATE SET data = excluded.data, expires_at = excluded.expires_at`
-    ).bind(session.token, Number(session.userId), data, expiresAt).run();
-    return;
-  }
-  if (env.SESSIONS) {
-    await env.SESSIONS.put(session.token, JSON.stringify(session), {
-      expirationTtl: resolveSessionTtl(session, ttlSeconds)
-    });
-  }
+  const ttl = resolveSessionTtl(session, ttlSeconds);
+  const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+  const data = JSON.stringify(session);
+  await env.DB.prepare(
+    `INSERT INTO sessions (token, user_id, data, expires_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(token) DO UPDATE SET data = excluded.data, expires_at = excluded.expires_at`
+  ).bind(session.token, Number(session.userId), data, expiresAt).run();
 }
 
 export async function createSession(env: SessionEnv, user: SessionUserInput): Promise<SessionUser> {
@@ -164,42 +156,25 @@ export async function getSession(env: SessionEnv, token: string): Promise<Sessio
   if (!token) {
     return null;
   }
-  if (env.DB) {
-    const now = Math.floor(Date.now() / 1000);
-    const row = await env.DB.prepare(
-      'SELECT data, expires_at FROM sessions WHERE token = ? LIMIT 1'
-    ).bind(token).first<{ data: string; expires_at: number }>();
-    if (!row) return null;
-    if (row.expires_at < now) {
-      await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-      return null;
-    }
-    const session = JSON.parse(row.data) as SessionUser;
-    session.token = token;
-    if (session.sessionVersion === undefined) session.sessionVersion = 0;
-    if (session.isAdmin === undefined) session.isAdmin = false;
-    return session;
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    'SELECT data, expires_at FROM sessions WHERE token = ? LIMIT 1'
+  ).bind(token).first<{ data: string; expires_at: number }>();
+  if (!row) return null;
+  if (row.expires_at < now) {
+    await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+    return null;
   }
-  if (env.SESSIONS) {
-    const raw = await env.SESSIONS.get(token);
-    if (!raw) return null;
-    const session = JSON.parse(raw) as SessionUser;
-    session.token = token;
-    if (session.sessionVersion === undefined) session.sessionVersion = 0;
-    if (session.isAdmin === undefined) session.isAdmin = false;
-    return session;
-  }
-  return null;
+  const session = JSON.parse(row.data) as SessionUser;
+  session.token = token;
+  if (session.sessionVersion === undefined) session.sessionVersion = 0;
+  if (session.isAdmin === undefined) session.isAdmin = false;
+  return session;
 }
 
 export async function deleteSession(env: SessionEnv, token: string): Promise<void> {
   if (!token) {
     return;
   }
-  if (env.DB) {
-    await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-  }
-  if (env.SESSIONS) {
-    await env.SESSIONS.delete(token);
-  }
+  await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
 }

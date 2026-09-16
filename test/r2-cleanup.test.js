@@ -28,6 +28,70 @@ function insertUser(database, username, { deleted = false } = {}) {
 	return Number(database.exec("SELECT last_insert_rowid()")[0].values[0][0]);
 }
 
+/**
+ * D1 单存储下 GC 删除的是 uploaded_files 里的行，旧测试观察的 R2 delete 换成
+ * 包装 D1 的 run()：可以记录被删的 key，也可以模拟删除失败。
+ * 包装后的语句要保留 inner/sql，否则外层计量与失败注入都拿不到原始语句。
+ */
+function withDeleteBehaviour(db, { deleted = null, fail = false } = {}) {
+	return {
+		prepare(sql) {
+			const statement = db.prepare(sql);
+			const isDelete = /DELETE\s+FROM\s+uploaded_files/i.test(String(sql));
+			const guard = () => {
+				if (fail) throw new Error("simulated D1 delete outage");
+			};
+			const wrap = (bound) => {
+				if (!isDelete) return bound;
+				return {
+					// 批次执行时外层用的是 inner 语句，注入点必须同时覆盖两条路径。
+					...(bound.inner === undefined
+						? {}
+						: {
+								inner: {
+									all: () => bound.inner.all(),
+									first: (column) => bound.inner.first(column),
+									async run() {
+										guard();
+										return bound.inner.run();
+									}
+								}
+							}),
+					...(bound.sql === undefined ? {} : { sql: bound.sql }),
+					async all() {
+						return bound.all();
+					},
+					async first(column) {
+						return bound.first(column);
+					},
+					async run() {
+						guard();
+						return bound.run();
+					}
+				};
+			};
+			return {
+				...(statement.inner === undefined ? {} : { inner: statement.inner }),
+				...(statement.sql === undefined ? {} : { sql: statement.sql }),
+				async all() {
+					return statement.all();
+				},
+				async first(column) {
+					return statement.first(column);
+				},
+				async run() {
+					return statement.run();
+				},
+				bind(...values) {
+					if (isDelete && deleted) deleted.push(values[0]);
+					return wrap(statement.bind(...values));
+				}
+			};
+		},
+		...(typeof db.batch === "function" ? { batch: (statements) => db.batch(statements) } : {})
+	};
+}
+
 function scalar(database, sql) {
 	return Number(database.exec(sql)[0]?.values?.[0]?.[0] || 0);
 }
@@ -95,13 +159,7 @@ test("孤儿扫描使用匹配索引，失败对象进入退避且不阻塞后�
 	);
 	const attempts = [];
 	await runScheduledGc({
-		DB: createD1Adapter(database),
-		FILES: {
-			async delete(key) {
-				attempts.push(key);
-				throw new Error("simulated R2 outage");
-			},
-		},
+		DB: withDeleteBehaviour(createD1Adapter(database), { deleted: attempts, fail: true }),
 		GC_BATCH_SIZE: 2,
 		GC_MAX_BATCHES_PER_RUN: 3,
 		ORPHAN_UPLOAD_RETENTION_DAYS: 1,
@@ -148,8 +206,7 @@ test("R2 删除后 D1 完成批次失败时保留任务并写入退避", async (
 
 	const deleted = [];
 	const summary = await runScheduledGc({
-		DB: measured.db,
-		FILES: { async delete(key) { deleted.push(key); } },
+		DB: withDeleteBehaviour(measured.db, { deleted }),
 		GC_BATCH_SIZE: 1,
 		GC_MAX_BATCHES_PER_RUN: 1,
 	});
@@ -246,8 +303,7 @@ test("GC 完成删除并移除占位后，旧请求不能写入失效的本地�
 
 	const deleted = [];
 	await runScheduledGc({
-		DB: createD1Adapter(database),
-		FILES: { async delete(key) { deleted.push(key); } },
+		DB: withDeleteBehaviour(createD1Adapter(database), { deleted }),
 		GC_BATCH_SIZE: 1,
 		GC_MAX_BATCHES_PER_RUN: 2,
 	});
@@ -404,8 +460,7 @@ test("GC 在共享预算内轮转多个步骤，失败后保留任务并可在�
 
 	const measured = createMeasuredD1(database);
 	const env = {
-		DB: measured.db,
-		FILES: { async delete() { throw new Error("R2 unavailable"); } },
+		DB: withDeleteBehaviour(measured.db, { fail: true }),
 		GC_BATCH_SIZE: 500,
 		GC_MAX_BATCHES_PER_RUN: 20,
 		GC_INTERNAL_OPERATION_BUDGET: 45,
@@ -451,8 +506,7 @@ test("重复发现已经排队的对象不会重置未来重试时间", async ()
 		"SELECT retry_count, next_retry_at FROM pending_r2_delete WHERE object_key = '1/future'",
 	)[0].values[0];
 	await runScheduledGc({
-		DB: createD1Adapter(database),
-		FILES: { async delete() { throw new Error("must not run"); } },
+		DB: withDeleteBehaviour(createD1Adapter(database), { fail: true }),
 	});
 	const after = database.exec(
 		"SELECT retry_count, next_retry_at FROM pending_r2_delete WHERE object_key = '1/future'",
@@ -494,7 +548,7 @@ test("硬删除用户前先持久化其 R2 清理任务", async () => {
 	};
 
 	await assert.rejects(
-		runScheduledGc({ DB: failingDb, FILES: { async delete() {} } }),
+		runScheduledGc({ DB: failingDb }),
 		/simulated metadata delete failure/,
 	);
 	assert.equal(
@@ -519,7 +573,6 @@ test("GC 可以清理从正常建号流程进入 general 的软删用户", async
 	);
 	const summary = await runScheduledGc({
 		DB: createD1Adapter(database),
-		FILES: { async delete() {} },
 	});
 	assert.equal(summary.usersDeleted, 1);
 	assert.equal(scalar(database, `SELECT COUNT(*) FROM users WHERE id = ${userId}`), 0);

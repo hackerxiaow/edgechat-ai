@@ -2,7 +2,7 @@ import type { AppBindings, SessionUser } from './types.ts';
 import { deleteSession, getSession, isAdminUser, putSession } from './auth.ts';
 import { isUserDisabled } from './user-status.ts';
 
-type SessionEnv = Pick<AppBindings, 'DB' | 'SESSIONS'>;
+type SessionEnv = Pick<AppBindings, 'DB'>;
 
 export type SessionValidationResult =
   | { ok: false; status: number; message: string }

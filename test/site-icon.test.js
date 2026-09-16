@@ -16,6 +16,12 @@ import { createD1Adapter } from "./support/d1.js";
 const SQL = await initSqlJs();
 const schemaSql = readFileSync(new URL("../worker/schema.sql", import.meta.url), "utf8");
 
+/** D1 单存储下 GC 删除的是 uploaded_files 里的行，测试直接观察行是否还在。 */
+function countUploadedFiles(database, objectKey) {
+	return database.exec("SELECT COUNT(*) FROM uploaded_files WHERE object_key = ?", [objectKey])[0]
+		.values[0][0];
+}
+
 function createHarness(key = "1/icon.png") {
 	const database = new SQL.Database();
 	database.exec(schemaSql);
@@ -101,12 +107,9 @@ test("本站完整 URL 保存为原子保护的本地 key，外链不阻止无�
 		)[0].values[0][0],
 		"r2:1/icon.png",
 	);
-	const localDeletes = [];
-	await runScheduledGc({
-		DB: local.db,
-		FILES: { async delete(key) { localDeletes.push(key); } },
-	});
-	assert.deepEqual(localDeletes, []);
+	await runScheduledGc({ DB: local.db });
+	// 站点图标仍被引用，孤儿清理不会删掉这一行
+	assert.equal(countUploadedFiles(local.database, "1/icon.png"), 1);
 
 	const external = createHarness("1/orphan.png");
 	await updateSiteSettings(external.db, {
@@ -118,12 +121,9 @@ test("本站完整 URL 保存为原子保护的本地 key，外链不阻止无�
 		siteName: "Edgechat",
 		siteIconUrl: "https://cdn.example/icon.png",
 	});
-	const externalDeletes = [];
-	await runScheduledGc({
-		DB: external.db,
-		FILES: { async delete(key) { externalDeletes.push(key); } },
-	});
-	assert.deepEqual(externalDeletes, ["1/orphan.png"]);
+	await runScheduledGc({ DB: external.db });
+	// 外链站点图标不引用本地 key，孤儿行会被清掉
+	assert.equal(countUploadedFiles(external.database, "1/orphan.png"), 0);
 });
 
 test("可信 origin 已配置时，外域 /files/ URL 不会保护同名本地孤儿", async () => {
@@ -131,13 +131,11 @@ test("可信 origin 已配置时，外域 /files/ URL 不会保护同名本地�
 	external.database.run(
 		"UPDATE site_settings SET setting_value = 'https://cdn.example/files/1%2Ficon.png' WHERE setting_key = 'site_icon_url'",
 	);
-	const deleted = [];
 	await runScheduledGc({
 		DB: external.db,
-		FILES: { async delete(key) { deleted.push(key); } },
 		SITE_ORIGINS: "https://chat.example",
 	});
-	assert.deepEqual(deleted, ["1/icon.png"]);
+	assert.equal(countUploadedFiles(external.database, "1/icon.png"), 0);
 });
 
 test("站点图标写入在 pending 阶段和删除完成后都拒绝失效 key", async () => {

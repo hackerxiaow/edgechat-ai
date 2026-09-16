@@ -12,6 +12,51 @@ import { createD1Adapter } from "./support/d1.js";
 
 const SQL = await initSqlJs();
 
+/**
+ * D1 单存储下 GC 删除的是 uploaded_files 里的行。这里包装 D1：记录被删的 key，
+ * 并允许按需模拟删除失败（原先是注入 env.FILES.delete 抛错）。
+ */
+function createAttachmentStore(database, { deleted = [], fail = () => false } = {}) {
+	const db = createD1Adapter(database);
+	return {
+		prepare(sql) {
+			const statement = db.prepare(sql);
+			const isDelete = /DELETE\s+FROM\s+uploaded_files/i.test(String(sql));
+			return {
+				async all() {
+					return statement.all();
+				},
+				async first(column) {
+					return statement.first(column);
+				},
+				async run() {
+					return statement.run();
+				},
+				bind(...values) {
+					if (!isDelete) return statement.bind(...values);
+					const bound = statement.bind(...values);
+					return {
+						async all() {
+							return bound.all();
+						},
+						async first(column) {
+							return bound.first(column);
+						},
+						async run() {
+							if (fail()) throw new Error("simulated D1 delete outage");
+							const result = await bound.run();
+							// 只有真正删掉的行才算已清理。
+							deleted.push(values[0]);
+							return result;
+						},
+					};
+				},
+			};
+		},
+		batch: (statements) => db.batch(statements),
+	};
+}
+
 function createHarness(isAdmin = false) {
 	const database = new SQL.Database();
 	database.exec(readFileSync(new URL("../worker/schema.sql", import.meta.url), "utf8"));
@@ -20,9 +65,12 @@ function createHarness(isAdmin = false) {
 		 VALUES (1, 'owner', 'Owner', 'hash', 'salt'), (2, 'member', 'Member', 'hash', 'salt')`,
 	);
 	const deletedFiles = [];
+	const failures = { delete: false };
 	const env = {
-		DB: createD1Adapter(database),
-		FILES: { async delete(key) { deletedFiles.push(key); } },
+		DB: createAttachmentStore(database, {
+			deleted: deletedFiles,
+			fail: () => failures.delete,
+		}),
 	};
 	const app = new Hono();
 	app.use("*", async (c, next) => {
@@ -35,7 +83,7 @@ function createHarness(isAdmin = false) {
 	));
 	registerChannelRoutes(app);
 	return {
-		database, env, deletedFiles,
+		database, env, deletedFiles, failures,
 		async request(path, method, payload) {
 			return app.fetch(new Request(`https://example.com${path}`, {
 				method,
@@ -137,7 +185,7 @@ test("删除入口拒绝普通成员，底层不会删除 general 或私聊", as
 
 test("GC 复用硬删除清理历史群组，文件失败重试且保留共享引用", async () => {
 	const harness = createHarness();
-	const { database, env, deletedFiles } = harness;
+	const { database, env, deletedFiles, failures } = harness;
 	const id = await createGroup(harness);
 	addRelatedRecords(database, id);
 	database.run("UPDATE channels SET deleted_at = datetime('now', '-61 day') WHERE id = ?", [id]);
@@ -145,16 +193,20 @@ test("GC 复用硬删除清理历史群组，文件失败重试且保留共享�
 		"UPDATE uploaded_files SET owner_user_id = 2 WHERE object_key = 'group-avatar'",
 	);
 	database.run("UPDATE users SET avatar_key = 'group-avatar' WHERE id = 2");
-	const deleteFile = env.FILES.delete;
-	env.FILES.delete = async () => { throw new Error("R2 unavailable"); };
+	failures.delete = true;
 	const summary = await runScheduledGc(env);
 	assert.equal(summary.channelsDeleted, 1);
 	assert.equal(count(database, "channels", `id = ${id}`), 0);
 	assert.equal(count(database, "message_reads", `channel_id = ${id}`), 0);
+	// 头像仍被 user 2 引用 → 直接摘掉占位；历史附件删除失败 → 保留一条退避任务。
 	assert.equal(count(database, "pending_r2_delete"), 1);
 	assert.equal(count(database, "pending_r2_delete", "object_key = 'group-file' AND retry_count = 1"), 1);
+	assert.equal(summary.retryQueueSkippedReferenced, 1);
+	assert.equal(summary.r2DeleteFailed, 1);
 	assert.equal(count(database, "uploaded_files"), 2);
-	env.FILES.delete = deleteFile;
+	assert.deepEqual(deletedFiles, []);
+
+	failures.delete = false;
 	database.run("UPDATE pending_r2_delete SET next_retry_at = CURRENT_TIMESTAMP");
 	await runScheduledGc(env);
 	assert.deepEqual(deletedFiles, ["group-file"]);

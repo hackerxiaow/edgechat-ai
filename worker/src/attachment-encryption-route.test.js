@@ -11,7 +11,14 @@ const keyring = JSON.stringify({
   }
 });
 
-function fileDb({ accessible, metadata = true, data = null }) {
+function fileDb({
+  accessible,
+  metadata = true,
+  data = null,
+  filename = '报告.bin',
+  contentType = 'application/octet-stream',
+  onDataRead = null
+}) {
   return {
     prepare(sql) {
       return {
@@ -20,17 +27,16 @@ function fileDb({ accessible, metadata = true, data = null }) {
             async all() {
               if (sql.includes('SELECT filename, content_type, size')) {
                 return metadata
-                  ? { results: [{ filename: '报告.bin', content_type: 'application/octet-stream', size: 4 }] }
+                  ? { results: [{ filename, content_type: contentType, size: 4 }] }
                   : { results: [] };
               }
               return { results: accessible ? [{ found: 1 }] : [] };
             },
-            // 纯 D1 部署把附件正文存在 uploaded_files.data，下载走 first()。
+            // D1 单存储：附件正文存在 uploaded_files.data，下载走 first()。
             async first() {
               if (!sql.includes('SELECT filename, content_type, data')) return null;
-              return data
-                ? { filename: '报告.bin', content_type: 'application/octet-stream', data }
-                : null;
+              onDataRead?.();
+              return data ? { filename, content_type: contentType, data } : null;
             }
           };
         }
@@ -64,21 +70,10 @@ test('attachment upload reports when the deployment has no storage binding', asy
   });
 });
 
-test('authorized attachment download decrypts bytes and disables shared caching', async () => {
+test('authorized attachment download decrypts bytes and caches privately', async () => {
   const objectKey = '42/example.bin';
   const plaintext = Uint8Array.from([1, 2, 3, 4]);
   const ciphertext = await encryptAttachment(keyring, plaintext, objectKey);
-  const object = {
-    uploaded: new Date('2026-08-10T00:00:00Z'),
-    customMetadata: {},
-    async arrayBuffer() {
-      return ciphertext.buffer;
-    },
-    writeHttpMetadata(headers) {
-      headers.set('content-type', 'application/octet-stream');
-      headers.set('cache-control', 'public, max-age=31536000');
-    }
-  };
   const app = new Hono();
   registerUploadRoutes(app);
 
@@ -86,24 +81,21 @@ test('authorized attachment download decrypts bytes and disables shared caching'
     `https://edgechat.test/files/${objectKey}`,
     {},
     {
-      DB: fileDb({ accessible: true }),
-      FILES: {
-        async get() {
-          return object;
-        }
-      },
+      DB: fileDb({ accessible: true, data: ciphertext }),
       EDGECHAT_ENCRYPTION_KEYRING: keyring
     }
   );
 
   assert.equal(response.status, 200);
   assert.deepEqual(new Uint8Array(await response.arrayBuffer()), plaintext);
-  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  // 受权限保护的附件只允许浏览器私有缓存。
+  assert.equal(response.headers.get('cache-control'), 'private, max-age=31536000, immutable');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.match(response.headers.get('content-disposition'), /%E6%8A%A5%E5%91%8A\.bin/);
 });
 
-test('unauthorized attachment download is rejected before reading R2', async () => {
-  let r2Read = false;
+test('unauthorized attachment download is rejected before reading stored bytes', async () => {
+  let dataRead = false;
   const app = new Hono();
   registerUploadRoutes(app);
 
@@ -111,26 +103,26 @@ test('unauthorized attachment download is rejected before reading R2', async () 
     'https://edgechat.test/files/42/private.bin',
     {},
     {
-      DB: fileDb({ accessible: false }),
-      FILES: {
-        async get() {
-          r2Read = true;
-          return null;
+      DB: fileDb({
+        accessible: false,
+        data: Uint8Array.from([1]),
+        onDataRead() {
+          dataRead = true;
         }
-      },
+      }),
       EDGECHAT_ENCRYPTION_KEYRING: keyring
     }
   );
 
   assert.equal(response.status, 403);
-  assert.equal(r2Read, false);
+  assert.equal(dataRead, false);
 });
 
-test('attachment download falls back to D1 when the deployment has no R2 binding', async () => {
+test('attachment download reads bytes from D1 and 404s when no body was stored', async () => {
   const app = new Hono();
   registerUploadRoutes(app);
 
-  // 纯 D1 部署：uploaded_files.data 为空说明该文件从未落库，按 404 处理。
+  // data 为空说明该文件从未落库（例如 Telegram 入站附件不再导入）。
   const missing = await app.request(
     'https://edgechat.test/files/42/private.bin',
     {},
@@ -138,7 +130,7 @@ test('attachment download falls back to D1 when the deployment has no R2 binding
   );
   assert.equal(missing.status, 404);
 
-  // 正文存在 D1 时直接回吐字节，并按不可变内容缓存。
+  // 历史明文行（非加密信封）按原样返回。
   const stored = Uint8Array.from([9, 8, 7]);
   const served = await app.request(
     'https://edgechat.test/files/42/private.bin',
@@ -147,8 +139,6 @@ test('attachment download falls back to D1 when the deployment has no R2 binding
   );
   assert.equal(served.status, 200);
   assert.deepEqual(new Uint8Array(await served.arrayBuffer()), stored);
-  assert.equal(served.headers.get('cache-control'), 'public, max-age=31536000, immutable');
-  assert.equal(served.headers.get('x-content-type-options'), 'nosniff');
 });
 
 test('telegram attachment downloads through message authorization without uploaded file ownership', async () => {
@@ -162,20 +152,13 @@ test('telegram attachment downloads through message authorization without upload
     `https://edgechat.test/files/${encodeURIComponent(objectKey)}`,
     {},
     {
-      DB: fileDb({ accessible: true, metadata: false }),
-      FILES: {
-        async get() {
-          return {
-            customMetadata: { filename: 'telegram-photo.jpg' },
-            async arrayBuffer() {
-              return ciphertext.buffer;
-            },
-            writeHttpMetadata(headers) {
-              headers.set('content-type', 'image/jpeg');
-            }
-          };
-        }
-      },
+      DB: fileDb({
+        accessible: true,
+        metadata: false,
+        data: ciphertext,
+        filename: 'telegram-photo.jpg',
+        contentType: 'image/jpeg'
+      }),
       EDGECHAT_ENCRYPTION_KEYRING: keyring
     }
   );

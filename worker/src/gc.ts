@@ -2,8 +2,8 @@ import { hardDeleteChannels } from "./data/channel-deletion.ts";
 import { classifyStoredSiteIcon } from "./site-icon.ts";
 import type { AppBindings } from "./types.ts";
 
-/** GC 只依赖 D1 与可选的 R2，其余读取自 env 字符串变量。 */
-type GcEnv = Pick<AppBindings, "DB" | "FILES"> & Record<string, unknown>;
+/** GC 只依赖 D1，其余读取自 env 字符串变量。 */
+type GcEnv = Pick<AppBindings, "DB"> & Record<string, unknown>;
 
 interface GcConfig {
 	messageRetentionDays: number;
@@ -165,14 +165,17 @@ function getGcConfig(env: GcEnv): GcConfig {
 	};
 }
 
+/**
+ * 附件删除预算：历史上对应 R2 对象操作，D1 单存储后用来限制每次 GC 尝试删除的附件数量，
+ * 避免一次请求把整张 uploaded_files 扫空。内部操作与 D1 语句预算只统计真实的 D1 调用。
+ */
 function createExecutionBudget(config: GcConfig): GcBudget {
 	const used = { d1ApiCalls: 0, d1Statements: 0, r2Operations: 0 };
 	let exhausted = false;
 
 	function canSpend({ d1ApiCalls = 0, d1Statements = 0, r2Operations = 0 }: GcBudgetCost = {}): boolean {
 		return (
-			used.d1ApiCalls + used.r2Operations + d1ApiCalls + r2Operations <=
-				config.internalOperationBudget &&
+			used.d1ApiCalls + d1ApiCalls <= config.internalOperationBudget &&
 			used.d1Statements + d1Statements <= config.d1StatementBudget &&
 			used.r2Operations + r2Operations <= config.r2OperationBudget
 		);
@@ -191,7 +194,7 @@ function createExecutionBudget(config: GcConfig): GcBudget {
 			return true;
 		},
 		remainingInternalOperations() {
-			return config.internalOperationBudget - used.d1ApiCalls - used.r2Operations;
+			return config.internalOperationBudget - used.d1ApiCalls;
 		},
 		remainingD1Statements() {
 			return config.d1StatementBudget - used.d1Statements;
@@ -205,7 +208,7 @@ function createExecutionBudget(config: GcConfig): GcBudget {
 		snapshot() {
 			return {
 				...used,
-				internalOperations: used.d1ApiCalls + used.r2Operations,
+				internalOperations: used.d1ApiCalls,
 				exhausted,
 				limits: {
 					internalOperations: config.internalOperationBudget,
@@ -342,6 +345,10 @@ async function removePendingR2DeleteKeys(db: D1Database, keys: string[], budget:
 	return resultChanges(result);
 }
 
+/**
+ * D1 单存储下「删除对象」就是删掉 uploaded_files 的那一行，并与清掉待删占位放在同一个
+ * 批次里：两者要么一起生效，要么一起回滚，避免删除成功却留下占位或反过来。
+ */
 async function completeR2Delete(db: D1Database, key: string, budget: GcBudget) {
 	if (!budget.spend({ d1ApiCalls: 1, d1Statements: 2 })) return false;
 	await db.batch([
@@ -374,9 +381,6 @@ async function markR2RetryFailure(db: D1Database, key: string, retryCount: numbe
 
 async function processR2Rows(env: GcEnv, config: GcConfig, summary: GcSummary, rows: GcRow[], siteIconKey: string | null, budget: GcBudget) {
 	if (!rows.length) return false;
-	// 没有绑定 R2 的部署没有可删对象，直接跳过，避免 env.FILES 为空时抛错。
-	const files = env.FILES;
-	if (!files) return false;
 	const referenced = await findReferencedKeys(
 		env.DB,
 		rows.map((row) => String(row.object_key)),
@@ -396,7 +400,8 @@ async function processR2Rows(env: GcEnv, config: GcConfig, summary: GcSummary, r
 	for (const row of rows) {
 		const key = String(row.object_key || "");
 		if (!key || referenced.has(key)) continue;
-		// R2 成功后若 D1 完成批次失败，还要保留一次写回退避状态的余量。
+		// 最坏情况：删除批次用掉 1 次调用/2 条语句，失败后写回退避再用掉 1 次调用/1 条语句。
+		// 预算不足时必须停下来，否则删除成功却写不进退避状态会丢掉重试机会。
 		const worstCaseCost = { d1ApiCalls: 2, d1Statements: 3, r2Operations: 1 };
 		if (!budget.canSpend(worstCaseCost)) {
 			budget.markExhausted();
@@ -406,7 +411,6 @@ async function processR2Rows(env: GcEnv, config: GcConfig, summary: GcSummary, r
 		budget.spend({ r2Operations: 1 });
 		progressed = true;
 		try {
-			await files.delete(key);
 			const completed = await completeR2Delete(env.DB, key, budget);
 			if (!completed) {
 				budget.markExhausted();
@@ -436,11 +440,12 @@ async function processR2Rows(env: GcEnv, config: GcConfig, summary: GcSummary, r
 }
 
 async function runRetryQueueStep(env: GcEnv, config: GcConfig, summary: GcSummary, siteIconKey: string | null, budget: GcBudget) {
+	// 单条待删记录最坏花掉 2 次 D1 调用与 3 条语句，另外给本次查询本身留 4 个单位。
 	const capacity = Math.min(
 		config.batchSize,
 		budget.remainingR2Operations(),
-		Math.floor((budget.remainingInternalOperations() - 3) / 3),
-		Math.floor((budget.remainingD1Statements() - 3) / 3),
+		Math.floor((budget.remainingInternalOperations() - 4) / 2),
+		Math.floor((budget.remainingD1Statements() - 4) / 3),
 	);
 	if (capacity <= 0) {
 		budget.markExhausted();

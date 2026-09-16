@@ -260,8 +260,7 @@ export function registerV1Routes(app: Hono<AppEnv>) {
   });
 
   app.post('/api/v1/uploads', authMiddleware, async (c) => {
-    // 与网页端一致：没有 R2 时附件正文落进 D1，只有两者都缺失才算不可用。
-    if (!c.env.FILES && !c.env.DB) {
+    if (!c.env.DB) {
       return v1ErrorResponse('attachments_unavailable', '存储服务不可用，无法上传附件', 503);
     }
     const maxFileSize = Number(c.env.MAX_FILE_SIZE || 20971520);

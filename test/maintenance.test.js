@@ -13,42 +13,28 @@ test("environment exposes presence only, never secret values", () => {
   assert.equal(result.find((x) => x.required).present, true);
 });
 
-test("system check isolates errors, timeouts, and optional R2", async () => {
-  const result = await runSystemCheck({ DB: okDb, SESSIONS: { get: async () => { throw new Error("token leak"); } }, FILES: { list: async () => [] } }, { timeoutMs: 10 });
-  assert.equal(result.checks.find((x) => x.id === "sessions").code, "request_failed");
-  assert.equal(result.checks.find((x) => x.id === "d1").status, "ok");
-  assert.equal(JSON.stringify(result).includes("token leak"), false);
-  const missing = await runSystemCheck({ DB: okDb }, { timeoutMs: 1 });
-  assert.equal(missing.checks.find((x) => x.id === "files").status, "disabled");
+test("system check isolates database failures and timeouts", async () => {
+  const failing = await runSystemCheck({ DB: { prepare: () => { throw new Error("token leak"); } } }, { timeoutMs: 10 });
+  assert.equal(failing.checks.find((x) => x.id === "d1").code, "request_failed");
+  assert.equal(failing.checks.find((x) => x.id === "schema").status, "blocked");
+  assert.equal(JSON.stringify(failing).includes("token leak"), false);
 });
 
-test("system check reports no Durable Object probes on the D1-only deployment", async () => {
+test("system check reports only D1, schema and environment on the D1-only deployment", async () => {
   const result = await runSystemCheck({ DB: okDb }, { timeoutMs: 5 });
   const ids = result.checks.map((check) => check.id);
-  for (const retired of ["channelRoom", "userInbox", "scheduler"]) {
+  assert.deepEqual(ids, ["d1", "schema", "environment"]);
+  // 不再有 KV / R2 / Durable Object 的探活项。
+  for (const retired of ["sessions", "files", "channelRoom", "userInbox", "scheduler"]) {
     assert.equal(ids.includes(retired), false);
   }
-  assert.deepEqual(ids, ["d1", "schema", "sessions", "files", "environment"]);
-});
-
-test("system probes use fixed KV key and R2 limit one, and do not read payloads", async () => {
-  let key; let options; let read = false;
-  const result = await runSystemCheck({
-    DB: okDb,
-    SESSIONS: { get: async (value) => { key = value; return { secret: "must-not-be-read" }; } },
-    FILES: { list: async (value) => { options = value; return { objects: [], truncated: false }; } }
-  }, { timeoutMs: 10 });
-  read = JSON.stringify(result).includes("must-not-be-read");
-  assert.equal(key, "__edgechat_health__");
-  assert.deepEqual(options, { limit: 1 });
-  assert.equal(read, false);
 });
 
 test("real auth and admin middleware return 401, 403, and allow admins", async () => {
   const app = new Hono();
   app.use("/api/admin/*", authMiddleware, adminMiddleware);
   registerMaintenanceRoutes(app);
-  // 会话已从 KV 迁到 D1 的 sessions 表，夹具按 D1 建模。
+  // 会话存在 D1 的 sessions 表，夹具按 D1 建模。
   const dbFor = (isAdmin, session) => ({
     prepare(sql) {
       return {
@@ -78,5 +64,5 @@ test("real auth and admin middleware return 401, 403, and allow admins", async (
   const response = await app.request("/api/admin/maintenance", { headers: { Authorization: "Bearer token" } }, adminEnv);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
-  assert.equal((await response.json()).checks.length, 5);
+  assert.equal((await response.json()).checks.length, 3);
 });

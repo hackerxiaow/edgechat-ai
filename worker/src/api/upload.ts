@@ -3,7 +3,6 @@ import type { AppEnv, SessionUser } from '../types.ts';
 import {
   canAccessFile,
   getUploadedFileByClientId,
-  getUploadedFileMetadata,
   recordUploadedFile
 } from '../data/uploaded-files.ts';
 import { decryptAttachment, encryptAttachment } from '../encryption.ts';
@@ -11,7 +10,6 @@ import { normalizeContentType, sanitizeFilename } from '../attachment-metadata.t
 import { validateSession } from '../session.ts';
 import { errorResponse, requestBodyTooLarge } from '../utils.ts';
 
-const FILE_RESPONSE_CACHE_CONTROL = 'private, no-store';
 const UPLOAD_BODY_OVERHEAD_BYTES = 1024 * 1024;
 const BLOCKED_MIME_TYPES = new Set([
   'text/html',
@@ -23,7 +21,7 @@ const BLOCKED_MIME_TYPES = new Set([
   'application/xml'
 ]);
 
-type UploadEnv = Pick<AppEnv['Bindings'], 'DB' | 'FILES' | 'MAX_FILE_SIZE' | 'ALLOWED_FILE_TYPES'>;
+type UploadEnv = Pick<AppEnv['Bindings'], 'DB' | 'MAX_FILE_SIZE' | 'ALLOWED_FILE_TYPES'>;
 
 interface StoredFileRow {
   filename: string | null;
@@ -83,7 +81,7 @@ function validateUpload(env: UploadEnv, file: File): void {
 
 export function registerUploadRoutes(app: Hono<AppEnv>) {
   app.post('/api/upload', async (c) => {
-    if (!c.env.FILES && !c.env.DB) {
+    if (!c.env.DB) {
       return errorResponse('存储服务不可用，无法上传附件', 503);
     }
 
@@ -122,63 +120,34 @@ export function registerUploadRoutes(app: Hono<AppEnv>) {
     if (!canRead) {
       return new Response('Forbidden', { status: 403 });
     }
-    // 优先从 R2 获取，若无 R2 或 R2 无此文件，从 D1 读取
-    const object = c.env.FILES ? await c.env.FILES.get(key) : null;
-    const fileMetadata = await getUploadedFileMetadata(c.env.DB, key);
-
-    if (!object) {
-      const d1File = await c.env.DB.prepare(
-        'SELECT filename, content_type, data FROM uploaded_files WHERE object_key = ? LIMIT 1'
-      ).bind(key).first<StoredFileRow>();
-      if (!d1File?.data) {
-        return new Response('Not Found', { status: 404 });
-      }
-      const headers = new Headers();
-      const contentType = normalizeContentType(d1File.content_type) || 'application/octet-stream';
-      headers.set('content-type', contentType);
-      headers.set('cache-control', 'public, max-age=31536000, immutable');
-      headers.set('x-content-type-options', 'nosniff');
-      const inlineAllowed = isInlineContentType(contentType);
-      const dispositionKind = inlineAllowed && !contentType.startsWith('text/') ? 'inline' : 'attachment';
-      headers.set('content-disposition', contentDispositionValue(dispositionKind, d1File.filename || 'file'));
-      return new Response(d1File.data, { headers });
+    // 附件正文存在 D1 的 uploaded_files.data，没有外部对象存储。
+    const stored = await c.env.DB.prepare(
+      'SELECT filename, content_type, data FROM uploaded_files WHERE object_key = ? LIMIT 1'
+    ).bind(key).first<StoredFileRow>();
+    if (!stored?.data) {
+      return new Response('Not Found', { status: 404 });
     }
 
-    let decrypted: { bytes: Uint8Array };
-    try {
-      decrypted = await decryptAttachment(c.env, await object.arrayBuffer(), key);
-    } catch (error) {
-      console.error('Failed to decrypt attachment', { key, error });
-      throw error;
-    }
+    const raw = stored.data instanceof Uint8Array ? stored.data : new Uint8Array(stored.data);
+    // 与 R2 时期一致：正文以绑定对象键的信封加密存储；历史明文行按原样返回。
+    const { bytes } = await decryptAttachment(c.env, raw, key);
 
     const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set('cache-control', FILE_RESPONSE_CACHE_CONTROL);
-    if (object.uploaded) {
-      headers.set('last-modified', object.uploaded.toUTCString());
-    }
-
+    const contentType = normalizeContentType(stored.content_type) || 'application/octet-stream';
+    headers.set('content-type', contentType);
+    // 受 canAccessFile 保护，只允许浏览器私有缓存，避免共享缓存把附件发给未授权用户。
+    headers.set('cache-control', 'private, max-age=31536000, immutable');
     headers.set('x-content-type-options', 'nosniff');
     headers.set('referrer-policy', 'no-referrer');
     headers.set(
       'content-security-policy',
       "sandbox; default-src 'none'; base-uri 'none'; form-action 'none'"
     );
-
-    const contentType =
-      normalizeContentType(fileMetadata?.contentType) ||
-      normalizeContentType(headers.get('content-type')) ||
-      'application/octet-stream';
-    headers.set('content-type', contentType);
     const inlineAllowed = isInlineContentType(contentType);
-    const dispositionKind =
-      inlineAllowed && !contentType.startsWith('text/') ? 'inline' : 'attachment';
-    const filename =
-      fileMetadata?.filename || object.customMetadata?.filename || key.split('/').pop() || 'file';
-    headers.set('content-disposition', contentDispositionValue(dispositionKind, filename));
+    const dispositionKind = inlineAllowed && !contentType.startsWith('text/') ? 'inline' : 'attachment';
+    headers.set('content-disposition', contentDispositionValue(dispositionKind, stored.filename || 'file'));
 
-    return new Response(decrypted.bytes, { headers });
+    return new Response(bytes, { headers });
   });
 }
 
@@ -211,14 +180,7 @@ export async function saveUploadedFile(
   const contentType = normalizeContentType(file.type) || 'application/octet-stream';
 
   const fileBytes = await file.arrayBuffer();
-
-  if (env.FILES) {
-    const encryptedFile = await encryptAttachment(env, fileBytes, key);
-    await env.FILES.put(key, encryptedFile, {
-      httpMetadata: { contentType, cacheControl: FILE_RESPONSE_CACHE_CONTROL },
-      customMetadata: { filename, edgechatEncryption: 'v1' }
-    });
-  }
+  const encryptedBytes = await encryptAttachment(env, fileBytes, key);
 
   try {
     await recordUploadedFile(env.DB, {
@@ -228,16 +190,9 @@ export async function saveUploadedFile(
       contentType,
       size: file.size,
       clientUploadId,
-      data: !env.FILES ? new Uint8Array(fileBytes) : null
+      data: encryptedBytes
     });
   } catch (error) {
-    if (env.FILES) {
-      try {
-        await env.FILES.delete(key);
-      } catch (deleteError) {
-        console.warn('Failed to delete orphaned upload after metadata error', deleteError);
-      }
-    }
     if (clientUploadId && String((error as { message?: unknown })?.message || error).includes('UNIQUE')) {
       const existing = await getUploadedFileByClientId(env.DB, session.userId, clientUploadId);
       if (existing) return { file: existing, created: false };

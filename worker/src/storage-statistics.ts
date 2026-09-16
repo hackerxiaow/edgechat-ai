@@ -1,5 +1,3 @@
-const USER_OBJECT_KEY_PATTERN = /^(\d+)\//;
-
 export interface StorageOwnerRef {
 	key: string;
 	type: "user" | "telegram" | "unknown";
@@ -15,57 +13,37 @@ export interface StorageSummary {
 	latestUploadedAt: string | null;
 }
 
-/** R2Object 中本模块实际使用的字段。 */
-export interface StorageObjectLike {
-	key?: string;
-	size?: number;
-	uploaded?: Date | string;
+/** uploaded_files 按归属聚合后的行；D1 单存储下附件正文也在同一张表。 */
+export interface UploadedFileStatRow {
+	owner_user_id: number | null;
+	object_count: number;
+	bytes: number;
+	latest_uploaded_at: string | null;
 }
 
-export function storageOwnerFromObjectKey(key: unknown): StorageOwnerRef {
-	const normalizedKey = String(key || "");
-	const userMatch = USER_OBJECT_KEY_PATTERN.exec(normalizedKey);
-	if (userMatch) {
-		const userId = Number(userMatch[1]);
-		if (Number.isSafeInteger(userId) && userId > 0) {
-			return { key: `user:${userId}`, type: "user", userId };
-		}
+export function storageOwnerFromUserId(ownerUserId: number | null | undefined): StorageOwnerRef {
+	const numeric = Number(ownerUserId);
+	if (Number.isSafeInteger(numeric) && numeric > 0) {
+		return { key: `user:${numeric}`, type: "user", userId: numeric };
 	}
-
-	if (normalizedKey.startsWith("telegram/")) {
-		return { key: "system:telegram", type: "telegram", userId: null };
-	}
-
 	return { key: "system:unknown", type: "unknown", userId: null };
 }
 
-export function summarizeR2Objects(objects: StorageObjectLike[] = []): StorageSummary[] {
-	const summaries = new Map<string, StorageSummary>();
-
-	for (const object of objects) {
-		const owner = storageOwnerFromObjectKey(object?.key);
-		const current = summaries.get(owner.key) || {
+export function summarizeUploadedFiles(rows: UploadedFileStatRow[] = []): StorageSummary[] {
+	return rows.map((row) => {
+		const owner = storageOwnerFromUserId(row.owner_user_id);
+		// D1 的 CURRENT_TIMESTAMP 是不带时区的 UTC 字符串，必须显式按 UTC 解析。
+		const uploadedAt = row.latest_uploaded_at
+			? new Date(`${String(row.latest_uploaded_at).replace(" ", "T")}Z`)
+			: null;
+		return {
 			ownerKey: owner.key,
 			ownerType: owner.type,
 			ownerId: owner.userId,
-			objectCount: 0,
-			bytes: 0,
-			latestUploadedAt: null,
+			objectCount: Math.max(0, Number(row.object_count) || 0),
+			bytes: Math.max(0, Number(row.bytes) || 0),
+			latestUploadedAt:
+				uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? uploadedAt.toISOString() : null,
 		};
-		const uploadedAt = object?.uploaded ? new Date(object.uploaded) : null;
-
-		current.objectCount += 1;
-		current.bytes += Math.max(0, Number(object?.size) || 0);
-		if (
-			uploadedAt &&
-			!Number.isNaN(uploadedAt.getTime()) &&
-			(!current.latestUploadedAt || uploadedAt > new Date(current.latestUploadedAt))
-		) {
-			current.latestUploadedAt = uploadedAt.toISOString();
-		}
-
-		summaries.set(owner.key, current);
-	}
-
-	return [...summaries.values()];
+	});
 }

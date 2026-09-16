@@ -4,10 +4,6 @@
 export interface AppBindings {
   /** D1 数据库：消息、会话、附件正文与迁移记录的唯一事实来源。 */
   DB: D1Database;
-  /** 可选：旧部署的 KV 会话存储，缺省时回退到 D1 的 sessions 表。 */
-  SESSIONS?: KVNamespace;
-  /** 可选：旧部署的 R2 附件存储，缺省时附件正文直接落进 D1。 */
-  FILES?: R2Bucket;
   /** Pages 静态资产绑定。 */
   ASSETS?: Fetcher;
 

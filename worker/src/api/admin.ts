@@ -14,11 +14,9 @@ import { getSiteSettings, updateSiteSettings } from '../data/site-settings.ts';
 import { isR2ObjectUnavailableError } from '../data/uploaded-files.ts';
 import { listAdminUsers, listStorageOwners, type StorageOwner } from '../data/users.ts';
 import { ApiError } from '../errors.ts';
-import { summarizeR2Objects } from '../storage-statistics.ts';
+import { summarizeUploadedFiles, type UploadedFileStatRow } from '../storage-statistics.ts';
 import { errorResponse, parseJsonRequest, randomToken } from '../utils.ts';
 import { banExpiryFromMinutes } from '../user-status.ts';
-
-const STORAGE_SCAN_PAGE_SIZE = 1000;
 
 interface StorageScanResponse {
   items: unknown;
@@ -31,25 +29,24 @@ interface StorageScanResponse {
 
 export function registerAdminRoutes(app: Hono<AppEnv>) {
   app.get('/api/admin/storage/scan', async (c) => {
-    if (!c.env.FILES) {
-      return errorResponse('当前部署没有绑定 R2，无法统计存储空间', 503);
-    }
+    // D1 单存储：附件正文就在 uploaded_files 里，按归属一次聚合即可，无需分页游标。
+    const { results } = await c.env.DB.prepare(
+      `SELECT owner_user_id,
+              COUNT(*) AS object_count,
+              COALESCE(SUM(size), 0) AS bytes,
+              MAX(created_at) AS latest_uploaded_at
+       FROM uploaded_files
+       GROUP BY owner_user_id
+       ORDER BY bytes DESC`
+    ).all<UploadedFileStatRow>();
 
-    const cursor = new URL(c.req.url).searchParams.get('cursor') || undefined;
-    const listed = await c.env.FILES.list({
-      limit: STORAGE_SCAN_PAGE_SIZE,
-      ...(cursor ? { cursor } : {})
-    });
     const response: StorageScanResponse = {
-      items: summarizeR2Objects(listed.objects),
-      scannedObjects: listed.objects.length,
-      truncated: listed.truncated,
-      cursor: listed.truncated ? listed.cursor ?? null : null
+      items: summarizeUploadedFiles(results),
+      scannedObjects: results.reduce((total, row) => total + Number(row.object_count || 0), 0),
+      truncated: false,
+      cursor: null,
+      users: await listStorageOwners(c.env.DB)
     };
-
-    if (!cursor) {
-      response.users = await listStorageOwners(c.env.DB);
-    }
 
     c.header('Cache-Control', 'private, no-store');
     return c.json(response);

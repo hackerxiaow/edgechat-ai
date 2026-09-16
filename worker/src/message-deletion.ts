@@ -37,10 +37,7 @@ type GetDeletionTargetFn = (
 	db: D1Database,
 	messageId: number,
 ) => Promise<MessageDeletionTarget | null>;
-type CleanupFn = (
-	env: { DB: D1Database; FILES?: R2Bucket },
-	keys: string[],
-) => Promise<unknown>;
+type CleanupFn = (env: { DB: D1Database }, keys: string[]) => Promise<unknown>;
 
 export function createMessageDeletion({
 	authorize = authorizeMessageModeration as AuthorizeFn,

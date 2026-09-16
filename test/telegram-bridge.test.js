@@ -6,8 +6,8 @@ import initSqlJs from "sql.js";
 import { createD1Adapter } from "./support/d1.js";
 import { insertExternalMessage, mapMessage } from "../worker/src/data/messages.ts";
 import {
-	decryptAttachment,
 	decryptMessageContent,
+	encryptAttachment,
 	decryptSecretValue,
 	encryptMessageContent,
 	encryptSecretValue,
@@ -236,97 +236,105 @@ test("Telegram 文字回复使用 reply_parameters 指向同群原消息", async
 	assert.deepEqual(JSON.parse(captured.init.body).reply_parameters, { message_id: 2 });
 });
 
-test("Telegram 入站附件下载后加密写入 R2，超限时不下载", async () => {
+test("Telegram 入站附件在 D1 单存储下不导入，出站附件从 D1 读取并解密", async () => {
+	// 入站：D1 只能把附件归属到本地账号，Telegram 消息没有对应本地用户，
+	// 因此不下载也不落库，连 Telegram 文件接口都不必调用。
 	const originalFetch = globalThis.fetch;
-	const writes = [];
 	let fetchCount = 0;
-	globalThis.fetch = async (url) => {
+	globalThis.fetch = async () => {
 		fetchCount += 1;
-		if (String(url).includes("/getFile")) {
-			return Response.json({ ok: true, result: { file_path: "documents/a.bin", file_size: 4 } });
-		}
-		return new Response(Uint8Array.from([1, 2, 3, 4]), {
-			headers: { "content-length": "4" },
-		});
-	};
-	const env = {
-		EDGECHAT_ENCRYPTION_KEYRING: keyring,
-		FILES: {
-			async put(key, value, options) {
-				writes.push({ key, value, options });
-			},
-		},
+		return Response.json({ ok: true, result: {} });
 	};
 	let imported;
-	let importedAudio;
 	try {
-		imported = await importTelegramAttachment(env, {
-			botToken: "123:token",
-			telegramChatId: "-1001",
-			telegramMessageId: 9,
-			attachment: {
-				fileId: "file-id",
-				fileName: "voice.ogg",
-				mimeType: "audio/ogg",
-				fileSize: 4,
-				kind: "voice",
-				durationMs: 4200,
+		imported = await importTelegramAttachment(
+			{ EDGECHAT_ENCRYPTION_KEYRING: keyring },
+			{
+				botToken: "123:token",
+				telegramChatId: "-1001",
+				telegramMessageId: 9,
+				attachment: {
+					fileId: "file-id",
+					fileName: "voice.ogg",
+					mimeType: "audio/ogg",
+					fileSize: 4,
+					kind: "voice",
+					durationMs: 4200,
+				},
 			},
-		});
-		importedAudio = await importTelegramAttachment(env, {
-			botToken: "123:token",
-			telegramChatId: "-1001",
-			telegramMessageId: 10,
-			attachment: {
-				fileId: "audio-id",
-				fileName: "song.mp3",
-				mimeType: "audio/mpeg",
-				fileSize: 4,
-				kind: "audio",
-				durationMs: 12_000,
-			},
-		});
+		);
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
-	assert.equal(fetchCount, 4);
-	assert.match(imported.attachment.key, /^telegram\/-1001\/9-[0-9a-f-]+\.ogg$/);
-	assert.equal(imported.attachment.kind, "voice");
-	assert.equal(imported.attachment.durationMs, 4200);
-	assert.equal(importedAudio.attachment.kind, "audio");
-	assert.equal(importedAudio.attachment.durationMs, 12_000);
-	assert.equal(writes.length, 2);
-	assert.deepEqual(
-		(await decryptAttachment(env, writes[0].value, writes[0].key)).bytes,
-		Uint8Array.from([1, 2, 3, 4]),
-	);
-	const oversized = await importTelegramAttachment(env, {
-		botToken: "123:token",
-		telegramChatId: "-1001",
-		telegramMessageId: 10,
-		attachment: { fileId: "large", fileSize: TELEGRAM_BRIDGE_FILE_LIMIT + 1 },
-	});
-	assert.deepEqual(oversized, {
-		attachment: null,
-		skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE,
-	});
-
-	const withoutStorage = await importTelegramAttachment({}, {
-		botToken: "123:token",
-		telegramChatId: "-1001",
-		telegramMessageId: 11,
-		attachment: { fileId: "file-id", fileSize: 4 },
-	});
-	assert.deepEqual(withoutStorage, {
+	assert.equal(fetchCount, 0);
+	assert.deepEqual(imported, {
 		attachment: null,
 		skipReason: TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE,
 	});
+
+	// 没有附件时不需要给出跳过原因。
 	assert.deepEqual(
-		await loadEdgeChatAttachment({}, { key: "missing.bin", size: 4 }),
-		{
-			file: null,
-			skipReason: TELEGRAM_FILE_SKIP_REASON.STORAGE_UNAVAILABLE,
+		await importTelegramAttachment(
+			{},
+			{
+				botToken: "123:token",
+				telegramChatId: "-1001",
+				telegramMessageId: 10,
+				attachment: null,
+			},
+		),
+		{ attachment: null, skipReason: null },
+	);
+
+	// 出站：正文以加密信封存在 D1，读取后解密再交给 Telegram。
+	const objectKey = "7/voice.ogg";
+	const plaintext = Uint8Array.from([1, 2, 3, 4]);
+	const envelope = await encryptAttachment(keyring, plaintext, objectKey);
+	const db = {
+		prepare(sql) {
+			return {
+				bind() {
+					return {
+						async first() {
+							return sql.includes("FROM uploaded_files")
+								? { filename: "voice.ogg", content_type: "audio/ogg", data: envelope }
+								: null;
+						},
+					};
+				},
+			};
 		},
+	};
+	const loaded = await loadEdgeChatAttachment(
+		{ DB: db, EDGECHAT_ENCRYPTION_KEYRING: keyring },
+		{
+			key: objectKey,
+			name: "voice.ogg",
+			type: "audio/ogg",
+			size: plaintext.byteLength,
+			kind: "voice",
+			durationMs: 4200,
+		},
+	);
+	assert.deepEqual(loaded.file.bytes, plaintext);
+	assert.equal(loaded.file.kind, "voice");
+	assert.equal(loaded.file.durationMs, 4200);
+	assert.equal(loaded.file.type, "audio/ogg");
+
+	// 行不存在或超出 Bridge 上限时按对应原因跳过。
+	const emptyDb = {
+		prepare: () => ({ bind: () => ({ async first() { return null; } }) }),
+	};
+	assert.deepEqual(
+		await loadEdgeChatAttachment({ DB: emptyDb }, { key: "missing.bin", size: 4 }),
+		{ file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.NOT_FOUND },
+	);
+	assert.deepEqual(
+		await loadEdgeChatAttachment(
+			{ DB: emptyDb },
+			{ key: "huge.bin", size: TELEGRAM_BRIDGE_FILE_LIMIT + 1 },
+		),
+		{ file: null, skipReason: TELEGRAM_FILE_SKIP_REASON.TOO_LARGE },
 	);
 });
 
