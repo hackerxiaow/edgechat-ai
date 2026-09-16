@@ -1609,6 +1609,8 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   /* 不压暗背后的聊天区：面板本身不透明且有边框阴影，已足够区分。 */
   background: transparent;
+  /* 和上下边缘留出间距，否则圆角会被视口边缘切掉。 */
+  padding-block: 10px;
 }
 
 .room-management-sidebar {
@@ -1616,7 +1618,10 @@ onBeforeUnmount(() => {
   height: 100%;
   overflow-y: auto;
   background: var(--chat-hover);
-  border-left: 1px solid var(--chat-line);
+  /* 贴住窗口右侧，只给左侧做圆角；四角都是直角时左上角会显得像戳出的尖角。 */
+  border-radius: 16px 0 0 16px;
+  border: 1px solid var(--chat-line);
+  border-right: none;
   touch-action: pan-y;
   box-shadow: var(--chat-shadow-panel);
 }
