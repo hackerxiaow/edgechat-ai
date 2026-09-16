@@ -28,6 +28,10 @@ const form = reactive({
 
 const token = computed(() => String(route.params.token || '').trim());
 const isOpenRegistration = computed(() => !token.value);
+// 后台「运行配置」里的开放注册开关；关闭时无 token 访问只能看到提示。
+const openRegistrationEnabled = computed(() => Boolean(store.site.allowOpenRegistration));
+const showForm = computed(() => Boolean(invite.value) || (isOpenRegistration.value && openRegistrationEnabled.value));
+const openRegistrationClosed = computed(() => isOpenRegistration.value && !openRegistrationEnabled.value);
 
 const usernameInput = ref(null);
 const displayNameInput = ref(null);
@@ -110,9 +114,12 @@ onMounted(() => {
 
       <p v-if="validating" class="login-info" role="status">{{ t('auth.validatingInvite') }}</p>
       <p v-else-if="invite?.note" class="login-info">{{ t('auth.invitationNote', { note: invite.note }) }}</p>
+      <p v-if="openRegistrationClosed" class="login-info" role="status">
+        本站未开放自由注册，请向管理员索取邀请链接。
+      </p>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
 
-      <form v-if="(invite || isOpenRegistration) && !error" class="login-form" @submit.prevent="submit">
+      <form v-if="showForm && !error" class="login-form" @submit.prevent="submit">
         <label v-if="isOpenRegistration" class="login-field">
           <span class="login-label">邮箱</span>
           <span class="input-wrapper">

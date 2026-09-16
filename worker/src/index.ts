@@ -88,7 +88,9 @@ app.get('/api/site', async (c) => {
       siteName: settings.siteName,
       siteIconUrl: settings.siteIconUrl,
       maxFileSize: settings.maxFileSize,
-      allowedFileTypes: settings.allowedFileTypes
+      allowedFileTypes: settings.allowedFileTypes,
+      // 注册页据此判断该展示开放注册表单还是「请联系管理员」提示。
+      allowOpenRegistration: settings.allowOpenRegistration
     }
   });
 });

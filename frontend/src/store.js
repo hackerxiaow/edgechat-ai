@@ -23,7 +23,8 @@ const state = reactive({
   session: null,
   site: {
     siteName: 'Edgechat',
-    siteIconUrl: ''
+    siteIconUrl: '',
+    allowOpenRegistration: false
   }
 });
 
@@ -134,7 +135,8 @@ function setSession(session) {
 function setSite(site) {
   state.site = {
     siteName: String(site?.siteName || 'Edgechat').trim() || 'Edgechat',
-    siteIconUrl: String(site?.siteIconUrl || '').trim()
+    siteIconUrl: String(site?.siteIconUrl || '').trim(),
+    allowOpenRegistration: Boolean(site?.allowOpenRegistration)
   };
   applySiteMetadata(state.site);
 }
