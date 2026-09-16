@@ -21,9 +21,9 @@
   background: transparent;
 }
 
-/* 只让「真正的卡片」承担玻璃。.admin-section / .admin-section__header 是
-   分组容器，若也上玻璃就会和内部的 .ui-surface 叠加，0.72 叠两层已接近不透明，
-   玻璃效果消失、暗色下发闷。 */
+/* 规则：底图只出现在最底层，每一个「可视卡片」各铺一层相同的面板玻璃。
+   分组用的 .admin-section 本身透明，卡片（.ui-surface、区段标题、表格容器）
+   各自铺一层，这样它们和侧边栏是同一个材质、又不会互相叠加成不透明。 */
 .admin-sidebar,
 .admin-topbar,
 .admin-panel,
@@ -52,8 +52,10 @@
 }
 
 .admin-page .admin-section__header {
-  background: transparent !important;
-  border-color: transparent !important;
+  background: var(--admin-panel) !important;
+  border-color: var(--admin-border) !important;
+  -webkit-backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;
+  backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;
 }
 
 /* 侧栏内部元素不再自带底色，避免和侧栏玻璃叠加 */
@@ -70,18 +72,6 @@
 .admin-nav-item--active,
 .admin-nav-subitem--active {
   background-color: var(--admin-active);
-}
-
-/* 语言切换与主题按钮沿用全局玻璃令牌，暗色下不再是一块刺眼的白块。 */
-.admin-topbar .language-switch {
-  background: var(--admin-active) !important;
-  border-color: var(--admin-border) !important;
-  color: var(--admin-text) !important;
-  box-shadow: none !important;
-}
-
-.admin-topbar .language-switch:hover {
-  background: var(--admin-panel);
 }
 
 .admin-topbar .language-switch__menu {
@@ -182,4 +172,100 @@ html.dark textarea {
 .admin-identity > svg {
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+
+/* ================================================
+   内容区与侧边栏使用同一套面板材质
+   ================================================ */
+
+/* 内容区里凡是「一块有边界的内容」（表格容器、空状态、用户创建卡等），
+   都铺一层和侧边栏相同的面板玻璃，这样底图只在最底层透出，
+   内容块之间不会一块透明一块不透明。 */
+.admin-table-wrap,
+.maintenance-empty,
+.admin-user-creator,
+.admin-empty,
+.invite-list__empty {
+  background: var(--admin-panel) !important;
+  border-color: var(--admin-border);
+  -webkit-backdrop-filter: var(--blur-md, blur(12px)) saturate(120%);
+  backdrop-filter: var(--blur-md, blur(12px)) saturate(120%);
+}
+
+/* .admin-section 只是分组容器，保持透明，避免和内部卡片叠成不透明。 */
+.admin-section {
+  background: transparent !important;
+}
+
+
+/* ================================================
+   顶栏图标按钮：与首页登录卡片上的按钮完全一致
+   ================================================ */
+
+/* 首页用的是 .theme-toggle-btn + 卡片内 .language-switch 这一对：
+   无边框、透明底、38×38、hover 浮起 --surface-0。这里照搬同一套数值，
+   保证「语言切换」和「深浅色切换」两个按钮在两端看起来是同一个控件。 */
+.admin-topbar .topbar-icon-btn,
+.admin-topbar .language-switch {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--admin-muted) !important;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.admin-topbar .topbar-icon-btn:hover,
+.admin-topbar .language-switch:hover {
+  background: var(--surface-0, rgba(255, 255, 255, 0.5)) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-topbar .topbar-icon-btn:focus-visible,
+.admin-topbar .language-switch:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 2px;
+}
+
+/* 语言下拉菜单：提升到内容区之上。
+   注意 .admin-topbar 带 backdrop-filter，会自建层叠上下文，
+   菜单的 z-index 只在这个上下文里生效，因此必须整条顶栏压过内容区。 */
+.admin-topbar {
+  position: relative;
+  z-index: 20;
+}
+
+.admin-content {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-topbar .language-switch__menu {
+  z-index: 60;
+  background: var(--admin-panel) !important;
+  border: 1px solid var(--admin-border) !important;
+  -webkit-backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;
+  backdrop-filter: var(--blur-md, blur(12px)) saturate(120%) !important;
+  box-shadow: var(--admin-shadow-raised);
+}
+
+.admin-topbar .language-switch__option {
+  color: var(--admin-text) !important;
+}
+
+.admin-topbar .language-switch__option:hover,
+.admin-topbar .language-switch__option:focus-visible {
+  background: var(--admin-active) !important;
+}
+
+.admin-topbar .language-switch__option[aria-current='true'] {
+  color: var(--admin-brand) !important;
 }

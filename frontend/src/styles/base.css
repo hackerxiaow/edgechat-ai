@@ -15,7 +15,12 @@ body {
 }
 
 html {
-  background: var(--bg);
+  /* 暗纹底图挂在 html 而不是 body：聊天页的 .chat-layout 是 position: fixed，
+     会把 body 的高度压成 0，body 上的背景就没有画布可铺，
+     于是聊天页只剩 html 的纯色底、看不到暗纹。挂在 html 上则始终铺满视口。 */
+  background-color: var(--bg);
+  background-image: var(--doodle-bg);
+  background-attachment: fixed;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -24,13 +29,11 @@ html::-webkit-scrollbar {
   display: none;
 }
 
-/* ===== Telegram 风格暗纹/涂鸦背景 ===== */
+/* ===== Telegram 风格暗纹/涂鸦背景（底层由 html 承载） ===== */
 
 body {
   position: relative;
-  background-color: var(--bg);
-  background-image: var(--doodle-bg);
-  background-attachment: fixed;
+  background-color: transparent;
   color: var(--text);
   font-family: var(--font-sans);
 }

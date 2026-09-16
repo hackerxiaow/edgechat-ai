@@ -70,12 +70,14 @@ async function saveProfile() {
     store.setSession(payload.session);
     // 只规范化这次已保存的输入，头像更新与请求期间的新编辑不能重置草稿。
     if (profileForm.bio === submittedBio) profileForm.bio = payload.session.bio;
+    // 底图现在由 html 承载（body 在聊天页会被 fixed 布局压成 0 高度），
+    // 自定义背景也必须写到 html 才会在所有页面生效。
     if (profileForm.customBackground) {
       localStorage.setItem('customBackground', profileForm.customBackground);
-      document.body.style.background = profileForm.customBackground;
+      document.documentElement.style.background = profileForm.customBackground;
     } else {
       localStorage.removeItem('customBackground');
-      document.body.style.background = '';
+      document.documentElement.style.background = '';
     }
     info.value = t('settings.profileUpdated');
   } catch (currentError) {

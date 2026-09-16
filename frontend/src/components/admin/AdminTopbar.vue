@@ -1,13 +1,15 @@
 <script setup>
-import { Gauge, Settings } from '@lucide/vue';
+import { Gauge, Moon, Settings, Sun } from '@lucide/vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { adminRouteIcons } from '../../admin/navigation.js';
 import { t } from '../../i18n.js';
+import { useTheme } from '../../composables/useTheme.js';
 import LanguageSwitch from '../ui/LanguageSwitch.vue';
 
 const route = useRoute();
 const router = useRouter();
+const { isDark, toggleTheme } = useTheme();
 
 const currentIcon = computed(() => adminRouteIcons[route.meta.adminIcon] || Gauge);
 const currentTitle = computed(() => t(route.meta.adminTitleKey || 'admin.topbar.defaultTitle'));
@@ -20,6 +22,15 @@ const currentTitle = computed(() => t(route.meta.adminTitleKey || 'admin.topbar.
       <h1>{{ currentTitle }}</h1>
     </div>
     <div class="admin-topbar__actions">
+      <button
+        type="button"
+        class="topbar-icon-btn"
+        :title="isDark ? t('theme.light') : t('theme.dark')"
+        @click="toggleTheme"
+      >
+        <Sun v-if="isDark" :size="21" />
+        <Moon v-else :size="21" />
+      </button>
       <LanguageSwitch />
       <button type="button" class="admin-topbar__settings" @click="router.push('/admin/site')">
         <Settings :size="19" aria-hidden="true" />

@@ -24,10 +24,10 @@ import './styles/auth.css';
 import { initLiquidGlass } from './liquid-glass.js';
 import { initializeI18n } from './i18n.js';
 
-// 应用自定义背景
+// 应用自定义背景（写到 html，见 base.css 中底图承载位置的说明）
 const customBg = localStorage.getItem('customBackground');
 if (customBg) {
-  document.body.style.background = customBg;
+  document.documentElement.style.background = customBg;
 }
 
 initializeI18n().then(() => store.initialize()).finally(() => {
