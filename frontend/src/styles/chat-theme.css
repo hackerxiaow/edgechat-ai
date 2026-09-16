@@ -296,3 +296,37 @@ html.dark .composer-textarea {
 .add-conversation-dialog__error {
   color: var(--danger) !important;
 }
+
+
+/* ================================================
+   浮层表面统一使用不透明底色
+   ================================================ */
+
+/* 成员面板是从聊天区右侧滑出的浮层，之前用 --chat-hover 当底色，
+   而 --chat-hover 现在是 --surface-0（50% 透明），
+   于是面板底下的聊天内容会整片透上来。浮层一律改用不透明令牌。 */
+.room-management-sidebar {
+  background: var(--surface-solid) !important;
+  border-left: 1px solid var(--chat-line) !important;
+}
+
+/* 「添加人员」弹窗同属浮层，一并改为不透明。 */
+.add-conversation-dialog {
+  background: var(--surface-solid) !important;
+}
+
+/* 弹窗内部的选项卡片铺在弹窗底色上，保持不透明以维持可读性。 */
+.add-conversation-choice,
+.add-conversation-person {
+  background: var(--surface-solid) !important;
+}
+
+.add-conversation-choice:hover,
+.add-conversation-person:hover:not(:disabled) {
+  background: var(--surface-0) !important;
+}
+
+/* 群组设置与创建群组弹窗的面板类名同为 .room-dialog，一并按浮层处理。 */
+.room-dialog {
+  background: var(--surface-solid) !important;
+}
