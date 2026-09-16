@@ -1,6 +1,73 @@
-/* tokens.css — 业务组件样式
-   设计令牌（颜色/字体/阴影/圆角）已统一在 styles.css 中定义
-   此文件仅包含业务相关的全局类名，不定义任何 :root 变量 */
+/* tokens.css — 全局设计令牌与业务组件样式
+   在此处统一定义全局令牌，解决深浅色模式缺失及背景失效问题。
+ */
+
+:root {
+  --bg: #f2f7fb;
+  --surface-0: rgba(255, 255, 255, 0.5);
+  --surface-1: rgba(255, 255, 255, 0.4);
+  --surface-2: rgba(255, 255, 255, 0.85);
+  
+  --text: #172b4d;
+  --text-soft: #5e6c84;
+  --text-faint: #8993a4;
+  
+  --line-soft: rgba(9, 30, 66, 0.08);
+  
+  --shadow-sm: 0 2px 8px rgba(9, 30, 66, 0.06);
+  --shadow-lg: 0 16px 48px rgba(9, 30, 66, 0.12), 0 2px 8px rgba(9, 30, 66, 0.08);
+  
+  --radius-control: 12px;
+  --radius-panel: 16px;
+  --radius-window: 24px;
+  --radius-pill: 999px;
+  
+  --page-padding: 24px;
+  
+  --warm: #e37e33;
+  --warm-soft: rgba(227, 126, 51, 0.15);
+  
+  --cool: #3579bd;
+  --cool-soft: rgba(53, 121, 189, 0.15);
+  
+  --sky-soft: rgba(14, 165, 233, 0.1);
+  
+  --danger: #c0453f;
+  --danger-soft: rgba(192, 69, 63, 0.12);
+  
+  --blur-md: blur(12px) saturate(120%);
+  --blur-lg: blur(24px) saturate(140%);
+  
+  --transition-soft: 220ms cubic-bezier(0.37, 0, 0.63, 1);
+}
+
+html[data-theme="dark"],
+html.dark {
+  --bg: #0a1420;
+  --surface-0: rgba(20, 32, 46, 0.5);
+  --surface-1: rgba(20, 32, 46, 0.35);
+  --surface-2: rgba(20, 32, 46, 0.85);
+  
+  --text: #e8f0f9;
+  --text-soft: #93a8bd;
+  --text-faint: #74889c;
+  
+  --line-soft: rgba(255, 255, 255, 0.1);
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  
+  --warm: #d57732;
+  --warm-soft: rgba(213, 119, 50, 0.15);
+  
+  --cool: #4a8ed0;
+  --cool-soft: rgba(74, 142, 208, 0.15);
+  
+  --sky-soft: rgba(14, 165, 233, 0.1);
+  
+  --danger: #ef8880;
+  --danger-soft: rgba(239, 136, 128, 0.12);
+}
 
 /* ================================================
    页面结构
