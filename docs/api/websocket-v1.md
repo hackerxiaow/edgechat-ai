@@ -1,5 +1,12 @@
 # EdgeChat WebSocket v1
 
+> **当前部署状态：不可用。** 纯 D1 部署没有 Durable Objects，`/api/v1/realtime/ws`
+> 在通过 upgrade 校验后直接返回 `501 realtime_unsupported`，且**不消费**票据。
+> 客户端应当改用 `GET /api/v1/rooms/:kind/:id/sync?cursor=` 与
+> `GET /api/v1/rooms/:kind/:id/messages` 做游标轮询；`POST /api/v1/realtime/tickets`
+> 保留用于将来支持长连接的部署，现阶段调用没有意义。下面记录的帧格式仍然有效，
+> 供恢复实时连接时参照。
+
 Android clients use WebSocket only while the app is visible. Sending, deleting and retrying messages stays on the idempotent HTTP API.
 
 ## Connection

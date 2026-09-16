@@ -417,6 +417,13 @@ paths:
   /realtime/tickets:
     post:
       operationId: createRealtimeTicket
+      description: |
+        Issues a single-use ticket for the WebSocket upgrade endpoint.
+        The current D1-only deployment has no Durable Objects, so
+        `GET /api/v1/realtime/ws` answers `501 realtime_unsupported` and the
+        ticket is never consumed. Clients should poll
+        `GET /api/v1/rooms/{kind}/{id}/sync` instead and treat
+        `features.realtimeTickets: false` as "do not attempt a socket".
       requestBody:
         required: true
         content:

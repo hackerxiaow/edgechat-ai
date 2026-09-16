@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import initSqlJs from "sql.js";
 
+import { createD1Adapter } from "./support/d1.js";
 import { insertExternalMessage, mapMessage } from "../worker/src/data/messages.js";
 import {
 	decryptAttachment,
@@ -460,39 +463,17 @@ test("消息 projection 保留 Telegram 来源而不伪造 EdgeChat 账号", () 
 	);
 });
 
-test("Telegram 私有群入站使用映射中的真实房间类型", async () => {
-	let roomName = "";
-	let submittedPayload = null;
+test("Telegram 私有群入站写入映射中的真实房间", async () => {
+	const SQL = await initSqlJs();
+	const database = new SQL.Database();
+	database.exec(readFileSync(new URL("../worker/schema.sql", import.meta.url), "utf8"));
+	database.run("INSERT INTO channels (id, name, kind) VALUES (9, 'private-bridge', 'private')");
 	const env = {
-		DB: {
-			prepare() {
-				return {
-					bind() {
-						return this;
-					},
-					async all() {
-						return { results: [] };
-					},
-				};
-			},
-		},
-		CHANNEL_ROOM: {
-			idFromName(name) {
-				roomName = name;
-				return name;
-			},
-			get() {
-				return {
-					async fetch(_url, init) {
-						submittedPayload = JSON.parse(init.body);
-						return Response.json({ ok: true, created: true, message: {} });
-					},
-				};
-			},
-		},
+		DB: createD1Adapter(database),
+		EDGECHAT_ENCRYPTION_KEYRING: keyring,
 	};
 
-	await ingestTelegramMessage(env, {
+	const result = await ingestTelegramMessage(env, {
 		mapping: { channelId: 9, channelName: "Private bridge", channelKind: "private" },
 		telegramMessage: {
 			sourceMessageId: "-100900:1",
@@ -506,12 +487,17 @@ test("Telegram 私有群入站使用映射中的真实房间类型", async () =>
 		botToken: "",
 	});
 
-	assert.equal(roomName, "private:9");
-	assert.deepEqual(submittedPayload.room, {
-		id: 9,
-		kind: "private",
-		name: "Private bridge",
-	});
+	assert.equal(result.created, true);
+	const row = database.exec(
+		"SELECT channel_id, content, sender_kind, external_sender_id FROM messages WHERE id = ?",
+		[result.message.id],
+	)[0].values[0];
+	assert.equal(Number(row[0]), 9);
+	assert.equal(row[2], "external");
+	assert.equal(row[3], "42");
+	// 正文以绑定来源的密文落库，明文不写入数据库。
+	assert.equal(String(row[1]).includes("private inbound"), false);
+	database.close();
 });
 
 test("Telegram webhook 公开接收而后台配置仍要求登录", async () => {

@@ -96,14 +96,9 @@ test("full schema executes baseline migration plan into ledger and passes system
   db.exec(plan.sql);
   assert.ok(plan.decisions.every(({ action }) => action === "baseline"));
   assert.equal((await inspectSchema(async (sql) => rows(db, sql), manifest)).status, "ok");
-  const namespace = (service) => ({
-    idFromName: (name) => name,
-    get: () => ({ fetch: async () => Response.json({ ok: true, service }) })
-  });
   const result = await runSystemCheck({
     DB: { prepare: (sql) => ({ all: async () => ({ results: rows(db, sql) }) }) },
     SESSIONS: { get: async () => null }, FILES: { list: async () => ({ objects: [] }) },
-    CHANNEL_ROOM: namespace('ChannelRoom'), USER_INBOX: namespace('UserInbox'), SCHEDULER: namespace('Scheduler'),
     EDGECHAT_ENCRYPTION_KEYRING: 'presence-only'
   });
   assert.equal(result.status, 'ok');

@@ -33,12 +33,7 @@ import {
   registerTelegramAdminRoutes,
   registerTelegramPublicRoutes
 } from './api/telegram.js';
-import { ChannelRoom } from './do/ChannelRoom.js';
-import { Scheduler } from './do/Scheduler.js';
-import { UserInbox } from './do/UserInbox.js';
-import { forwardInboxConnection, forwardRoomConnection } from './do-bridge.js';
-import { runScheduledGc } from './gc.js';
-import { isUserDisabled } from './user-status.js';
+import { runScheduledGc } from './gc.js';import { isUserDisabled } from './user-status.js';
 import { updateCurrentDeviceSessionVersion } from './mobile-session.js';
 import {
   errorCodeForStatus,
@@ -284,31 +279,14 @@ registerAdminRoutes(app);
 registerMaintenanceRoutes(app);
 registerTelegramAdminRoutes(app);
 
-app.get('/api/ws/:kind/:id', async (c) => {
-  const session = c.get('session');
-  const kind = c.req.param('kind');
-  const id = c.req.param('id');
-  if (!['public', 'private', 'dm'].includes(kind)) {
-    return errorResponse('无效的会话类型');
-  }
+// 纯 D1 部署不提供 WebSocket 长连接：实时性由客户端轮询同步游标提供。
+app.get('/api/ws/:kind/:id', () =>
+  errorResponse('当前部署不支持 WebSocket，请改用轮询同步', 501)
+);
 
-  return forwardRoomConnection({
-    env: c.env,
-    request: c.req.raw,
-    kind,
-    roomId: id,
-    principal: session
-  });
-});
-
-app.get('/api/inbox/ws', async (c) => {
-  const session = c.get('session');
-  return forwardInboxConnection({
-    env: c.env,
-    request: c.req.raw,
-    principal: session
-  });
-});
+app.get('/api/inbox/ws', () =>
+  errorResponse('当前部署不支持 WebSocket，请改用轮询同步', 501)
+);
 
 app.notFound(async (c) => {
   const pathname = new URL(c.req.url).pathname;
@@ -348,4 +326,3 @@ export default {
     ctx.waitUntil(runScheduledGc(env));
   }
 };
-export { ChannelRoom, Scheduler, UserInbox };

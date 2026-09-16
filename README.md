@@ -174,14 +174,13 @@ GitHub Actions 会管理服务端加密 Worker Secrets。首次部署时，如�
 | 部分 | 技术 |
 |---|---|
 | 前端 | Vue 3、Vue Router、Vite |
-| 后端 | Cloudflare Workers、Hono |
-| 实时通信 | Durable Objects、WebSocket Hibernation |
-| 数据库 | Cloudflare D1 |
-| 会话存储 | Cloudflare KV |
-| 文件存储 | Cloudflare R2 |
+| 后端 | Cloudflare Workers / Pages Functions、Hono |
+| 实时通信 | 同步游标轮询（D1 `message_events`，无长连接） |
+| 数据库 | Cloudflare D1（消息、会话与附件正文） |
+| 可选回退 | KV 会话、R2 文件存储（旧部署保留，非必需） |
 | 构建与部署 | Wrangler、GitHub Actions |
 
-更多实现说明见 [TECHNICAL.md](TECHNICAL.md)。
+更多实现说明见 [docs/api](docs/api)。
 
 ## 部署
 
@@ -291,7 +290,7 @@ Edgechat/
 ├─ worker/
 │  ├─ schema.sql         # 数据库结构
 │  ├─ migrations/        # 数据库迁移
-│  └─ src/               # API、认证与 Durable Objects
+│  └─ src/               # API、认证与数据访问
 ├─ capacitor/            # 基于 Web UI 的 Android 客户端
 ├─ android/              # 暂时保留的原生 Android 客户端
 ├─ .github/workflows/    # 自动部署与 CI

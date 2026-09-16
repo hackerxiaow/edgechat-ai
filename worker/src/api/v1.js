@@ -7,11 +7,7 @@ import {
 } from '../data/messages.js';
 import { getSiteSettings } from '../data/site-settings.js';
 import { getUserByUsername } from '../data/users.js';
-import {
-  forwardInboxConnection,
-  forwardRoomConnection,
-  submitClientRoomAction
-} from '../do-bridge.js';
+import { submitClientRoomAction } from '../room-actions.js';
 import { ApiError } from '../errors.js';
 import { authMiddleware } from '../middleware.js';
 import {
@@ -19,7 +15,7 @@ import {
   refreshMobileDeviceSession,
   revokeMobileDeviceSession
 } from '../mobile-session.js';
-import { issueRealtimeTicket, consumeRealtimeTicket } from '../realtime-tickets.js';
+import { issueRealtimeTicket } from '../realtime-tickets.js';
 import { authorizeRoom, isRoomKind } from '../room-access.js';
 import { markRoomRead } from '../data/unread.js';
 import { isUserDisabled } from '../user-status.js';
@@ -91,9 +87,11 @@ export function registerV1Routes(app) {
       },
       features: {
         deviceSessions: true,
-        realtimeTickets: true,
+        // 纯 D1 部署不提供长连接，客户端应使用 roomSync 轮询。
+        realtimeTickets: false,
         idempotentMessages: true,
-        idempotentUploads: Boolean(c.env.FILES),
+        // 去重键 client_upload_id 存在 D1，与是否绑定 R2 无关。
+        idempotentUploads: true,
         roomSync: true,
         backgroundPush: false
       }
@@ -157,27 +155,13 @@ export function registerV1Routes(app) {
     if (c.req.header('upgrade')?.toLowerCase() !== 'websocket') {
       return v1ErrorResponse('websocket_required', '需要 WebSocket 连接', 426);
     }
-    const redeemed = await consumeRealtimeTicket(c.env, c.req.query('ticket'));
-    if (!redeemed) {
-      return v1ErrorResponse('realtime_ticket_invalid', '实时票据无效或已过期', 401);
-    }
-    const url = new URL(c.req.url);
-    url.search = '';
-    const request = new Request(url.toString(), c.req.raw);
-    if (redeemed.scope === 'inbox') {
-      return forwardInboxConnection({
-        env: c.env,
-        request,
-        principal: redeemed.session
-      });
-    }
-    return forwardRoomConnection({
-      env: c.env,
-      request,
-      kind: redeemed.roomKind,
-      roomId: redeemed.roomId,
-      principal: redeemed.session
-    });
+    // 纯 D1 部署不提供长连接；移动端改用 /messages 与 /sync 的游标轮询。
+    // 不消费票据，便于客户端在支持 WebSocket 的部署上重试。
+    return v1ErrorResponse(
+      'realtime_unsupported',
+      '当前部署不支持 WebSocket 实时连接，请改用同步游标轮询',
+      501
+    );
   });
 
   app.get('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {

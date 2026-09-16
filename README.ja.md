@@ -174,11 +174,10 @@ GitHub Actions はサーバーサイド暗号化の Worker Secrets を管理し�
 | 部分 | 技術 |
 |---|---|
 | フロントエンド | Vue 3、Vue Router、Vite |
-| バックエンド | Cloudflare Workers、Hono |
-| リアルタイム通信 | Durable Objects、WebSocket Hibernation |
-| データベース | Cloudflare D1 |
-| セッションストレージ | Cloudflare KV |
-| ファイルストレージ | Cloudflare R2 |
+| バックエンド | Cloudflare Workers / Pages Functions、Hono |
+| リアルタイム通信 | D1 `message_events` のカーソルポーリング（常時接続なし） |
+| データベース | Cloudflare D1（メッセージ、セッション、添付本文） |
+| 任意のフォールバック | KV セッション、R2 ファイルストレージ（旧デプロイ向け、必須ではない） |
 | ビルドとデプロイ | Wrangler、GitHub Actions |
 
 実装の詳細は [TECHNICAL.md](TECHNICAL.md) を参照してください。
@@ -291,7 +290,7 @@ Edgechat/
 ├─ worker/
 │  ├─ schema.sql         # データベーススキーマ
 │  ├─ migrations/        # データベースマイグレーション
-│  └─ src/               # API、認証、Durable Objects
+│  └─ src/               # API、認証、データアクセス
 ├─ capacitor/            # Web UI ベースの Android クライアント
 ├─ android/              # 一時的に保持されるネイティブ Android クライアント
 ├─ .github/workflows/    # 自動デプロイと CI

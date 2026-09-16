@@ -344,10 +344,11 @@ test("部署工作流每次发布都在 Worker 之前准备并执行 D1 迁移",
 	assert.match(workflow, /\.tmp\/edgechat-d1-migrations\.sql/);
 });
 
-test("CI Wrangler 配置保留收件箱 Durable Object 与管理员变量", () => {
+test("CI Wrangler 配置保留管理员变量且不再声明 Durable Object", () => {
 	const config = readFileSync(new URL("../wrangler.example.toml", import.meta.url), "utf8");
 
 	assert.match(config, /ADMIN_USERNAMES = "admin"/);
-	assert.match(config, /name = "USER_INBOX"\s+class_name = "UserInbox"/);
-	assert.match(config, /tag = "v2"\s+new_sqlite_classes = \["UserInbox"\]/);
+	// 纯 D1 部署不再需要 Durable Objects；残留绑定会让 wrangler 找不到已删除的类。
+	assert.doesNotMatch(config, /durable_objects/);
+	assert.doesNotMatch(config, /class_name = "ChannelRoom"/);
 });

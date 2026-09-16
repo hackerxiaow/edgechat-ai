@@ -8,7 +8,7 @@ import {
 	findMessageReplyBySource,
 	getMessageSourceReference,
 } from "../../data/replies.js";
-import { submitExternalRoomMessage } from "../../do-bridge.js";
+import { submitExternalMessage } from "../../external-message-submission.js";
 import { sendTelegramMedia, sendTelegramText } from "./client.js";
 import {
 	deleteImportedTelegramAttachment,
@@ -214,32 +214,31 @@ export async function ingestTelegramMessage(env, { mapping, telegramMessage, bot
 				: "";
 	const content = [telegramMessage.content, attachmentNotice].filter(Boolean).join("\n\n");
 	try {
-		const response = await submitExternalRoomMessage(env, {
+		// 纯 D1 部署下提交直接返回结果对象，不再经过 Durable Object 的 HTTP 响应。
+		const result = await submitExternalMessage(env, {
 			room: {
 				id: mapping.channelId,
 				kind: mapping.channelKind,
 				name: mapping.channelName,
 			},
-			content,
-			attachment: imported.attachment,
-			source: "telegram",
-			sourceMessageId: telegramMessage.sourceMessageId,
-			sourceAttachmentId: telegramMessage.attachment?.fileId || null,
+			payload: {
+				content,
+				attachment: imported.attachment,
+				source: "telegram",
+				sourceMessageId: telegramMessage.sourceMessageId,
+				sourceAttachmentId: telegramMessage.attachment?.fileId || null,
 				sourceAttachmentUniqueId: telegramMessage.attachment?.fileUniqueId || null,
 				externalSender: telegramMessage.sender,
 				replyToMessageId: reply?.messageId || null,
 				replyToSenderId: reply?.senderId || null,
-			});
-		if (!response.ok) {
-			throw new Error(`Telegram 入站消息提交失败：${response.status}`);
-		}
-		const result = await response.json();
+			},
+		});
 		if (!result.created) {
 			await deleteImportedTelegramAttachment(env, imported.attachment);
 		}
-		return result;
+		return { ok: true, ...result };
 	} catch (error) {
-		// DO 响应中断时先按去重键复查，避免删除已经被正式消息引用的 R2 对象。
+		// 提交中断时先按去重键复查，避免删除已经被正式消息引用的对象。
 		const persisted = await getMessageBySource(
 			env,
 			"telegram",

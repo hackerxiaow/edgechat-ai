@@ -4,7 +4,7 @@ const AI_API_URL = 'https://api.seurl.eu.org/v1/chat/completions';
 const AI_API_KEY = 'sk_cf_2781e99f40f74df98c51a4592ab7ad95';
 const AI_MODEL = 'gemini/gemini-3.6-flash-high';
 
-export async function processAiBotResponse(channelRoom, { room, message }) {
+export async function processAiBotResponse(env, { room, message }) {
   try {
     // 忽略 AI 自身发出的消息，避免死循环
     if (message.source === 'ai' || message.sender?.displayName === 'ZeroClaw' || message.sender?.username === 'zeroclaw') {
@@ -60,15 +60,8 @@ export async function processAiBotResponse(channelRoom, { room, message }) {
       }
     };
 
-    const submission = await submitExternalMessage(channelRoom.env, { room, payload });
-
-    // 3. 如果在 DO 模式下广播 WebSocket；如果在 Pages 模式下由客户端轮询拉取
-    if (channelRoom.broadcast) {
-      await channelRoom.broadcast(submission.packet);
-    }
-    if (channelRoom.runMessageProjections) {
-      channelRoom.runMessageProjections(room, submission.message, submission.replyToSenderId);
-    }
+    // 纯 D1 部署没有实时推送，客户端轮询同步游标即可拿到这条回复。
+    await submitExternalMessage(env, { room, payload });
   } catch (err) {
     console.error('Failed to process AI bot response:', err);
   }

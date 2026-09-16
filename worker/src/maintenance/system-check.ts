@@ -1,21 +1,13 @@
 import manifest from '../generated/schema-manifest.json' with { type: 'json' };
-import { createInternalHeaders } from '../verified-identity.js';
 import { inspectSchema, type SchemaQuery } from './schema-contract.ts';
 
 interface Database {
   prepare(sql: string): { all(): Promise<{ results: Awaited<ReturnType<SchemaQuery>> }> };
 }
-interface Namespace {
-  idFromName(name: string): unknown;
-  get(id: unknown): { fetch(request: Request): Promise<Response> };
-}
 interface MaintenanceEnv {
   DB?: Database;
   SESSIONS?: { get(key: string): Promise<unknown> };
   FILES?: { list(options: { limit: number }): Promise<unknown> };
-  CHANNEL_ROOM?: Namespace;
-  USER_INBOX?: Namespace;
-  SCHEDULER?: Namespace;
   [key: string]: unknown;
 }
 type CheckStatus = 'ok' | 'error' | 'missing' | 'disabled' | 'blocked';
@@ -60,20 +52,6 @@ export function inspectEnvironment(env: MaintenanceEnv) {
   ];
 }
 
-async function checkObject(id: string, namespace: Namespace | undefined, service: string, timeoutMs: number) {
-  if (!namespace) return absent(id);
-  return probe(id, async () => {
-    // 固定探针地址复用同一对象，不创建随机业务房间，也不触发任何持久化写入。
-    const stub = namespace.get(namespace.idFromName('__edgechat_health__'));
-    const response = await stub.fetch(new Request('https://internal/health', { headers: createInternalHeaders() }));
-    const body = await response.json() as { ok?: boolean; service?: string };
-    if (!response.ok || body.ok !== true || body.service !== service) {
-      return { status: 'error', code: 'unexpected_response' };
-    }
-    return {};
-  }, timeoutMs);
-}
-
 export async function runSystemCheck(env: MaintenanceEnv, { timeoutMs = 8000 } = {}) {
   const started = Date.now();
   const database = async (): Promise<Check[]> => {
@@ -88,16 +66,13 @@ export async function runSystemCheck(env: MaintenanceEnv, { timeoutMs = 8000 } =
     }, timeoutMs);
     return [connectivity, schema];
   };
-  const [dbChecks, kv, r2, room, inbox, scheduler] = await Promise.all([
+  const [dbChecks, kv, r2] = await Promise.all([
     database(),
     env.SESSIONS ? probe('sessions', async () => { await env.SESSIONS?.get('__edgechat_health__'); return {}; }, timeoutMs) : absent('sessions'),
-    env.FILES ? probe('files', async () => { await env.FILES?.list({ limit: 1 }); return {}; }, timeoutMs) : absent('files', true),
-    checkObject('channelRoom', env.CHANNEL_ROOM, 'ChannelRoom', timeoutMs),
-    checkObject('userInbox', env.USER_INBOX, 'UserInbox', timeoutMs),
-    checkObject('scheduler', env.SCHEDULER, 'Scheduler', timeoutMs)
+    env.FILES ? probe('files', async () => { await env.FILES?.list({ limit: 1 }); return {}; }, timeoutMs) : absent('files', true)
   ]);
   const environment = inspectEnvironment(env);
-  const checks: Check[] = [...dbChecks, kv, r2, room, inbox, scheduler, {
+  const checks: Check[] = [...dbChecks, kv, r2, {
     id: 'environment', status: environment.some((item) => item.required && !item.present) ? 'missing' : 'ok',
     code: 'presence_only', durationMs: 0
   }];

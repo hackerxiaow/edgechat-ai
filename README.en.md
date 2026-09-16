@@ -174,11 +174,10 @@ To enable automatic incremental rotation for an existing Worker, manually run `D
 | Area | Technology |
 |---|---|
 | Frontend | Vue 3, Vue Router, Vite |
-| Backend | Cloudflare Workers, Hono |
-| Real-time communication | Durable Objects, WebSocket Hibernation |
-| Database | Cloudflare D1 |
-| Session storage | Cloudflare KV |
-| File storage | Cloudflare R2 |
+| Backend | Cloudflare Workers / Pages Functions, Hono |
+| Real-time communication | Cursor polling over D1 `message_events` (no long-lived sockets) |
+| Database | Cloudflare D1 (messages, sessions and attachment bodies) |
+| Optional fallbacks | KV sessions, R2 file storage (kept for older deployments, not required) |
 | Build and deployment | Wrangler, GitHub Actions |
 
 See [TECHNICAL.md](TECHNICAL.md) for more implementation details.
@@ -291,7 +290,7 @@ Edgechat/
 ├─ worker/
 │  ├─ schema.sql         # Database schema
 │  ├─ migrations/        # Database migrations
-│  └─ src/               # APIs, authentication, and Durable Objects
+│  └─ src/               # APIs, authentication, and data access
 ├─ capacitor/            # Web UI-based Android client
 ├─ android/              # Temporarily retained native Android client
 ├─ .github/workflows/    # Automated deployment and CI
