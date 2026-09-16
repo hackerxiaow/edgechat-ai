@@ -1600,7 +1600,8 @@ onBeforeUnmount(() => {
   z-index: 30;
   display: flex;
   justify-content: flex-end;
-  background: var(--chat-scrim);
+  /* 不压暗背后的聊天区：面板本身不透明且有边框阴影，已足够区分。 */
+  background: transparent;
 }
 
 .room-management-sidebar {
@@ -1768,7 +1769,7 @@ onBeforeUnmount(() => {
     width: auto;
     height: auto;
     padding-left: 48px;
-    background: rgba(11, 20, 26, 0.35);
+    background: transparent;
   }
 
   .room-management-sidebar {
