@@ -1155,8 +1155,9 @@ onBeforeUnmount(() => {
 .right-sidebar-action--admin,
 .right-sidebar-action--labeled {
   width: 64px;
-  min-height: 60px;
-  height: auto;
+  /* 固定高度要能容纳两行标签，否则只有长标签的按钮会变高、和邻居错位。 */
+  min-height: 72px;
+  height: 72px;
   padding: 8px 2px;
   gap: 6px;
   border-radius: 14px;
@@ -1189,8 +1190,14 @@ onBeforeUnmount(() => {
   max-width: 100%;
   font-size: 11px;
   line-height: 1.35;
-  white-space: nowrap;
+  /* 允许最多两行：英文 "Notifications off" 等较长标签挤不下一行。 */
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tooltip {
