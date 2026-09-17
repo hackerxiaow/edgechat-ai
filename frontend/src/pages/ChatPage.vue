@@ -66,6 +66,7 @@ const forwarding = ref(false);
 const isSelecting = ref(false);
 const selectedMessageIds = ref(new Set());
 const showInChatSearch = ref(false);
+const roomDrafts = reactive({});
 const messageComposer = ref(null);
 const showMobileNavigation = ref(false);
 const publicGroupPreview = ref(null);
@@ -566,6 +567,16 @@ async function bootstrap() {
   catch (e) { error.value = e.message; }
 }
 
+watch(composerText, (text) => {
+  if (!activeRoomKey.value) return;
+  const clean = String(text || '').trim();
+  if (clean) {
+    roomDrafts[activeRoomKey.value] = clean;
+  } else {
+    delete roomDrafts[activeRoomKey.value];
+  }
+});
+
 watch(activeRoomKey, async (k) => {
   closeMessageMenu();
   cancelMessageLongPress();
@@ -918,13 +929,17 @@ onBeforeUnmount(() => {
           @select-message="handleSelectSearchMessage"
         />
 
-			<ConversationList
-		  :items="conversationItems"
-		  :active-key="activeRoomKey"
-		  :loading="sidebarLoading"
-		  :is-room-muted="isRoomMuted"
-		  @select="selectConversation"
-		/>
+				<ConversationList
+			  :items="conversationItems"
+			  :active-key="activeRoomKey"
+			  :loading="sidebarLoading"
+			  :is-room-muted="isRoomMuted"
+			  :drafts="roomDrafts"
+			  @select="selectConversation"
+			  @toggle-mute="toggleRoomMuted"
+			  @mark-read="(item) => markConversationRead(item.kind, item.id)"
+			  @mark-unread="(item) => applyConversationActivity({ kind: item.kind, roomId: item.id, unreadCount: 1 })"
+			/>
 
 		<PublicGroupDiscovery :items="publicGroupItems" @select="openPublicGroupPreview" />
       </div>
