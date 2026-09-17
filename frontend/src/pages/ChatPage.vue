@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, Ban, Bell, BellOff, Check, ContactRound, Forward as ForwardIcon, Menu, MessageCircle, Pencil as PencilIcon, Search as SearchIcon, Settings, Trash2 as TrashIcon, UsersRound, X as CloseIcon } from '@lucide/vue';
+import { ArrowLeft, Ban, Bell, BellOff, Check, ChevronDown, ContactRound, Forward as ForwardIcon, Menu, MessageCircle, Paperclip, Pencil as PencilIcon, Search as SearchIcon, Settings, Trash2 as TrashIcon, UsersRound, X as CloseIcon } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '../composables/useTheme.js';
@@ -69,6 +69,9 @@ const forwarding = ref(false);
 const isSelecting = ref(false);
 const selectedMessageIds = ref(new Set());
 const showInChatSearch = ref(false);
+const isScrolledUp = ref(false);
+const unreadSinceScrolledUp = ref(0);
+const isDraggingFiles = ref(false);
 const showLightbox = ref(false);
 const lightboxUrl = ref('');
 const lightboxTitle = ref('');
@@ -489,6 +492,55 @@ function openMediaLightbox(url, title = '') {
 	showLightbox.value = true;
 }
 
+function handleMessagesScroll() {
+	if (!messagesEl.value) return;
+	const el = messagesEl.value;
+	const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+	if (distFromBottom > 240) {
+		isScrolledUp.value = true;
+	} else {
+		isScrolledUp.value = false;
+		unreadSinceScrolledUp.value = 0;
+	}
+}
+
+function messageDateSeparator(currentMsg, prevMsg) {
+	if (!currentMsg?.createdAt) return null;
+	const currentDate = new Date(currentMsg.createdAt).toDateString();
+	const prevDate = prevMsg?.createdAt ? new Date(prevMsg.createdAt).toDateString() : null;
+	if (currentDate === prevDate) return null;
+	const now = new Date();
+	const today = now.toDateString();
+	const yesterday = new Date(now.getTime() - 86400000).toDateString();
+	if (currentDate === today) return t('chat.today');
+	if (currentDate === yesterday) return t('chat.yesterday');
+	const d = new Date(currentMsg.createdAt);
+	return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function handleFileDrop(e) {
+	isDraggingFiles.value = false;
+	const file = e.dataTransfer?.files?.[0];
+	if (file) uploadAttachment(file);
+}
+
+function handleWindowPaste(e) {
+	if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.kind === 'file' && item.type.startsWith('image/')) {
+				const file = item.getAsFile();
+				if (file) {
+					e.preventDefault();
+					uploadAttachment(file);
+					break;
+				}
+			}
+		}
+	}
+}
+
 function exportChatHistory() {
 	if (!activeRoom.value) return;
 	const name = roomLabel(activeRoom.value) || 'chat';
@@ -731,9 +783,21 @@ async function copySelectedMessage() {
 	}
 }
 
+watch(
+  () => conversationItems.value.reduce((sum, item) => sum + (Number(item.unreadCount) || 0), 0),
+  (unread) => {
+    const base = store.site?.siteName || 'EdgeChat';
+    if (typeof document !== 'undefined') {
+      document.title = unread > 0 ? `(${unread}) ${base}` : base;
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   startViewportSync();
   window.addEventListener('focus', syncNotificationPermission);
+  window.addEventListener('paste', handleWindowPaste);
   window.addEventListener(NATIVE_ROOM_OPEN_EVENT, openNativeRoom);
   void bootstrap().then(() => {
     nativeRoomNavigationReady = true;
@@ -859,6 +923,7 @@ onBeforeUnmount(() => {
   cancelMessageLongPress();
   nativeRoomNavigationReady = false;
   window.removeEventListener('focus', syncNotificationPermission);
+  window.removeEventListener('paste', handleWindowPaste);
   window.removeEventListener(NATIVE_ROOM_OPEN_EVENT, openNativeRoom);
   clearInAppNotifications();
   disconnectUnreadInbox();
@@ -1028,7 +1093,13 @@ onBeforeUnmount(() => {
     />
 
     <!-- Right Main Chat Window -->
-    <main v-if="!isContactsView" class="chat-main">
+    <main v-if="!isContactsView" class="chat-main" @dragenter.prevent="isDraggingFiles = true" @dragover.prevent="isDraggingFiles = true" @dragleave.self.prevent="isDraggingFiles = false" @drop.prevent="handleFileDrop">
+      <div v-if="isDraggingFiles" class="drag-dropzone-overlay" @dragleave.self="isDraggingFiles = false">
+        <div class="drag-dropzone-box">
+          <Paperclip :size="36" aria-hidden="true" />
+          <p>{{ t('chat.dropFilesHere') }}</p>
+        </div>
+      </div>
       <template v-if="activeRoom">
         <header class="chat-header">
           <button
@@ -1160,90 +1231,107 @@ onBeforeUnmount(() => {
           @unpin="unpinMessage(pinnedMessage.id)"
         />
 
-        <section ref="messagesEl" class="chat-messages">
+        <section ref="messagesEl" class="chat-messages" @scroll="handleMessagesScroll">
           <button v-if="messages.length" type="button" class="load-more-btn" @click="loadOlder">{{ t('chat.loadEarlier') }}</button>
           <div v-if="loading" class="messages-hint">{{ t('chat.loadingMessages') }}</div>
           <div v-else-if="!messages.length" class="messages-hint">{{ t('chat.noMessages') }}</div>
 
-          <article
-            v-for="msg in messages" :key="msg.id"
-            :data-message-id="msg.id"
-            class="message-row"
-            :class="{
-              'message-row--own': isOwnMessage(msg),
-              'message-row--actionable': true,
-              'message-row--selected': selectedMessageIds.has(Number(msg.id))
-            }"
-          >
-            <button
-              v-if="isSelecting"
-              type="button"
-              class="message-select-checkbox"
-              :class="{ 'message-select-checkbox--checked': selectedMessageIds.has(Number(msg.id)) }"
-              :title="selectedMessageIds.has(Number(msg.id)) ? t('common.close') : t('chat.selectMessages')"
-              @click.stop="toggleSelectMessage(msg.id)"
-            >
-              <Check v-if="selectedMessageIds.has(Number(msg.id))" :size="13" aria-hidden="true" />
-            </button>
-            <button
-              v-if="!isSelecting"
-              type="button"
-              class="profile-avatar-trigger message-avatar-trigger"
-              :aria-label="t('profile.view', { name: msg.sender.displayName })"
-              @click="openSenderProfile(msg.sender)"
-            >
-              <UiAvatar class="message-avatar" :src="msg.sender.avatarUrl" :alt="msg.sender.displayName" :fallback="msg.sender.displayName" size="sm" />
-            </button>
-	            <div
-	              class="message-bubble"
-	              :class="{
-	                'message-bubble--with-attachment': msg.attachment,
-	                'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id),
-	                'message-bubble--media-only': isPureMediaMessage(msg)
-	              }"
-              @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
-              @contextmenu="openMessageContextMenu($event, msg)"
-              @pointerdown="startMessageLongPress($event, msg)"
-              @pointermove="trackMessageLongPress"
-              @pointerup="cancelMessageLongPress"
-              @pointercancel="cancelMessageLongPress"
-            >
-              <div v-if="msg.forwardFromName" class="message-bubble__forward">
-                <ForwardIcon :size="12" aria-hidden="true" />
-                <span>{{ t('chat.forwardFrom', { name: msg.forwardFromName }) }}</span>
-              </div>
-              <div v-if="activeRoom.kind !== 'dm' && !isOwnMessage(msg) && !msg.forwardFromName" class="message-sender-name">
-                <span>{{ msg.sender.displayName }}</span>
-                <SenderSourceBadge :source="msg.sender.source" />
-              </div>
-              <MessageReplyPreview
-                v-if="msg.replyTo"
-                class="message-bubble__reply"
-                :reply="msg.replyTo"
-                :clickable="!msg.replyTo.deleted"
-                @reveal="revealMessage(msg.replyToMessageId)"
-              />
-	              <MessageMarkdown
-	                v-if="msg.content && !isPureMediaContent(msg.content)"
-	                :content="messageContent(msg)"
-	                :mentions="msg.mentions"
-	                :current-user-id="session?.userId"
-	                :streaming="isStreamingMessage(msg)"
-	              />
-	              <InlineMediaPreview v-if="msg.content" :content="msg.content" @preview="openMediaLightbox" />
-	              <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
-              <MessageReactions
-                v-if="msg.reactions && msg.reactions.length"
-                :reactions="msg.reactions"
-                :current-user-id="session?.userId"
-                @toggle="handleReact($event, msg.id)"
-              />
-              <span class="message-time">
-                <span v-if="msg.editedAt" class="message-edited">{{ t('chat.edited') }}</span>
-                {{ formatBubbleTime(msg.createdAt) }}
-              </span>
+          <template v-for="(msg, index) in messages" :key="msg.id">
+            <div v-if="messageDateSeparator(msg, messages[index - 1])" class="date-divider">
+              <span>{{ messageDateSeparator(msg, messages[index - 1]) }}</span>
             </div>
-          </article>
+            <article
+              :data-message-id="msg.id"
+              class="message-row"
+              :class="{
+                'message-row--own': isOwnMessage(msg),
+                'message-row--actionable': true,
+                'message-row--selected': selectedMessageIds.has(Number(msg.id))
+              }"
+            >
+              <button
+                v-if="isSelecting"
+                type="button"
+                class="message-select-checkbox"
+                :class="{ 'message-select-checkbox--checked': selectedMessageIds.has(Number(msg.id)) }"
+                :title="selectedMessageIds.has(Number(msg.id)) ? t('common.close') : t('chat.selectMessages')"
+                @click.stop="toggleSelectMessage(msg.id)"
+              >
+                <Check v-if="selectedMessageIds.has(Number(msg.id))" :size="13" aria-hidden="true" />
+              </button>
+              <button
+                v-if="!isSelecting"
+                type="button"
+                class="profile-avatar-trigger message-avatar-trigger"
+                :aria-label="t('profile.view', { name: msg.sender.displayName })"
+                @click="openSenderProfile(msg.sender)"
+              >
+                <UiAvatar class="message-avatar" :src="msg.sender.avatarUrl" :alt="msg.sender.displayName" :fallback="msg.sender.displayName" size="sm" />
+              </button>
+              <div
+                class="message-bubble"
+                :class="{
+                  'message-bubble--with-attachment': msg.attachment,
+                  'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id),
+                  'message-bubble--media-only': isPureMediaMessage(msg)
+                }"
+                @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
+                @contextmenu="openMessageContextMenu($event, msg)"
+                @pointerdown="startMessageLongPress($event, msg)"
+                @pointermove="trackMessageLongPress"
+                @pointerup="cancelMessageLongPress"
+                @pointercancel="cancelMessageLongPress"
+              >
+                <div v-if="msg.forwardFromName" class="message-bubble__forward">
+                  <ForwardIcon :size="12" aria-hidden="true" />
+                  <span>{{ t('chat.forwardFrom', { name: msg.forwardFromName }) }}</span>
+                </div>
+                <div v-if="activeRoom.kind !== 'dm' && !isOwnMessage(msg) && !msg.forwardFromName" class="message-sender-name">
+                  <span>{{ msg.sender.displayName }}</span>
+                  <SenderSourceBadge :source="msg.sender.source" />
+                </div>
+                <MessageReplyPreview
+                  v-if="msg.replyTo"
+                  class="message-bubble__reply"
+                  :reply="msg.replyTo"
+                  :clickable="!msg.replyTo.deleted"
+                  @reveal="revealMessage(msg.replyToMessageId)"
+                />
+                <MessageMarkdown
+                  v-if="msg.content && !isPureMediaContent(msg.content)"
+                  :content="messageContent(msg)"
+                  :mentions="msg.mentions"
+                  :current-user-id="session?.userId"
+                  :streaming="isStreamingMessage(msg)"
+                />
+                <InlineMediaPreview v-if="msg.content" :content="msg.content" @preview="openMediaLightbox" />
+                <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
+                <MessageReactions
+                  v-if="msg.reactions && msg.reactions.length"
+                  :reactions="msg.reactions"
+                  :current-user-id="session?.userId"
+                  @toggle="handleReact($event, msg.id)"
+                />
+                <span class="message-time">
+                  <span v-if="msg.editedAt" class="message-edited">{{ t('chat.edited') }}</span>
+                  {{ formatBubbleTime(msg.createdAt) }}
+                </span>
+              </div>
+            </article>
+          </template>
+
+          <button
+            v-if="isScrolledUp"
+            type="button"
+            class="scroll-to-bottom-fab"
+            :title="t('chat.scrollToBottom')"
+            @click="scrollToBottom(); unreadSinceScrolledUp = 0; isScrolledUp = false;"
+          >
+            <ChevronDown :size="20" aria-hidden="true" />
+            <span v-if="unreadSinceScrolledUp > 0" class="fab-unread-badge">
+              {{ unreadSinceScrolledUp > 99 ? '99+' : unreadSinceScrolledUp }}
+            </span>
+          </button>
 
           <!-- 「正在输入」必须留在消息容器内部：容器带有水平内边距，
                放到外面会让头像与气泡比真实消息整体左移 28px。 -->
@@ -1948,6 +2036,113 @@ onBeforeUnmount(() => {
 
 .chat-messages::-webkit-scrollbar { width: 6px; }
 .chat-messages::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
+
+/* Telegram Web 经典日期分隔线 */
+.date-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 14px 0 10px;
+  position: sticky;
+  top: 4px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.date-divider span {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+:root[data-theme='dark'] .date-divider span {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f1f5f9;
+}
+
+/* Telegram Web 经典回到底部悬浮按钮 (FAB) */
+.scroll-to-bottom-fab {
+  position: fixed;
+  right: clamp(16px, 25vw, 240px);
+  bottom: 84px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--chat-line, rgba(0, 0, 0, 0.08));
+  border-radius: 50%;
+  background: var(--surface-solid, #ffffff);
+  color: var(--chat-muted, #64748b);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+.scroll-to-bottom-fab:hover {
+  transform: scale(1.08);
+  background: var(--chat-hover);
+  color: var(--chat-ink);
+}
+
+.fab-unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--chat-accent, #008069);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 拖拽上传遮罩层 */
+.drag-dropzone-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 128, 105, 0.12);
+  backdrop-filter: blur(4px);
+  padding: 24px;
+  pointer-events: all;
+}
+
+.drag-dropzone-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  border: 2px dashed var(--chat-accent, #008069);
+  border-radius: 16px;
+  color: var(--chat-accent, #008069);
+  font-size: 18px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+:root[data-theme='dark'] .drag-dropzone-box {
+  background: rgba(15, 23, 42, 0.85);
+}
 
 .load-more-btn {
   display: block;
