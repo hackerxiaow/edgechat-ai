@@ -511,6 +511,11 @@ export function useChatRoom({
 		async function editMessage(messageId, content) {
 			if (!activeRoom.value) return false;
 			error.value = "";
+			const target = messages.value.find((m) => Number(m.id) === Number(messageId));
+			if (target) {
+				target.content = content;
+				target.editedAt = new Date().toISOString();
+			}
 			try {
 				const res = await roomApi.editRoomMessage(
 					activeRoom.value.kind,
@@ -531,6 +536,36 @@ export function useChatRoom({
 		async function reactToMessage(messageId, emoji) {
 			if (!activeRoom.value) return false;
 			error.value = "";
+			const numMsgId = Number(messageId);
+			const target = messages.value.find((m) => Number(m.id) === numMsgId);
+			if (target) {
+				const myUser = {
+					id: Number(session.value?.userId || 1),
+					displayName: session.value?.displayName || session.value?.username || 'me',
+				};
+				const currentReactions = target.reactions ? [...target.reactions] : [];
+				const existingIndex = currentReactions.findIndex((r) => r.emoji === emoji);
+				if (existingIndex >= 0) {
+					const existing = { ...currentReactions[existingIndex] };
+					const userIdx = existing.users.findIndex((u) => Number(u.id) === Number(myUser.id));
+					if (userIdx >= 0) {
+						existing.users = existing.users.filter((u) => Number(u.id) !== Number(myUser.id));
+						existing.count = existing.users.length;
+						if (existing.count === 0) {
+							currentReactions.splice(existingIndex, 1);
+						} else {
+							currentReactions[existingIndex] = existing;
+						}
+					} else {
+						existing.users = [...existing.users, myUser];
+						existing.count = existing.users.length;
+						currentReactions[existingIndex] = existing;
+					}
+				} else {
+					currentReactions.push({ emoji, count: 1, users: [myUser] });
+				}
+				target.reactions = currentReactions;
+			}
 			try {
 				await roomApi.reactToRoomMessage(
 					activeRoom.value.kind,
@@ -630,9 +665,10 @@ export function useChatRoom({
 		reportTyping,
 		clearTyping,
 		streamingMessageIds,
-		finishStreaming,
-		isOwnMessage,
-		loadMessages,
+			finishStreaming,
+			isOwnMessage,
+			upsertMessage,
+			loadMessages,
 		activateRoom,
 		deactivateRoom,
 		pauseRoom,

@@ -385,7 +385,101 @@ export async function requestDemo(path, options = {}) {
       pinnedMessage: cloneDemo(demoState.pinnedMessages[key] || null)
     };
   }
-  if (method === 'POST' && pathname === '/messages/read') {
+		  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/messages$/);
+		  if (method === 'POST' && match) {
+		    const key = roomKey(match[1], match[2]);
+		    const msgId = demoState.nextMessageId++;
+		    const msg = {
+		      id: msgId,
+		      content: String(body.content || ''),
+		      attachment: body.attachment || null,
+		      forwardFromName: body.forwardFromName || null,
+		      replyToMessageId: body.replyMessageId || null,
+		      sender: {
+		        kind: 'local',
+		        id: demoState.session.userId,
+		        username: demoState.session.username,
+		        displayName: demoState.session.displayName,
+		        avatarUrl: demoState.session.avatarUrl || '',
+		        source: 'edgechat'
+		      },
+		      createdAt: new Date().toISOString(),
+		      source: 'edgechat'
+		    };
+		    demoState.messages[key] = demoState.messages[key] || [];
+		    demoState.messages[key].push(msg);
+		    return { created: true, message: cloneDemo(msg) };
+		  }
+
+		  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/messages\/(\d+)$/);
+	  if (match) {
+	    const key = roomKey(match[1], match[2]);
+	    const msgId = Number(match[3]);
+	    const msgs = demoState.messages[key] || [];
+	    const msgIndex = msgs.findIndex((m) => Number(m.id) === msgId);
+
+	    if (method === 'DELETE') {
+	      if (msgIndex >= 0) msgs.splice(msgIndex, 1);
+	      return { ok: true, messageId: msgId };
+	    }
+	    if (method === 'PATCH') {
+	      if (msgIndex < 0) fail('消息不存在', 404);
+	      msgs[msgIndex].content = String(body.content || '');
+	      msgs[msgIndex].editedAt = new Date().toISOString();
+	      return { ok: true, message: cloneDemo(msgs[msgIndex]) };
+	    }
+	  }
+
+	  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/messages\/(\d+)\/reactions$/);
+	  if (method === 'POST' && match) {
+	    const key = roomKey(match[1], match[2]);
+	    const msgId = Number(match[3]);
+	    const msgs = demoState.messages[key] || [];
+	    const msg = msgs.find((m) => Number(m.id) === msgId);
+	    if (!msg) fail('消息不存在', 404);
+
+	    const emoji = String(body.emoji || '').trim();
+	    if (!emoji) fail('表情参数无效');
+	    msg.reactions = msg.reactions || [];
+	    const reaction = msg.reactions.find((r) => r.emoji === emoji);
+	    const myUser = { id: demoState.session.userId, displayName: demoState.session.displayName };
+
+	    let action = 'added';
+	    if (reaction) {
+	      const userIndex = reaction.users.findIndex((u) => Number(u.id) === Number(myUser.id));
+	      if (userIndex >= 0) {
+	        reaction.users.splice(userIndex, 1);
+	        reaction.count = reaction.users.length;
+	        action = 'removed';
+	        if (reaction.count === 0) {
+	          msg.reactions = msg.reactions.filter((r) => r.emoji !== emoji);
+	        }
+	      } else {
+	        reaction.users.push(myUser);
+	        reaction.count = reaction.users.length;
+	      }
+	    } else {
+	      msg.reactions.push({ emoji, count: 1, users: [myUser] });
+	    }
+	    return { ok: true, action };
+	  }
+
+	  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/pin$/);
+	  if (match) {
+	    const key = roomKey(match[1], match[2]);
+	    const msgId = Number(body.messageId);
+	    if (method === 'PUT') {
+	      const msg = (demoState.messages[key] || []).find((m) => Number(m.id) === msgId);
+	      if (msg) demoState.pinnedMessages[key] = msg;
+	      return { ok: true, message: cloneDemo(msg) };
+	    }
+	    if (method === 'DELETE') {
+	      delete demoState.pinnedMessages[key];
+	      return { ok: true, messageId: msgId };
+	    }
+	  }
+
+	  if (method === 'POST' && pathname === '/messages/read') {
     const room = body.kind === 'dm'
       ? demoState.dms.find((dm) => Number(dm.id) === Number(body.roomId))
       : findDemoChannel(body.roomId);

@@ -171,7 +171,7 @@ const {
   messagesEl, isOwnMessage, typingUsers, reportTyping, streamingMessageIds, finishStreaming, scrollToBottomIfPinned,
   loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
   pinMessage, unpinMessage, revealPinnedMessage,
-  revealMessage, editMessage, reactToMessage,
+  revealMessage, editMessage, reactToMessage, upsertMessage,
   uploadAttachment, clearAttachment, loadOlder
 } = useChatRoom({
   activeRoom,
@@ -365,15 +365,18 @@ async function handleForwardConfirm(targetRoom) {
 			? [forwardTargetMessage.value]
 			: messages.value.filter((m) => selectedMessageIds.value.has(Number(m.id)));
 
-		for (const msg of messagesToForward) {
-			const senderName = msg.sender?.displayName || msg.sender?.username || t('common.unknown');
-			await api.sendRoomMessage(targetRoom.kind, targetRoom.id, {
-				clientMessageId: crypto.randomUUID(),
-				content: msg.content || '',
-				attachment: msg.attachment || null,
-				forwardFromName: senderName
-			});
-		}
+			for (const msg of messagesToForward) {
+				const senderName = msg.sender?.displayName || msg.sender?.username || t('common.unknown');
+				const res = await api.sendRoomMessage(targetRoom.kind, targetRoom.id, {
+					clientMessageId: crypto.randomUUID(),
+					content: msg.content || '',
+					attachment: msg.attachment || null,
+					forwardFromName: senderName
+				});
+				if (res?.message && activeRoom.value?.kind === targetRoom.kind && Number(activeRoom.value?.id) === Number(targetRoom.id)) {
+					upsertMessage(res.message);
+				}
+			}
 		showForwardDialog.value = false;
 		forwardTargetMessage.value = null;
 		exitSelectMode();

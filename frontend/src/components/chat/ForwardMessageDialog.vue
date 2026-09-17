@@ -71,7 +71,7 @@ function handleConfirm() {
               v-model="searchQuery"
               type="text"
               class="search-input"
-              :placeholder="t('contacts.searchPlaceholder')"
+              :placeholder="t('contacts.search')"
             />
           </div>
 
