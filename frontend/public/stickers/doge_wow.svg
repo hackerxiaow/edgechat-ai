@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Head -->
+    <ellipse cx="80" cy="85" rx="46" ry="42" fill="url(#dogeGrad)"/>
+    <!-- White muzzle -->
+    <ellipse cx="80" cy="95" rx="26" ry="20" fill="#fff8e1"/>
+    <!-- Ears -->
+    <polygon points="45,55 35,22 68,42" fill="#ffb300"/>
+    <polygon points="48,50 40,28 65,42" fill="#ffcc80"/>
+    <polygon points="115,55 125,22 92,42" fill="#ffb300"/>
+    <polygon points="112,50 120,28 95,42" fill="#ffcc80"/>
+    <!-- Big round curious eyes -->
+    <circle cx="62" cy="72" r="9" fill="#ffffff" stroke="#3e2723" stroke-width="2"/>
+    <circle cx="98" cy="72" r="9" fill="#ffffff" stroke="#3e2723" stroke-width="2"/>
+    <circle cx="64" cy="71" r="5" fill="#212121"/>
+    <circle cx="96" cy="71" r="5" fill="#212121"/>
+    <circle cx="66" cy="69" r="2" fill="#ffffff"/>
+    <circle cx="98" cy="69" r="2" fill="#ffffff"/>
+    <!-- Nose & Mouth -->
+    <ellipse cx="80" cy="88" rx="8" ry="6" fill="#212121"/>
+    <path d="M 73 95 Q 80 102 87 95" stroke="#3e2723" stroke-width="2.5" fill="none"/>
+    <!-- WOW text floating -->
+    <text x="115" y="45" font-family="Comic Sans MS, sans-serif" font-weight="bold" font-size="18" fill="#e91e63">wow</text>
+    <text x="15" y="55" font-family="Comic Sans MS, sans-serif" font-weight="bold" font-size="16" fill="#00e676">so chat</text>
+  
+  </g>
+</svg>

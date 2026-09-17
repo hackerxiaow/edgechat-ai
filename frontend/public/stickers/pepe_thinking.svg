@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Face -->
+    <ellipse cx="80" cy="75" rx="52" ry="42" fill="url(#pepeGrad)"/>
+    <!-- Big introspective eyes -->
+    <ellipse cx="60" cy="55" rx="16" ry="14" fill="#ffffff" stroke="#33691e" stroke-width="2.5"/>
+    <ellipse cx="98" cy="55" rx="16" ry="14" fill="#ffffff" stroke="#33691e" stroke-width="2.5"/>
+    <circle cx="63" cy="52" r="6" fill="#212121"/>
+    <circle cx="101" cy="52" r="6" fill="#212121"/>
+    <!-- Thoughtful mouth -->
+    <path d="M 55 86 Q 80 84 105 88" stroke="#1b5e20" stroke-width="4" fill="none"/>
+    <!-- Hand on chin -->
+    <ellipse cx="80" cy="108" rx="16" ry="12" fill="#8bc34a" stroke="#689f38" stroke-width="2"/>
+    <!-- Thinking dots -->
+    <circle cx="130" cy="40" r="4" fill="#689f38"/>
+    <circle cx="140" cy="30" r="6" fill="#689f38"/>
+    <circle cx="150" cy="18" r="8" fill="#689f38"/>
+  
+  </g>
+</svg>

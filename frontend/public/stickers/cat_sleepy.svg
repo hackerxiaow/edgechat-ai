@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Head -->
+    <ellipse cx="80" cy="85" rx="48" ry="40" fill="url(#catGrad)"/>
+    <!-- Ears -->
+    <polygon points="42,55 35,25 65,48" fill="#ffa726"/>
+    <polygon points="118,55 125,25 95,48" fill="#ffa726"/>
+    <!-- Closed sleeping eyes (straight lines) -->
+    <line x1="56" y1="78" x2="74" y2="78" stroke="#4e342e" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="86" y1="78" x2="104" y2="78" stroke="#4e342e" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Nose & tiny mouth -->
+    <polygon points="77,84 83,84 80,88" fill="#ff8a80"/>
+    <path d="M 76 90 Q 80 93 84 90" stroke="#4e342e" stroke-width="2" fill="none"/>
+    <!-- Floating ZZZ -->
+    <text x="120" y="45" font-family="sans-serif" font-weight="900" font-size="22" fill="#3f51b5">Z</text>
+    <text x="135" y="30" font-family="sans-serif" font-weight="900" font-size="16" fill="#5c6bc0">z</text>
+    <text x="145" y="18" font-family="sans-serif" font-weight="900" font-size="12" fill="#7986cb">z</text>
+  
+  </g>
+</svg>

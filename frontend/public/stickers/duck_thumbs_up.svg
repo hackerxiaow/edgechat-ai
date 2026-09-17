@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Body -->
+    <ellipse cx="80" cy="90" rx="45" ry="40" fill="url(#duckGrad)"/>
+    <!-- Head -->
+    <circle cx="80" cy="55" r="32" fill="url(#duckGrad)"/>
+    <!-- Cheeks -->
+    <circle cx="62" cy="62" r="6" fill="#ff8a80" opacity="0.6"/>
+    <circle cx="98" cy="62" r="6" fill="#ff8a80" opacity="0.6"/>
+    <!-- Eyes (Happy arcs) -->
+    <path d="M 64 50 Q 70 44 76 50" stroke="#263238" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 84 50 Q 90 44 96 50" stroke="#263238" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- Beak -->
+    <ellipse cx="80" cy="60" rx="14" ry="8" fill="#ff9800"/>
+    <!-- Thumbs Up Hand -->
+    <rect x="110" y="70" width="16" height="24" rx="8" fill="#ffeb3b" stroke="#fbc02d" stroke-width="2"/>
+    <path d="M 118 70 L 118 55 Q 123 52 126 57 L 126 70 Z" fill="#ff9800"/>
+  
+  </g>
+</svg>

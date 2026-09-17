@@ -33,6 +33,11 @@ function sanitizeMediaUrl(raw) {
 const MARKDOWN_IMG_REGEX = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
 const DIRECT_IMG_REGEX = /(https?:\/\/[^\s]+(?:\.gif|\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s]+)?)/gi;
 const GIPHY_TENOR_REGEX = /(https?:\/\/(?:media\d*\.giphy\.com|c\.tenor\.com|media\.tenor\.com)\/[^\s]+)/gi;
+const STICKER_REGEX = /(\/stickers\/[^\s)]+\.(?:svg|webp|png))/gi;
+
+function isSticker(url) {
+  return String(url || '').includes('/stickers/');
+}
 
 const imageUrls = computed(() => {
   const text = String(props.content || '');
@@ -40,21 +45,27 @@ const imageUrls = computed(() => {
 
   const urls = new Set();
 
-  // 1. 提取 Markdown 格式的图片，提取后从文本中剔除，避免被后续普通 URL 正则重复抓取
-  let remainingText = text.replace(MARKDOWN_IMG_REGEX, (_match, url) => {
+  // 1. 提取 Telegram 本地贴纸直链
+  let remainingText = text.replace(STICKER_REGEX, (_match, url) => {
+    if (url) urls.add(url.trim());
+    return ' ';
+  });
+
+  // 2. 提取 Markdown 格式的图片
+  remainingText = remainingText.replace(MARKDOWN_IMG_REGEX, (_match, url) => {
     const clean = sanitizeMediaUrl(url);
     if (clean) urls.add(clean);
     return ' ';
   });
 
-  // 2. 从剩余文本提取常规图片格式直链
+  // 3. 从剩余文本提取常规图片格式直链
   remainingText = remainingText.replace(DIRECT_IMG_REGEX, (url) => {
     const clean = sanitizeMediaUrl(url);
     if (clean) urls.add(clean);
     return ' ';
   });
 
-  // 3. 提取 Giphy / Tenor 等常见动图直链
+  // 4. 提取 Giphy / Tenor 等常见动图直链
   remainingText.replace(GIPHY_TENOR_REGEX, (url) => {
     const clean = sanitizeMediaUrl(url);
     if (clean) urls.add(clean);
@@ -81,6 +92,7 @@ function handleImageError(url) {
       v-for="url in visibleUrls"
       :key="url"
       class="inline-media-card"
+      :class="{ 'inline-media-card--sticker': isSticker(url) }"
       @click="emit('preview', url)"
     >
       <img
@@ -119,11 +131,19 @@ function handleImageError(url) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.inline-media-img {
-  display: block;
-  max-width: 100%;
-  max-height: 240px;
-  object-fit: contain;
-  border-radius: 10px;
+.inline-media-card--sticker {
+  background: transparent;
+  box-shadow: none;
+  max-width: 140px;
+}
+
+.inline-media-card--sticker:hover {
+  transform: scale(1.08);
+  box-shadow: none;
+}
+
+.inline-media-card--sticker .inline-media-img {
+  max-height: 140px;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.18));
 }
 </style>

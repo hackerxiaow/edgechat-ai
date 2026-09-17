@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Face -->
+    <ellipse cx="80" cy="80" rx="55" ry="45" fill="url(#pepeGrad)"/>
+    <!-- Big Pepe Eyes -->
+    <ellipse cx="60" cy="60" rx="18" ry="14" fill="#ffffff" stroke="#33691e" stroke-width="3"/>
+    <ellipse cx="100" cy="60" rx="18" ry="14" fill="#ffffff" stroke="#33691e" stroke-width="3"/>
+    <!-- Pupils -->
+    <circle cx="62" cy="60" r="7" fill="#212121"/>
+    <circle cx="98" cy="60" r="7" fill="#212121"/>
+    <circle cx="64" cy="58" r="2.5" fill="#ffffff"/>
+    <circle cx="100" cy="58" r="2.5" fill="#ffffff"/>
+    <!-- Eyelids -->
+    <path d="M 42 55 Q 60 48 78 55" stroke="#33691e" stroke-width="3" fill="none"/>
+    <path d="M 82 55 Q 100 48 118 55" stroke="#33691e" stroke-width="3" fill="none"/>
+    <!-- Famous Pepe Smile -->
+    <path d="M 45 88 Q 80 115 115 88" stroke="#1b5e20" stroke-width="5" fill="#d32f2f" stroke-linecap="round"/>
+    <!-- Lips -->
+    <path d="M 40 85 Q 80 102 120 85" stroke="#33691e" stroke-width="4" fill="none"/>
+  
+  </g>
+</svg>

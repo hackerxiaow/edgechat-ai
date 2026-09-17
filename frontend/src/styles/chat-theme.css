@@ -211,15 +211,75 @@ html.dark .composer-textarea {
   box-shadow: var(--shadow-sm) !important;
 }
 
+/* 自己发出的消息气泡：Telegram Web 官方经典浅薄荷绿（浅色模式） */
 .message-row--own .message-bubble {
-  background: var(--cool) !important;
-  color: #ffffff !important;
-  border-color: transparent !important;
+  background: #effdde !important;
+  color: #111b21 !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 1px 2px rgba(11, 20, 26, 0.08) !important;
 }
 
-.message-row--own .message-bubble .message-time,
+.message-row--own .message-bubble .message-time {
+  color: #539e6a !important;
+}
+
 .message-row--own .message-bubble .message-sender-name {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: #168758 !important;
+}
+
+.message-row--own .message-bubble .message-markdown {
+  color: #111b21 !important;
+}
+
+/* 深色模式下的自己消息气泡：Telegram Web 官方暗空沉静蓝 */
+html[data-theme="dark"] .message-row--own .message-bubble,
+html.dark .message-row--own .message-bubble,
+[data-theme="dark"] .message-row--own .message-bubble {
+  background: #2b5278 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme="dark"] .message-row--own .message-bubble .message-time,
+html.dark .message-row--own .message-bubble .message-time,
+[data-theme="dark"] .message-row--own .message-bubble .message-time {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
+html[data-theme="dark"] .message-row--own .message-bubble .message-markdown,
+html.dark .message-row--own .message-bubble .message-markdown,
+[data-theme="dark"] .message-row--own .message-bubble .message-markdown {
+  color: #ffffff !important;
+}
+
+/* 纯图片/动图/贴纸气泡：完全透明无边框、无底色包边，时间戳浮于右下角 */
+.message-bubble.message-bubble--media-only {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.message-bubble.message-bubble--media-only .message-time {
+  position: absolute !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: #ffffff !important;
+  padding: 2px 7px !important;
+  border-radius: 10px !important;
+  font-size: 10.5px !important;
+  line-height: 1.2 !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 5 !important;
+  margin: 0 !important;
+}
+
+.message-bubble.message-bubble--media-only .message-time .message-edited {
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 

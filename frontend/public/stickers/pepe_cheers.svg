@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Face -->
+    <ellipse cx="70" cy="75" rx="50" ry="42" fill="url(#pepeGrad)"/>
+    <!-- Eyes looking smug -->
+    <ellipse cx="55" cy="58" rx="16" ry="12" fill="#ffffff" stroke="#33691e" stroke-width="2.5"/>
+    <ellipse cx="90" cy="58" rx="16" ry="12" fill="#ffffff" stroke="#33691e" stroke-width="2.5"/>
+    <circle cx="58" cy="58" r="6" fill="#212121"/>
+    <circle cx="93" cy="58" r="6" fill="#212121"/>
+    <!-- Smug half-smile -->
+    <path d="M 50 82 Q 75 95 105 78" stroke="#1b5e20" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- Wine Glass -->
+    <path d="M 115 90 C 115 110 135 110 135 90 Z" fill="rgba(255,255,255,0.7)" stroke="#b0bec5" stroke-width="2"/>
+    <path d="M 117 95 C 117 107 133 107 133 95 Z" fill="#b71c1c"/>
+    <line x1="125" y1="110" x2="125" y2="130" stroke="#b0bec5" stroke-width="3"/>
+    <ellipse cx="125" cy="130" rx="10" ry="3" fill="#b0bec5"/>
+  
+  </g>
+</svg>

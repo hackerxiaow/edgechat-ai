@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Head -->
+    <ellipse cx="80" cy="85" rx="48" ry="40" fill="url(#catGrad)"/>
+    <!-- Ears -->
+    <polygon points="42,55 35,25 65,48" fill="#ffa726"/>
+    <polygon points="45,52 40,32 62,48" fill="#ff8a80"/>
+    <polygon points="118,55 125,25 95,48" fill="#ffa726"/>
+    <polygon points="115,52 120,32 98,48" fill="#ff8a80"/>
+    <!-- Happy Curved Eyes -->
+    <path d="M 58 75 Q 66 67 74 75" stroke="#4e342e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 86 75 Q 94 67 102 75" stroke="#4e342e" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- Pink Nose -->
+    <polygon points="76,84 84,84 80,89" fill="#e91e63"/>
+    <!-- Mouth -->
+    <path d="M 74 91 Q 80 96 86 91" stroke="#4e342e" stroke-width="2.5" fill="none"/>
+    <!-- Hearts floating -->
+    <path d="M 35 45 C 35 38 25 35 20 42 C 15 50 35 65 35 65 C 35 65 55 50 50 42 C 45 35 35 38 35 45 Z" fill="#e91e63"/>
+    <path d="M 125 45 C 125 38 115 35 110 42 C 105 50 125 65 125 65 C 125 65 145 50 140 42 C 135 35 125 38 125 45 Z" fill="#e91e63"/>
+  
+  </g>
+</svg>

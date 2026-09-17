@@ -1,15 +1,15 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Film, Image as ImageIcon, Search, Smile, X } from '@lucide/vue';
+import { Film, Image as ImageIcon, Search, Smile, Sticker, X } from '@lucide/vue';
 import { t } from '../../i18n.js';
 
 const props = defineProps({
   open: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['close', 'select-emoji', 'select-gif']);
+const emit = defineEmits(['close', 'select-emoji', 'select-gif', 'select-sticker']);
 
-const activeTab = ref('emoji'); // 'emoji' | 'gif'
+const activeTab = ref('emoji'); // 'emoji' | 'stickers' | 'gif'
 const searchQuery = ref('');
 const pickerEl = ref(null);
 
@@ -71,6 +71,34 @@ const CURATED_GIFS = [
   { title: 'Love', url: 'https://media.giphy.com/media/M90mJvfWfd5mbUuULX/giphy.gif' }
 ];
 
+const TELEGRAM_STICKERS = [
+  {
+    pack: 'Duck (经典鸭子)',
+    stickers: [
+      { id: 'duck_thumbs_up', title: '赞', url: '/stickers/duck_thumbs_up.svg' },
+      { id: 'duck_heart', title: '爱心', url: '/stickers/duck_heart.svg' },
+      { id: 'duck_cool', title: '酷', url: '/stickers/duck_cool.svg' },
+      { id: 'duck_party', title: '庆祝', url: '/stickers/duck_party.svg' },
+    ]
+  },
+  {
+    pack: 'Pepe (经典佩佩蛙)',
+    stickers: [
+      { id: 'pepe_happy', title: '开心', url: '/stickers/pepe_happy.svg' },
+      { id: 'pepe_cheers', title: '干杯', url: '/stickers/pepe_cheers.svg' },
+      { id: 'pepe_thinking', title: '思考', url: '/stickers/pepe_thinking.svg' },
+    ]
+  },
+  {
+    pack: 'Cats & Doge (萌宠)',
+    stickers: [
+      { id: 'cat_love', title: '比心', url: '/stickers/cat_love.svg' },
+      { id: 'cat_sleepy', title: '困了', url: '/stickers/cat_sleepy.svg' },
+      { id: 'doge_wow', title: '哇塞', url: '/stickers/doge_wow.svg' },
+    ]
+  }
+];
+
 const filteredCategories = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return EMOJI_CATEGORIES;
@@ -127,6 +155,16 @@ onBeforeUnmount(() => {
           type="button"
           role="tab"
           class="picker-tab"
+          :class="{ 'picker-tab--active': activeTab === 'stickers' }"
+          @click="activeTab = 'stickers'"
+        >
+          <Sticker :size="15" aria-hidden="true" />
+          <span>{{ t('chat.stickers') }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="picker-tab"
           :class="{ 'picker-tab--active': activeTab === 'gif' }"
           @click="activeTab = 'gif'"
         >
@@ -170,6 +208,27 @@ onBeforeUnmount(() => {
             @click="emit('select-emoji', emoji)"
           >
             {{ emoji }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram 贴纸列表 -->
+    <div v-else-if="activeTab === 'stickers'" class="picker-scroll-area stickers-scroll-area">
+      <div v-for="pack in TELEGRAM_STICKERS" :key="pack.pack" class="sticker-pack">
+        <div class="category-header">
+          <span>{{ pack.pack }}</span>
+        </div>
+        <div class="sticker-grid">
+          <button
+            v-for="stk in pack.stickers"
+            :key="stk.id"
+            type="button"
+            class="sticker-cell"
+            :title="stk.title"
+            @click="emit('select-sticker', stk)"
+          >
+            <img :src="stk.url" :alt="stk.title" loading="lazy" />
           </button>
         </div>
       </div>
@@ -387,6 +446,37 @@ onBeforeUnmount(() => {
 
 .gif-cell:hover img {
   transform: scale(1.05);
+}
+
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px;
+}
+
+.sticker-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 120ms ease;
+}
+
+.sticker-cell:hover {
+  transform: scale(1.15);
+  background: var(--chat-hover, rgba(0, 0, 0, 0.05));
+}
+
+.sticker-cell img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .gif-cell__title {

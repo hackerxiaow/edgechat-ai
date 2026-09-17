@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Body -->
+    <ellipse cx="80" cy="95" rx="45" ry="38" fill="url(#duckGrad)"/>
+    <!-- Head -->
+    <circle cx="80" cy="60" r="30" fill="url(#duckGrad)"/>
+    <!-- Party Hat -->
+    <polygon points="80,15 65,45 95,45" fill="#e91e63"/>
+    <circle cx="80" cy="15" r="5" fill="#ffeb3b"/>
+    <circle cx="72" cy="35" r="3" fill="#00e676"/>
+    <circle cx="88" cy="30" r="3.5" fill="#00b0ff"/>
+    <!-- Happy Eyes -->
+    <path d="M 66 58 Q 72 52 78 58" stroke="#263238" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M 82 58 Q 88 52 94 58" stroke="#263238" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- Party Horn in Beak -->
+    <ellipse cx="80" cy="66" rx="12" ry="6" fill="#ff9800"/>
+    <path d="M 88 66 L 125 55 L 122 72 Z" fill="#00e5ff"/>
+    <circle cx="125" cy="63" r="5" fill="#ff1744"/>
+  
+  </g>
+</svg>

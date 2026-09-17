@@ -33,6 +33,7 @@ import PublicGroupDiscovery from '../components/chat/PublicGroupDiscovery.vue';
 import PublicGroupJoinDialog from '../components/chat/PublicGroupJoinDialog.vue';
 import UiAvatar from '../components/ui/Avatar.vue';
 import LanguageSwitch from '../components/ui/LanguageSwitch.vue';
+import { isPreviewableImageAttachment } from '../components/chat/attachment-utils.js';
 import { useActiveRoom } from '../composables/useActiveRoom.js';
 import { useBrowserNotifications } from '../composables/useBrowserNotifications.js';
 import { useChatRoom } from '../composables/useChatRoom.js';
@@ -346,6 +347,12 @@ async function handleSendGif(gif) {
 	replyingTo.value = null;
 }
 
+async function handleSendSticker(sticker) {
+	if (!sticker?.url || !activeRoom.value) return;
+	await sendMessage([], replyingTo.value?.id, null, sticker.url);
+	replyingTo.value = null;
+}
+
 function startEditMessage(message) {
 	closeMessageMenu();
 	if (!message) return;
@@ -463,6 +470,17 @@ async function handleSelectSearchMessage(item) {
 function isPureMediaContent(content) {
 	const text = String(content || '').trim();
 	return /^(?:https?:\/\/[^\s]+(?:\.gif|\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s]+)?|https?:\/\/(?:media\d*\.giphy\.com|c\.tenor\.com|media\.tenor\.com)\/[^\s]+|!\[.*?\]\(https?:\/\/[^\s)]+\))$/i.test(text);
+}
+
+function isPureMediaMessage(msg) {
+	if (!msg) return false;
+	if (msg.attachment && isPreviewableImageAttachment(msg.attachment) && !msg.content?.trim()) {
+		return true;
+	}
+	if (msg.content && isPureMediaContent(msg.content) && !msg.attachment) {
+		return true;
+	}
+	return false;
 }
 
 function openMediaLightbox(url, title = '') {
@@ -1176,12 +1194,13 @@ onBeforeUnmount(() => {
             >
               <UiAvatar class="message-avatar" :src="msg.sender.avatarUrl" :alt="msg.sender.displayName" :fallback="msg.sender.displayName" size="sm" />
             </button>
-            <div
-              class="message-bubble"
-              :class="{
-                'message-bubble--with-attachment': msg.attachment,
-                'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id)
-              }"
+	            <div
+	              class="message-bubble"
+	              :class="{
+	                'message-bubble--with-attachment': msg.attachment,
+	                'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id),
+	                'message-bubble--media-only': isPureMediaMessage(msg)
+	              }"
               @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
               @contextmenu="openMessageContextMenu($event, msg)"
               @pointerdown="startMessageLongPress($event, msg)"
@@ -1332,9 +1351,10 @@ onBeforeUnmount(() => {
 				  :mention-candidates="mentionCandidates"
 				  :replying-to="replyingTo"
 				  :context-key="activeRoomKey"
-					  @send="sendComposerMessage"
-					  @send-gif="handleSendGif"
-					  @voice-recorded="sendComposerVoice"
+						  @send="sendComposerMessage"
+						  @send-gif="handleSendGif"
+						  @send-sticker="handleSendSticker"
+						  @voice-recorded="sendComposerVoice"
 				  @cancel-reply="replyingTo = null"
 			  @typing="reportTyping"
 			  @upload="uploadAttachment"

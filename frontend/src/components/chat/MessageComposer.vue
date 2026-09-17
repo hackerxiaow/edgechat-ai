@@ -51,6 +51,7 @@ const emit = defineEmits([
 	"update:modelValue",
 	"send",
 	"send-gif",
+	"send-sticker",
 	"upload",
 	"clear-attachment",
 	"voice-recorded",
@@ -83,6 +84,11 @@ function handleSelectEmoji(emoji) {
 function handleSelectGif(gif) {
 	showEmojiPicker.value = false;
 	emit("send-gif", gif);
+}
+
+function handleSelectSticker(sticker) {
+	showEmojiPicker.value = false;
+	emit("send-sticker", sticker);
 }
 const finishingRecording = ref(false);
 const composing = ref(false);
@@ -515,13 +521,14 @@ onBeforeUnmount(() => {
 					</button>
 				</div>
 			</div>
-				<div v-else class="composer-row">
-					<EmojiGifPicker
-						:open="showEmojiPicker"
-						@close="showEmojiPicker = false"
-						@select-emoji="handleSelectEmoji"
-						@select-gif="handleSelectGif"
-					/>
+					<div v-else class="composer-row">
+						<EmojiGifPicker
+							:open="showEmojiPicker"
+							@close="showEmojiPicker = false"
+							@select-emoji="handleSelectEmoji"
+							@select-gif="handleSelectGif"
+							@select-sticker="handleSelectSticker"
+						/>
 					<button
 						type="button"
 						class="composer-btn composer-emoji-trigger"

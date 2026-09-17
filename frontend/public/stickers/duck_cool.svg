@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="duckGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffeb3b"/>
+      <stop offset="100%" stop-color="#fbc02d"/>
+    </linearGradient>
+    <linearGradient id="pepeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8bc34a"/>
+      <stop offset="100%" stop-color="#689f38"/>
+    </linearGradient>
+    <linearGradient id="catGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc80"/>
+      <stop offset="100%" stop-color="#ffa726"/>
+    </linearGradient>
+    <linearGradient id="dogeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#ffb300"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#shadow)">
+    
+    <!-- Body -->
+    <ellipse cx="80" cy="90" rx="45" ry="40" fill="url(#duckGrad)"/>
+    <!-- Head -->
+    <circle cx="80" cy="55" r="32" fill="url(#duckGrad)"/>
+    <!-- Beak with smug smile -->
+    <ellipse cx="80" cy="62" rx="14" ry="7" fill="#ff9800"/>
+    <!-- Sunglasses -->
+    <path d="M 52 46 L 76 46 L 73 58 L 55 58 Z" fill="#212121"/>
+    <path d="M 84 46 L 108 46 L 105 58 L 87 58 Z" fill="#212121"/>
+    <line x1="76" y1="48" x2="84" y2="48" stroke="#212121" stroke-width="3"/>
+    <line x1="45" y1="49" x2="52" y2="48" stroke="#212121" stroke-width="2.5"/>
+    <line x1="108" y1="48" x2="115" y2="49" stroke="#212121" stroke-width="2.5"/>
+    <!-- Glasses Glare -->
+    <line x1="56" y1="49" x2="62" y2="55" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
+    <line x1="88" y1="49" x2="94" y2="55" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
+  
+  </g>
+</svg>
