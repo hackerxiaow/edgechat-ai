@@ -163,6 +163,34 @@ export default {
       method: 'DELETE'
     });
   },
+  editRoomMessage(kind, roomId, messageId, content) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/messages/${Number(messageId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: { content }
+    });
+  },
+  reactToRoomMessage(kind, roomId, messageId, emoji) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/messages/${Number(messageId)}/reactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { emoji }
+    });
+  },
+  pinRoomMessage(kind, roomId, messageId) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/pin`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: { messageId: Number(messageId) }
+    });
+  },
+  unpinRoomMessage(kind, roomId, messageId) {
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/pin`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: { messageId: Number(messageId) }
+    });
+  },
   syncRoomMessages(kind, roomId, cursor) {
     const query = new URLSearchParams(cursor ? { cursor: String(cursor) } : {});
     return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/sync?${query.toString()}`);

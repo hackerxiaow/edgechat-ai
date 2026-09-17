@@ -234,13 +234,27 @@ export const D1_MIGRATIONS = [
 			"column:room_typing.avatar_url",
 		],
 	},
-	{
-		id: "2026-09-17-room-typing",
-		file: "worker/migrations/2026-09-17-room-typing.sql",
-		artifacts: ["table:room_typing", "index:idx_room_typing_channel_updated"],
-	},
-	{
-		id: "2026-09-17-user-presence",
+		{
+			id: "2026-09-17-room-typing",
+			file: "worker/migrations/2026-09-17-room-typing.sql",
+			artifacts: ["table:room_typing", "index:idx_room_typing_channel_updated"],
+		},
+		{
+			id: "2026-09-17-telegram-message-features",
+			file: "worker/migrations/2026-09-17-telegram-message-features.sql",
+			artifacts: [
+				"column:messages.edited_at",
+				"column:messages.forward_from_name",
+				"table:message_reactions",
+				"index:idx_message_reactions_message",
+				"index:idx_message_reactions_user",
+				"trigger:record_reaction_added_event",
+				"trigger:record_reaction_removed_event",
+				"trigger:record_message_edited_event",
+			],
+		},
+		{
+			id: "2026-09-17-user-presence",
 		file: "worker/migrations/2026-09-17-user-presence.sql",
 		artifacts: ["table:user_presence", "index:idx_user_presence_updated"],
 	},

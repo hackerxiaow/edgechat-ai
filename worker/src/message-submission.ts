@@ -23,6 +23,7 @@ export interface MessageSubmissionPayload {
 	mentionUserIds?: unknown;
 	replyMessageId?: unknown;
 	clientMessageId?: string | null;
+	forwardFromName?: string | null;
 }
 
 export interface MessageSubmissionResult {
@@ -112,13 +113,16 @@ export function createMessageSubmission({
 					replyMessageId: payload.replyMessageId,
 				}),
 			]);
-			const persistencePayload: PersistMessageInput = {
-				channelId: meta.room.id,
-				senderId: meta.principal.userId,
-				content: String(payload.content ?? ""),
-				attachment: payload.attachment,
-				mentionUserIds,
-			};
+					const persistencePayload: PersistMessageInput = {
+						channelId: meta.room.id,
+						senderId: meta.principal.userId,
+						content: String(payload.content ?? ""),
+						attachment: payload.attachment,
+						mentionUserIds,
+					};
+				if (payload.forwardFromName) {
+					persistencePayload.forwardFromName = payload.forwardFromName;
+				}
 			if (reply.messageId) {
 				persistencePayload.replyToMessageId = reply.messageId;
 				persistencePayload.replyToSenderId = reply.senderId;

@@ -338,55 +338,57 @@ export function useChatRoom({
 		roomSession.disconnect();
 	}
 
-		async function sendMessage(mentionUserIds = [], replyMessageId = null) {
-			if (!activeRoom.value) return false;
-			if (!composerText.value.trim() && !pendingAttachment.value) {
-				return false;
-			}
+			async function sendMessage(mentionUserIds = [], replyMessageId = null, forwardFromName = null) {
+				if (!activeRoom.value) return false;
+				if (!composerText.value.trim() && !pendingAttachment.value) {
+					return false;
+				}
 
-			sending.value = true;
-		reportTyping(false);
-			error.value = "";
-			const clientMessageId = crypto.randomUUID();
-			const content = composerText.value;
-			const attachment = pendingAttachment.value;
-			composerText.value = "";
-			pendingAttachment.value = null;
+				sending.value = true;
+			reportTyping(false);
+				error.value = "";
+				const clientMessageId = crypto.randomUUID();
+				const content = composerText.value;
+				const attachment = pendingAttachment.value;
+				composerText.value = "";
+				pendingAttachment.value = null;
 
-			// 乐观立即上屏：0ms 即刻看到自己的消息！
-			const tempId = -Date.now();
-			const optimisticMsg = {
-				id: tempId,
-				content,
-				attachment,
-				sender: {
-					kind: 'local',
-					id: Number(session.value?.userId || 1),
-					username: session.value?.username || 'me',
-					displayName: session.value?.displayName || session.value?.username || 'me',
-					avatarUrl: session.value?.avatarUrl || '',
-					source: 'edgechat'
-				},
-				createdAt: new Date().toISOString(),
-				source: 'edgechat',
-				clientMessageId
-			};
-			upsertMessage(optimisticMsg);
-
-			try {
-				const res = await roomApi.sendRoomMessage(activeRoom.value.kind, activeRoom.value.id, {
-					clientMessageId,
+				// 乐观立即上屏：0ms 即刻看到自己的消息！
+				const tempId = -Date.now();
+				const optimisticMsg = {
+					id: tempId,
 					content,
 					attachment,
-					mentionUserIds,
-					replyMessageId: replyMessageId ? Number(replyMessageId) : null
-				});
-					if (res?.message) {
-						upsertMessage(res.message);
-						applyActiveRoomActivity(res.message);
-					}
-				return true;
-			} catch (currentError) {
+					sender: {
+						kind: 'local',
+						id: Number(session.value?.userId || 1),
+						username: session.value?.username || 'me',
+						displayName: session.value?.displayName || session.value?.username || 'me',
+						avatarUrl: session.value?.avatarUrl || '',
+						source: 'edgechat'
+					},
+					createdAt: new Date().toISOString(),
+					source: 'edgechat',
+					clientMessageId,
+					...(forwardFromName ? { forwardFromName } : {})
+				};
+				upsertMessage(optimisticMsg);
+
+				try {
+					const res = await roomApi.sendRoomMessage(activeRoom.value.kind, activeRoom.value.id, {
+						clientMessageId,
+						content,
+						attachment,
+						mentionUserIds,
+						replyMessageId: replyMessageId ? Number(replyMessageId) : null,
+						...(forwardFromName ? { forwardFromName } : {})
+					});
+						if (res?.message) {
+							upsertMessage(res.message);
+							applyActiveRoomActivity(res.message);
+						}
+					return true;
+				} catch (currentError) {
 				error.value = currentError.message;
 				messages.value = messages.value.filter(m => m.id !== tempId && m.clientMessageId !== clientMessageId);
 				return false;
@@ -432,47 +434,116 @@ export function useChatRoom({
 			}
 		}
 
-	function deleteMessage(messageId) {
-		const key = activeRoom.value
-			? `${activeRoom.value.kind}:${activeRoom.value.id}`
-			: "";
-		if (!roomSession.isOpenFor(key)) {
-			error.value = t('chat.realtimeNotReady');
-			return false;
+		function deleteMessage(messageId) {
+			const key = activeRoom.value
+				? `${activeRoom.value.kind}:${activeRoom.value.id}`
+				: "";
+			if (!roomSession.isOpenFor(key)) {
+				error.value = t('chat.realtimeNotReady');
+				return false;
+			}
+			error.value = "";
+			const sent = roomSession.send(
+				JSON.stringify({ type: "delete_message", messageId: Number(messageId) }),
+				key,
+			);
+			if (typeof roomApi?.deleteRoomMessage === 'function') {
+				void roomApi.deleteRoomMessage(
+					activeRoom.value.kind,
+					activeRoom.value.id,
+					messageId,
+				).then(() => {
+					messages.value = messages.value.filter(
+						(m) => Number(m.id) !== Number(messageId),
+					);
+				}).catch(() => {});
+			}
+			return sent;
 		}
 
-		error.value = "";
-		return roomSession.send(
-			JSON.stringify({ type: "delete_message", messageId: Number(messageId) }),
-			key,
-		);
-	}
-
-	function pinMessage(messageId) {
-		const key = roomKey();
-		if (!roomSession.isOpenFor(key)) {
-			error.value = t('chat.realtimeNotReady');
-			return false;
+		function pinMessage(messageId) {
+			const key = roomKey();
+			if (!roomSession.isOpenFor(key)) {
+				error.value = t('chat.realtimeNotReady');
+				return false;
+			}
+			error.value = "";
+			const sent = roomSession.send(
+				JSON.stringify({ type: "pin_message", messageId: Number(messageId) }),
+				key,
+			);
+			if (typeof roomApi?.pinRoomMessage === 'function') {
+				void roomApi.pinRoomMessage(
+					activeRoom.value.kind,
+					activeRoom.value.id,
+					messageId,
+				).then(() => {
+					const target = messages.value.find((m) => Number(m.id) === Number(messageId));
+					if (target) pinnedMessage.value = target;
+				}).catch(() => {});
+			}
+			return sent;
 		}
-		error.value = "";
-		return roomSession.send(
-			JSON.stringify({ type: "pin_message", messageId: Number(messageId) }),
-			key,
-		);
-	}
 
-	function unpinMessage(messageId) {
-		const key = roomKey();
-		if (!roomSession.isOpenFor(key)) {
-			error.value = t('chat.realtimeNotReady');
-			return false;
+		function unpinMessage(messageId) {
+			const key = roomKey();
+			if (!roomSession.isOpenFor(key)) {
+				error.value = t('chat.realtimeNotReady');
+				return false;
+			}
+			error.value = "";
+			const sent = roomSession.send(
+				JSON.stringify({ type: "unpin_message", messageId: Number(messageId) }),
+				key,
+			);
+			if (typeof roomApi?.unpinRoomMessage === 'function') {
+				void roomApi.unpinRoomMessage(
+					activeRoom.value.kind,
+					activeRoom.value.id,
+					messageId,
+				).then(() => {
+					pinnedMessage.value = null;
+				}).catch(() => {});
+			}
+			return sent;
 		}
-		error.value = "";
-		return roomSession.send(
-			JSON.stringify({ type: "unpin_message", messageId: Number(messageId) }),
-			key,
-		);
-	}
+
+		async function editMessage(messageId, content) {
+			if (!activeRoom.value) return false;
+			error.value = "";
+			try {
+				const res = await roomApi.editRoomMessage(
+					activeRoom.value.kind,
+					activeRoom.value.id,
+					messageId,
+					content,
+				);
+				if (res?.message) {
+					upsertMessage(res.message);
+				}
+				return true;
+			} catch (e) {
+				error.value = localizeErrorMessage(e?.message || t('common.unknown'));
+				return false;
+			}
+		}
+
+		async function reactToMessage(messageId, emoji) {
+			if (!activeRoom.value) return false;
+			error.value = "";
+			try {
+				await roomApi.reactToRoomMessage(
+					activeRoom.value.kind,
+					activeRoom.value.id,
+					messageId,
+					emoji,
+				);
+				return true;
+			} catch (e) {
+				error.value = localizeErrorMessage(e?.message || t('common.unknown'));
+				return false;
+			}
+		}
 
 	async function revealMessage(messageId) {
 		const targetId = Number(messageId);
@@ -567,11 +638,13 @@ export function useChatRoom({
 		pauseRoom,
 		connectSocket,
 		disconnectSocket,
-			sendMessage,
-			sendVoiceMessage,
-		deleteMessage,
-		pinMessage,
-			unpinMessage,
+				sendMessage,
+				sendVoiceMessage,
+			editMessage,
+			reactToMessage,
+			deleteMessage,
+			pinMessage,
+				unpinMessage,
 			revealMessage,
 			revealPinnedMessage,
 		uploadAttachment,

@@ -5,8 +5,10 @@ import { saveUploadedFile, UPLOAD_BODY_OVERHEAD_BYTES } from './upload.ts';
 import {
   getRoomSyncCursor,
   listMessages,
-  listRoomMessageEvents
+  listRoomMessageEvents,
+  updateMessageContent
 } from '../data/messages.ts';
+import { toggleMessageReaction } from '../data/reactions.ts';
 import { getRuntimeSettings } from '../data/site-settings.ts';
 import { getUserByUsername } from '../data/users.ts';
 import { submitClientRoomAction } from '../room-actions.ts';
@@ -250,31 +252,120 @@ export function registerV1Routes(app: Hono<AppEnv>) {
     }
 
     const payload = await parseJsonRequest<{
-      clientMessageId?: string;
-      content?: string;
-      attachment?: unknown;
-      mentionUserIds?: unknown;
-      replyMessageId?: unknown;
-    }>(c.req.raw);
-    if (!isUuid(payload.clientMessageId)) {
-      return v1ErrorResponse('client_message_id_invalid', 'clientMessageId 必须是 UUID');
-    }
-    return submitClientRoomAction(c.env, {
-      room,
-      principal: session,
-      action: {
-        type: 'send',
-        clientMessageId: payload.clientMessageId,
-			content: String(payload.content ?? ''),
-				attachment: payload.attachment || null,
-				mentionUserIds: payload.mentionUserIds || [],
-				replyMessageId: payload.replyMessageId ?? null
-			  },
-      ctx: c.executionCtx
-    });
-  });
+	      clientMessageId?: string;
+	      content?: string;
+	      attachment?: unknown;
+	      mentionUserIds?: unknown;
+	      replyMessageId?: unknown;
+	      forwardFromName?: string;
+	    }>(c.req.raw);
+	    if (!isUuid(payload.clientMessageId)) {
+	      return v1ErrorResponse('client_message_id_invalid', 'clientMessageId 必须是 UUID');
+	    }
+	    return submitClientRoomAction(c.env, {
+	      room,
+	      principal: session,
+	      action: {
+	        type: 'send',
+	        clientMessageId: payload.clientMessageId,
+				content: String(payload.content ?? ''),
+					attachment: payload.attachment || null,
+					mentionUserIds: payload.mentionUserIds || [],
+					replyMessageId: payload.replyMessageId ?? null,
+					forwardFromName: payload.forwardFromName ? String(payload.forwardFromName) : null
+				  },
+	      ctx: c.executionCtx
+	    });
+	  });
 
-  app.delete('/api/v1/rooms/:kind/:id/messages/:messageId', authMiddleware, async (c) => {
+	  app.patch('/api/v1/rooms/:kind/:id/messages/:messageId', authMiddleware, async (c) => {
+	    const { session, room } = await requireRoom(c);
+	    const messageId = Number(c.req.param('messageId'));
+	    if (!Number.isInteger(messageId) || messageId <= 0) {
+	      return v1ErrorResponse('message_id_invalid', '消息 ID 无效');
+	    }
+	    const payload = await parseJsonRequest<{ content: string }>(c.req.raw);
+	    const content = String(payload.content || '').trim();
+	    if (!content) {
+	      return v1ErrorResponse('content_required', '消息内容不能为空');
+	    }
+	    try {
+	      const updated = await updateMessageContent(c.env, {
+	        messageId,
+	        channelId: room.id,
+	        userId: session.userId,
+	        content
+	      });
+		      return c.json({ ok: true, message: updated });
+		    } catch (e: unknown) {
+		      const msg = String((e as { message?: string })?.message || '');
+	      if (msg.includes('Cannot edit')) {
+	        return v1ErrorResponse('forbidden', '只能编辑自己发送的消息', 403);
+	      }
+	      if (msg.includes('not found')) {
+	        return v1ErrorResponse('message_not_found', '消息不存在或已删除', 404);
+	      }
+	      return v1ErrorResponse('update_failed', msg || '编辑失败');
+	    }
+	  });
+
+	  app.post('/api/v1/rooms/:kind/:id/messages/:messageId/reactions', authMiddleware, async (c) => {
+	    const { session, room } = await requireRoom(c);
+	    const messageId = Number(c.req.param('messageId'));
+	    if (!Number.isInteger(messageId) || messageId <= 0) {
+	      return v1ErrorResponse('message_id_invalid', '消息 ID 无效');
+	    }
+	    const payload = await parseJsonRequest<{ emoji: string }>(c.req.raw);
+	    const emoji = String(payload.emoji || '').trim();
+	    if (!emoji || emoji.length > 32) {
+	      return v1ErrorResponse('emoji_invalid', '表情参数无效');
+	    }
+	    try {
+	      const result = await toggleMessageReaction(c.env.DB, {
+	        channelId: room.id,
+	        messageId,
+	        userId: session.userId,
+	        emoji
+	      });
+		      return c.json({ ok: true, ...result });
+		    } catch (e: unknown) {
+		      const msg = String((e as { message?: string })?.message || '');
+	      if (msg.includes('not found')) {
+	        return v1ErrorResponse('message_not_found', '消息不存在或已删除', 404);
+	      }
+	      return v1ErrorResponse('reaction_failed', msg || '操作失败');
+	    }
+	  });
+
+	  app.put('/api/v1/rooms/:kind/:id/pin', authMiddleware, async (c) => {
+	    const { session, room } = await requireRoom(c);
+	    const payload = await parseJsonRequest<{ messageId: number | string }>(c.req.raw);
+	    const messageId = Number(payload.messageId);
+	    if (!Number.isInteger(messageId) || messageId <= 0) {
+	      return v1ErrorResponse('message_id_invalid', '消息 ID 无效');
+	    }
+	    return submitClientRoomAction(c.env, {
+	      room,
+	      principal: session,
+	      action: { type: 'pin_message', messageId }
+	    });
+	  });
+
+	  app.delete('/api/v1/rooms/:kind/:id/pin', authMiddleware, async (c) => {
+	    const { session, room } = await requireRoom(c);
+	    const payload = await parseJsonRequest<{ messageId: number | string }>(c.req.raw);
+	    const messageId = Number(payload.messageId);
+	    if (!Number.isInteger(messageId) || messageId <= 0) {
+	      return v1ErrorResponse('message_id_invalid', '消息 ID 无效');
+	    }
+	    return submitClientRoomAction(c.env, {
+	      room,
+	      principal: session,
+	      action: { type: 'unpin_message', messageId }
+	    });
+	  });
+
+	  app.delete('/api/v1/rooms/:kind/:id/messages/:messageId', authMiddleware, async (c) => {
     const { session, room } = await requireRoom(c);
     return submitClientRoomAction(c.env, {
       room,

@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, Ban, Bell, BellOff, ContactRound, Menu, MessageCircle, Settings, UsersRound } from '@lucide/vue';
+import { ArrowLeft, Ban, Bell, BellOff, Check, ContactRound, Forward as ForwardIcon, Menu, MessageCircle, Pencil as PencilIcon, Settings, Trash2 as TrashIcon, UsersRound, X as CloseIcon } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '../composables/useTheme.js';
@@ -12,6 +12,7 @@ import { isDemoMode } from '../runtime.js';
 import AddConversationDialog from '../components/chat/AddConversationDialog.vue';
 import ConversationList from '../components/chat/ConversationList.vue';
 import CreateGroupDialog from '../components/chat/CreateGroupDialog.vue';
+import ForwardMessageDialog from '../components/chat/ForwardMessageDialog.vue';
 import GroupSettingsDialog from '../components/chat/GroupSettingsDialog.vue';
 import InAppNotificationStack from '../components/chat/InAppNotificationStack.vue';
 import MemberPanel from '../components/chat/MemberPanel.vue';
@@ -19,6 +20,7 @@ import MessageAttachment from '../components/chat/MessageAttachment.vue';
 import MessageComposer from '../components/chat/MessageComposer.vue';
 import MessageMarkdown from '../components/chat/MessageMarkdown.vue';
 import MessageContextMenu from '../components/chat/MessageContextMenu.vue';
+import MessageReactions from '../components/chat/MessageReactions.vue';
 import MessageReplyPreview from '../components/chat/MessageReplyPreview.vue';
 import PinnedMessageBar from '../components/chat/PinnedMessageBar.vue';
 import MobileNavigationDrawer from '../components/chat/MobileNavigationDrawer.vue';
@@ -55,6 +57,12 @@ const { formatTime: formatLocaleTime, t } = useI18n();
 const error = ref('');
 const activeRoom = ref(null);
 const replyingTo = ref(null);
+const editingMessage = ref(null);
+const showForwardDialog = ref(false);
+const forwardTargetMessage = ref(null);
+const forwarding = ref(false);
+const isSelecting = ref(false);
+const selectedMessageIds = ref(new Set());
 const messageComposer = ref(null);
 const showMobileNavigation = ref(false);
 const publicGroupPreview = ref(null);
@@ -161,9 +169,9 @@ function handleRoomAccessRevoked(room) {
 const {
   messages, pinnedMessage, highlightedMessageId, loading, wsStatus, composerText, pendingAttachment, sending,
   messagesEl, isOwnMessage, typingUsers, reportTyping, streamingMessageIds, finishStreaming, scrollToBottomIfPinned,
-	  loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
-	  pinMessage, unpinMessage, revealPinnedMessage,
-	  revealMessage,
+  loadMessages, activateRoom, deactivateRoom, pauseRoom, disconnectSocket, sendMessage, sendVoiceMessage, deleteMessage,
+  pinMessage, unpinMessage, revealPinnedMessage,
+  revealMessage, editMessage, reactToMessage,
   uploadAttachment, clearAttachment, loadOlder
 } = useChatRoom({
   activeRoom,
@@ -204,6 +212,11 @@ const canModerateMessages = computed(() => {
 const canPinMessages = computed(
   () => Boolean(activeRoom.value?.kind !== 'dm' && (session.value?.isAdmin || canManageActiveRoom.value))
 );
+const canEditSelectedMessage = computed(() => {
+  const msg = messageMenu.value?.message;
+  if (!msg) return false;
+  return isOwnMessage(msg) && !msg.attachment?.kind;
+});
 const {
   messageMenu,
   closeMessageMenu,
@@ -303,12 +316,108 @@ function editProfile() {
 watch(() => session.value?.userId, closeUserProfile);
 
 async function sendComposerMessage() {
+	if (editingMessage.value) {
+		const msgId = editingMessage.value.id;
+		const newContent = composerText.value;
+		editingMessage.value = null;
+		composerText.value = '';
+		return editMessage(msgId, newContent);
+	}
 	const sent = await sendMessage(
 		resolveMentionUserIds(composerText.value, mentionCandidates.value, session.value?.userId),
 		replyingTo.value?.id,
 	);
 	if (sent) replyingTo.value = null;
 	return sent;
+}
+
+function startEditMessage(message) {
+	closeMessageMenu();
+	if (!message) return;
+	replyingTo.value = null;
+	editingMessage.value = message;
+	composerText.value = message.content || '';
+	nextTick(() => messageComposer.value?.focus());
+}
+
+function cancelEditMessage() {
+	editingMessage.value = null;
+	composerText.value = '';
+}
+
+async function handleReact(emoji, messageId) {
+	closeMessageMenu();
+	if (!messageId || !emoji) return;
+	await reactToMessage(messageId, emoji);
+}
+
+function openForwardDialog(message) {
+	closeMessageMenu();
+	forwardTargetMessage.value = message || null;
+	showForwardDialog.value = true;
+}
+
+async function handleForwardConfirm(targetRoom) {
+	if (!targetRoom) return;
+	forwarding.value = true;
+	try {
+		const messagesToForward = forwardTargetMessage.value
+			? [forwardTargetMessage.value]
+			: messages.value.filter((m) => selectedMessageIds.value.has(Number(m.id)));
+
+		for (const msg of messagesToForward) {
+			const senderName = msg.sender?.displayName || msg.sender?.username || t('common.unknown');
+			await api.sendRoomMessage(targetRoom.kind, targetRoom.id, {
+				clientMessageId: crypto.randomUUID(),
+				content: msg.content || '',
+				attachment: msg.attachment || null,
+				forwardFromName: senderName
+			});
+		}
+		showForwardDialog.value = false;
+		forwardTargetMessage.value = null;
+		exitSelectMode();
+	} catch (e) {
+		error.value = e?.message || t('common.unknown');
+	} finally {
+		forwarding.value = false;
+	}
+}
+
+function startMultiSelect(message) {
+	closeMessageMenu();
+	isSelecting.value = true;
+	selectedMessageIds.value = new Set(message ? [Number(message.id)] : []);
+}
+
+function toggleSelectMessage(messageId) {
+	const numId = Number(messageId);
+	const next = new Set(selectedMessageIds.value);
+	if (next.has(numId)) {
+		next.delete(numId);
+	} else {
+		next.add(numId);
+	}
+	selectedMessageIds.value = next;
+}
+
+function exitSelectMode() {
+	isSelecting.value = false;
+	selectedMessageIds.value = new Set();
+}
+
+async function deleteSelectedMessages() {
+	const ids = [...selectedMessageIds.value];
+	if (!ids.length || !window.confirm(t('chat.deleteMessageConfirm'))) return;
+	for (const id of ids) {
+		await deleteMessage(id);
+	}
+	exitSelectMode();
+}
+
+function forwardSelectedMessages() {
+	forwardTargetMessage.value = null;
+	showForwardDialog.value = true;
 }
 
 async function sendComposerVoice(recording) {
@@ -900,12 +1009,24 @@ onBeforeUnmount(() => {
             v-for="msg in messages" :key="msg.id"
             :data-message-id="msg.id"
             class="message-row"
-			:class="{
-			  'message-row--own': isOwnMessage(msg),
-			  'message-row--actionable': true
-			}"
+            :class="{
+              'message-row--own': isOwnMessage(msg),
+              'message-row--actionable': true,
+              'message-row--selected': selectedMessageIds.has(Number(msg.id))
+            }"
           >
             <button
+              v-if="isSelecting"
+              type="button"
+              class="message-select-checkbox"
+              :class="{ 'message-select-checkbox--checked': selectedMessageIds.has(Number(msg.id)) }"
+              :title="selectedMessageIds.has(Number(msg.id)) ? t('common.close') : t('chat.selectMessages')"
+              @click.stop="toggleSelectMessage(msg.id)"
+            >
+              <Check v-if="selectedMessageIds.has(Number(msg.id))" :size="13" aria-hidden="true" />
+            </button>
+            <button
+              v-if="!isSelecting"
               type="button"
               class="profile-avatar-trigger message-avatar-trigger"
               :aria-label="t('profile.view', { name: msg.sender.displayName })"
@@ -919,32 +1040,46 @@ onBeforeUnmount(() => {
                 'message-bubble--with-attachment': msg.attachment,
                 'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id)
               }"
+              @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
               @contextmenu="openMessageContextMenu($event, msg)"
               @pointerdown="startMessageLongPress($event, msg)"
               @pointermove="trackMessageLongPress"
               @pointerup="cancelMessageLongPress"
               @pointercancel="cancelMessageLongPress"
             >
-			  <div v-if="activeRoom.kind !== 'dm' && !isOwnMessage(msg)" class="message-sender-name">
+              <div v-if="msg.forwardFromName" class="message-bubble__forward">
+                <ForwardIcon :size="12" aria-hidden="true" />
+                <span>{{ t('chat.forwardFrom', { name: msg.forwardFromName }) }}</span>
+              </div>
+              <div v-if="activeRoom.kind !== 'dm' && !isOwnMessage(msg) && !msg.forwardFromName" class="message-sender-name">
                 <span>{{ msg.sender.displayName }}</span>
                 <SenderSourceBadge :source="msg.sender.source" />
-			  </div>
-			  <MessageReplyPreview
-				v-if="msg.replyTo"
-				class="message-bubble__reply"
-				:reply="msg.replyTo"
-				:clickable="!msg.replyTo.deleted"
-				@reveal="revealMessage(msg.replyToMessageId)"
-			  />
-			  <MessageMarkdown
-				v-if="msg.content"
-				:content="messageContent(msg)"
-				:mentions="msg.mentions"
-				:current-user-id="session?.userId"
-				:streaming="isStreamingMessage(msg)"
-			  />
+              </div>
+              <MessageReplyPreview
+                v-if="msg.replyTo"
+                class="message-bubble__reply"
+                :reply="msg.replyTo"
+                :clickable="!msg.replyTo.deleted"
+                @reveal="revealMessage(msg.replyToMessageId)"
+              />
+              <MessageMarkdown
+                v-if="msg.content"
+                :content="messageContent(msg)"
+                :mentions="msg.mentions"
+                :current-user-id="session?.userId"
+                :streaming="isStreamingMessage(msg)"
+              />
               <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
-              <span class="message-time">{{ formatBubbleTime(msg.createdAt) }}</span>
+              <MessageReactions
+                v-if="msg.reactions && msg.reactions.length"
+                :reactions="msg.reactions"
+                :current-user-id="session?.userId"
+                @toggle="handleReact($event, msg.id)"
+              />
+              <span class="message-time">
+                <span v-if="msg.editedAt" class="message-edited">{{ t('chat.edited') }}</span>
+                {{ formatBubbleTime(msg.createdAt) }}
+              </span>
             </div>
           </article>
 
@@ -971,37 +1106,95 @@ onBeforeUnmount(() => {
           :open="Boolean(messageMenu.message)"
           :x="messageMenu.x"
           :y="messageMenu.y"
-		  :can-pin="canPinMessages"
-			  :can-delete="canModerateMessages"
-			  :can-copy="Boolean(messageMenu.message?.content)"
-			  :pinned="selectedMessageIsPinned"
-			  @close="closeMessageMenu"
-			  @copy="copySelectedMessage"
-			  @reply="replyToSelectedMessage"
+          :can-pin="canPinMessages"
+          :can-delete="canModerateMessages"
+          :can-copy="Boolean(messageMenu.message?.content)"
+          :can-edit="canEditSelectedMessage"
+          :pinned="selectedMessageIsPinned"
+          @close="closeMessageMenu"
+          @copy="copySelectedMessage"
+          @reply="replyToSelectedMessage"
           @pin="pinSelectedMessage"
           @unpin="unpinSelectedMessage"
           @delete="confirmDeleteMessage"
+          @react="handleReact($event, messageMenu.message?.id)"
+          @edit="startEditMessage(messageMenu.message)"
+          @forward="openForwardDialog(messageMenu.message)"
+          @select="startMultiSelect(messageMenu.message)"
         />
 
-		<p v-if="composerDisabledHint" class="composer-disabled-hint">{{ composerDisabledHint }}</p>
+			<p v-if="composerDisabledHint" class="composer-disabled-hint">{{ composerDisabledHint }}</p>
 
-		<MessageComposer
-		  ref="messageComposer"
-		  v-model="composerText"
-		  :pending-attachment="pendingAttachment"
-		  :sending="sending"
-			  :disabled="!activeRoom || activeDmBlockedByMe || composerDisabled"
-			  :error="error"
-			  :mention-candidates="mentionCandidates"
-			  :replying-to="replyingTo"
-			  :context-key="activeRoomKey"
-			  @send="sendComposerMessage"
-			  @voice-recorded="sendComposerVoice"
-			  @cancel-reply="replyingTo = null"
-		  @typing="reportTyping"
-		  @upload="uploadAttachment"
-		  @clear-attachment="clearAttachment"
-		/>
+			<!-- Telegram Web 风格的编辑状态横幅 -->
+			<div v-if="editingMessage" class="composer-edit-banner">
+				<div class="composer-edit-banner__info">
+					<PencilIcon :size="15" aria-hidden="true" />
+					<span>{{ t('chat.editingMessage') }}</span>
+				</div>
+				<button
+					type="button"
+					class="composer-edit-banner__close"
+					:title="t('chat.cancelEdit')"
+					:aria-label="t('chat.cancelEdit')"
+					@click="cancelEditMessage"
+				>
+					<CloseIcon :size="16" aria-hidden="true" />
+				</button>
+			</div>
+
+			<!-- 多选操作栏 -->
+			<div v-if="isSelecting" class="selection-action-bar">
+				<span class="selection-action-bar__count">
+					{{ t('chat.selectedCount', { count: selectedMessageIds.size }) }}
+				</span>
+				<div class="selection-action-bar__actions">
+					<button
+						type="button"
+						class="selection-btn"
+						:disabled="!selectedMessageIds.size"
+						@click="forwardSelectedMessages"
+					>
+						<ForwardIcon :size="15" aria-hidden="true" />
+						<span>{{ t('chat.forwardSelected') }}</span>
+					</button>
+					<button
+						type="button"
+						class="selection-btn selection-btn--danger"
+						:disabled="!selectedMessageIds.size"
+						@click="deleteSelectedMessages"
+					>
+						<TrashIcon :size="15" aria-hidden="true" />
+						<span>{{ t('chat.deleteSelected') }}</span>
+					</button>
+					<button
+						type="button"
+						class="selection-btn selection-btn--cancel"
+						@click="exitSelectMode"
+					>
+						<CloseIcon :size="15" aria-hidden="true" />
+						<span>{{ t('chat.exitSelect') }}</span>
+					</button>
+				</div>
+			</div>
+
+			<MessageComposer
+			  v-else
+			  ref="messageComposer"
+			  v-model="composerText"
+			  :pending-attachment="pendingAttachment"
+			  :sending="sending"
+				  :disabled="!activeRoom || activeDmBlockedByMe || composerDisabled"
+				  :error="error"
+				  :mention-candidates="mentionCandidates"
+				  :replying-to="replyingTo"
+				  :context-key="activeRoomKey"
+				  @send="sendComposerMessage"
+				  @voice-recorded="sendComposerVoice"
+				  @cancel-reply="replyingTo = null"
+			  @typing="reportTyping"
+			  @upload="uploadAttachment"
+			  @clear-attachment="clearAttachment"
+			/>
       </template>
 
       <div v-else class="chat-empty">
@@ -1112,10 +1305,17 @@ onBeforeUnmount(() => {
       @upload-avatar="uploadGroupAvatar"
       @save="saveGroupSettings"
       @delete-group="deleteGroup"
-      @leave-group="leaveGroup"
-      @transfer-owner="transferOwner"
-    />
-    <InAppNotificationStack
+	      @leave-group="leaveGroup"
+	      @transfer-owner="transferOwner"
+	    />
+	    <ForwardMessageDialog
+	      :show="showForwardDialog"
+	      :conversation-items="conversationItems"
+	      :forwarding="forwarding"
+	      @close="showForwardDialog = false"
+	      @forward="handleForwardConfirm"
+	    />
+	    <InAppNotificationStack
       :notifications="inAppNotifications"
       @open="openInAppNotification"
       @dismiss="dismissInAppNotification"
@@ -1765,6 +1965,152 @@ onBeforeUnmount(() => {
 
 .message-bubble__reply {
 	margin-bottom: 5px;
+}
+
+.message-row--selected .message-bubble {
+  box-shadow: 0 0 0 2px var(--chat-accent, #008069);
+}
+
+.message-select-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--chat-line, rgba(0, 0, 0, 0.2));
+  border-radius: 50%;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  padding: 0;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.message-select-checkbox--checked {
+  background: var(--chat-accent, #008069);
+  border-color: var(--chat-accent, #008069);
+}
+
+.message-bubble__forward {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--chat-accent, #008069);
+  font-weight: 500;
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.message-edited {
+  margin-right: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.composer-edit-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 940px;
+  margin: 0 auto 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--chat-paper, #ffffff);
+  border-left: 3px solid var(--chat-accent, #008069);
+  box-shadow: var(--chat-shadow);
+}
+
+.composer-edit-banner__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--chat-accent, #008069);
+  font-weight: 500;
+}
+
+.composer-edit-banner__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--chat-muted);
+  cursor: pointer;
+}
+
+.composer-edit-banner__close:hover {
+  background: var(--chat-hover);
+}
+
+.selection-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 940px;
+  margin: 0 auto 8px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: var(--surface-solid, #ffffff);
+  border: 1px solid var(--chat-line, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme='dark'] .selection-action-bar {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.selection-action-bar__count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--chat-ink);
+}
+
+.selection-action-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--chat-line, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chat-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.selection-btn:hover:not(:disabled) {
+  background: var(--chat-hover);
+}
+
+.selection-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selection-btn--danger {
+  color: var(--chat-danger, #e53935);
+  border-color: rgba(229, 57, 53, 0.2);
+}
+
+.selection-btn--danger:hover:not(:disabled) {
+  background: var(--chat-danger-soft, rgba(229, 57, 53, 0.08));
 }
 
 .chat-empty {

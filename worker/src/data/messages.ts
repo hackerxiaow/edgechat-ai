@@ -2,6 +2,7 @@ import { decryptMessageContent, encryptMessageContent } from "../encryption.ts";
 import type { AppBindings } from "../types.ts";
 import { pickAttachment, publicFileUrl } from "../utils.ts";
 import { normalizeMentionUserIds } from "./mentions.ts";
+import type { MessageReactionSummary } from "./reactions.ts";
 import { fileBelongsToUser, isR2ObjectUnavailableError } from "./uploaded-files.ts";
 
 export type AttachmentKind = "voice" | "audio";
@@ -52,6 +53,9 @@ export interface Message {
 	clientMessageId?: string;
 	replyToMessageId?: number;
 	replyTo?: MessageReplyTarget;
+	editedAt?: string | null;
+	forwardFromName?: string | null;
+	reactions?: MessageReactionSummary[];
 }
 
 /** MESSAGE_SELECT 的投影结果。 */
@@ -78,6 +82,8 @@ export interface MessageRow {
 	mention_user_ids: string | null;
 	reply_to_message_id: number | null;
 	reply_to_sender_id: number | null;
+	edited_at: string | null;
+	forward_from_name: string | null;
 	created_at: string;
 	sender_id: number | null;
 	sender_username: string | null;
@@ -100,31 +106,33 @@ export interface MessageRow {
 	reply_sender_id: number | null;
 	reply_sender_username: string | null;
 	reply_sender_display_name: string | null;
-	reply_sender_avatar_key: string | null;
-	mentions_json: string | null;
-}
+		reply_sender_avatar_key: string | null;
+		mentions_json: string | null;
+		reactions_json: string | null;
+	}
 
-/** 由上游提交入口构造的持久化参数；本地与外部消息共用同一形状。 */
-export interface PersistMessageInput {
-	channelId: number | string;
-	senderId?: number | string | null;
-	externalSender?: {
-		id?: string | number;
-		displayName?: string;
-		username?: string;
-		avatarUrl?: string;
-	} | null;
-	content: string;
-	attachment?: unknown;
-	source?: string;
-	sourceMessageId?: string | null;
-	sourceAttachmentId?: string | null;
-	sourceAttachmentUniqueId?: string | null;
-	clientMessageId?: string | null;
-	mentionUserIds?: unknown;
-	replyToMessageId?: number | string | null;
-	replyToSenderId?: number | string | null;
-}
+	/** 由上游提交入口构造的持久化参数；本地与外部消息共用同一形状。 */
+	export interface PersistMessageInput {
+		channelId: number | string;
+		senderId?: number | string | null;
+		externalSender?: {
+			id?: string | number;
+			displayName?: string;
+			username?: string;
+			avatarUrl?: string;
+		} | null;
+		content: string;
+		attachment?: unknown;
+		source?: string;
+		sourceMessageId?: string | null;
+		sourceAttachmentId?: string | null;
+		sourceAttachmentUniqueId?: string | null;
+		clientMessageId?: string | null;
+		mentionUserIds?: unknown;
+		replyToMessageId?: number | string | null;
+		replyToSenderId?: number | string | null;
+		forwardFromName?: string | null;
+	}
 
 export interface PersistMessageResult {
 	message: Message | null;
@@ -216,6 +224,20 @@ export function mapMessage(
 			displayName: mention.displayName,
 		}),
 	);
+	const rawReactions: Array<{ emoji: string; userId: number; displayName: string }> = JSON.parse(
+		row.reactions_json || "[]",
+	);
+	const reactionGroups = new Map<string, Array<{ id: number; displayName: string }>>();
+	for (const item of rawReactions) {
+		const list = reactionGroups.get(item.emoji) || [];
+		list.push({ id: Number(item.userId), displayName: item.displayName });
+		reactionGroups.set(item.emoji, list);
+	}
+	const reactions: MessageReactionSummary[] = [];
+	for (const [emoji, users] of reactionGroups.entries()) {
+		reactions.push({ emoji, count: users.length, users });
+	}
+
 	const message: Message = {
 		id: Number(row.id),
 		content,
@@ -239,6 +261,15 @@ export function mapMessage(
 		},
 		attachment: mapAttachment(row),
 	};
+	if (row.edited_at) {
+		message.editedAt = row.edited_at;
+	}
+	if (row.forward_from_name) {
+		message.forwardFromName = row.forward_from_name;
+	}
+	if (reactions.length > 0) {
+		message.reactions = reactions;
+	}
 	if (row.client_message_id) {
 		message.clientMessageId = row.client_message_id;
 	}
@@ -333,8 +364,9 @@ const MESSAGE_SELECT = `SELECT
 		  m.sender_kind, m.external_sender_id, m.external_sender_name,
 		  m.external_sender_avatar_url, m.source, m.source_message_id,
 		  m.source_attachment_id, m.source_attachment_unique_id, m.client_message_id,
-			  m.mention_user_ids, m.reply_to_message_id, m.reply_to_sender_id, m.created_at,
-		  u.id AS sender_id, u.username AS sender_username,
+			  m.mention_user_ids, m.reply_to_message_id, m.reply_to_sender_id,
+			  m.edited_at, m.forward_from_name, m.created_at,
+			  u.id AS sender_id, u.username AS sender_username,
 		  u.display_name AS sender_display_name, u.avatar_key AS sender_avatar_key,
 		  reply.id AS reply_message_id, reply.content AS reply_content,
 		  reply.deleted_at AS reply_deleted_at,
@@ -359,10 +391,20 @@ const MESSAGE_SELECT = `SELECT
 	      'username', mentioned.username,
 	      'displayName', mentioned.display_name
 	    ))
-	    FROM json_each(COALESCE(m.mention_user_ids, '[]')) mention_ids
-	    JOIN users mentioned ON mentioned.id = CAST(mention_ids.value AS INTEGER)
-		 ), '[]') AS mentions_json
-	 FROM messages m
+		    FROM json_each(COALESCE(m.mention_user_ids, '[]')) mention_ids
+		    JOIN users mentioned ON mentioned.id = CAST(mention_ids.value AS INTEGER)
+			 ), '[]') AS mentions_json,
+		  COALESCE((
+		    SELECT json_group_array(json_object(
+		      'emoji', r.emoji,
+		      'userId', r.user_id,
+		      'displayName', ru.display_name
+		    ))
+		    FROM message_reactions r
+		    JOIN users ru ON ru.id = r.user_id
+		    WHERE r.message_id = m.id
+			 ), '[]') AS reactions_json
+		 FROM messages m
 	 LEFT JOIN users u ON u.id = m.sender_id
 	 LEFT JOIN messages reply ON reply.id = m.reply_to_message_id
 	 LEFT JOIN users reply_user ON reply_user.id = reply.sender_id`;
@@ -663,12 +705,13 @@ async function persistMessage(
 		source = "edgechat",
 		sourceMessageId = null,
 		sourceAttachmentId = null,
-		sourceAttachmentUniqueId = null,
-		clientMessageId = null,
-		mentionUserIds = [],
-		replyToMessageId = null,
-		replyToSenderId = null,
-	}: PersistMessageInput,
+			sourceAttachmentUniqueId = null,
+			clientMessageId = null,
+			mentionUserIds = [],
+			replyToMessageId = null,
+			replyToSenderId = null,
+			forwardFromName = null,
+		}: PersistMessageInput,
 ): Promise<PersistMessageResult> {
 	const isExternal = externalSender !== null;
 	const normalizedSenderId = isExternal ? null : Number(senderId);
@@ -710,48 +753,52 @@ async function persistMessage(
 		isExternal ? [] : normalizeMentionUserIds(mentionUserIds),
 	);
 	const normalizedReplyToMessageId = replyToMessageId ? Number(replyToMessageId) : null;
-	const normalizedReplyToSenderId = replyToSenderId ? Number(replyToSenderId) : null;
-	try {
-		const result = await env.DB
-			.prepare(
-				`INSERT INTO messages (
-				   channel_id, sender_id, content, attachment_key, attachment_name,
-				   attachment_type, attachment_size, attachment_kind, attachment_duration_ms,
-				   attachment_waveform, sender_kind, external_sender_id,
-					   external_sender_name, external_sender_avatar_url, source, source_message_id,
-					   source_attachment_id, source_attachment_unique_id, client_message_id,
-						   mention_user_ids, reply_to_message_id, reply_to_sender_id
-						 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			)
-			.bind(
-				Number(channelId),
-				normalizedSenderId,
-				storedContent,
-				cleanAttachment?.key || null,
-				cleanAttachment?.name || null,
-				cleanAttachment?.type || null,
-				cleanAttachment?.size || null,
-				cleanAttachment?.kind || null,
-				cleanAttachment?.kind === "voice" || cleanAttachment?.kind === "audio"
-					? cleanAttachment.durationMs
-					: null,
-				cleanAttachment?.kind === "voice"
-					? JSON.stringify(cleanAttachment.waveform)
-					: null,
-				isExternal ? "external" : "local",
-				isExternal ? externalId : null,
-				isExternal ? externalName : null,
-				isExternal ? String(externalSender.avatarUrl || "") : null,
-				String(source || "edgechat"),
-				sourceMessageId ? String(sourceMessageId) : null,
-				sourceAttachmentId ? String(sourceAttachmentId) : null,
-				sourceAttachmentUniqueId ? String(sourceAttachmentUniqueId) : null,
-				normalizedClientMessageId,
-				storedMentionUserIds,
-				normalizedReplyToMessageId,
-				normalizedReplyToSenderId,
-			)
-			.run();
+		const normalizedReplyToSenderId = replyToSenderId ? Number(replyToSenderId) : null;
+		const normalizedForwardFromName = forwardFromName
+			? String(forwardFromName).trim().slice(0, 100) || null
+			: null;
+		try {
+			const result = await env.DB
+				.prepare(
+					`INSERT INTO messages (
+					   channel_id, sender_id, content, attachment_key, attachment_name,
+					   attachment_type, attachment_size, attachment_kind, attachment_duration_ms,
+					   attachment_waveform, sender_kind, external_sender_id,
+						   external_sender_name, external_sender_avatar_url, source, source_message_id,
+						   source_attachment_id, source_attachment_unique_id, client_message_id,
+							   mention_user_ids, reply_to_message_id, reply_to_sender_id, forward_from_name
+							 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				)
+				.bind(
+					Number(channelId),
+					normalizedSenderId,
+					storedContent,
+					cleanAttachment?.key || null,
+					cleanAttachment?.name || null,
+					cleanAttachment?.type || null,
+					cleanAttachment?.size || null,
+					cleanAttachment?.kind || null,
+					cleanAttachment?.kind === "voice" || cleanAttachment?.kind === "audio"
+						? cleanAttachment.durationMs
+						: null,
+					cleanAttachment?.kind === "voice"
+						? JSON.stringify(cleanAttachment.waveform)
+						: null,
+					isExternal ? "external" : "local",
+					isExternal ? externalId : null,
+					isExternal ? externalName : null,
+					isExternal ? String(externalSender.avatarUrl || "") : null,
+					String(source || "edgechat"),
+					sourceMessageId ? String(sourceMessageId) : null,
+					sourceAttachmentId ? String(sourceAttachmentId) : null,
+					sourceAttachmentUniqueId ? String(sourceAttachmentUniqueId) : null,
+					normalizedClientMessageId,
+					storedMentionUserIds,
+					normalizedReplyToMessageId,
+					normalizedReplyToSenderId,
+					normalizedForwardFromName,
+				)
+				.run();
 		return {
 			message: await getMessageById(env, Number(result.meta.last_row_id ?? 0)),
 			created: true,
@@ -803,6 +850,7 @@ export async function insertMessage(
 		mentionUserIds = [],
 		replyToMessageId = null,
 		replyToSenderId = null,
+		forwardFromName = null,
 	}: PersistMessageInput,
 ): Promise<Message | null> {
 	const result = await persistMessage(env, {
@@ -814,6 +862,7 @@ export async function insertMessage(
 		mentionUserIds,
 		replyToMessageId,
 		replyToSenderId,
+		forwardFromName,
 	});
 	return result.message;
 }
@@ -831,3 +880,61 @@ export function insertExternalMessage(
 ): Promise<PersistMessageResult> {
 	return persistMessage(env, payload);
 }
+
+export async function updateMessageContent(
+	env: MessageEnv,
+	{
+		messageId,
+		channelId,
+		userId,
+		content,
+	}: {
+		messageId: number | string;
+		channelId: number | string;
+		userId: number;
+		content: string;
+	},
+): Promise<Message | null> {
+	const cleanContent = String(content || '').trim();
+	if (!cleanContent) {
+		throw new Error('Message content cannot be empty');
+	}
+	const numMessageId = Number(messageId);
+	const numChannelId = Number(channelId);
+	const numUserId = Number(userId);
+
+	const existing = await env.DB
+		.prepare(
+			`SELECT id, sender_id, sender_kind
+			 FROM messages
+			 WHERE id = ? AND channel_id = ? AND deleted_at IS NULL
+			 LIMIT 1`,
+		)
+		.bind(numMessageId, numChannelId)
+		.first<{ id: number; sender_id: number; sender_kind: string }>();
+
+	if (!existing) {
+		throw new Error('Message not found');
+	}
+	if (existing.sender_kind !== 'local' || Number(existing.sender_id) !== numUserId) {
+		throw new Error("Cannot edit other users' messages");
+	}
+
+	const storedContent = await encryptMessageContent(env, cleanContent, {
+		channelId: numChannelId,
+		senderId: numUserId,
+		senderContext: '',
+	});
+
+	await env.DB
+		.prepare(
+			`UPDATE messages
+			 SET content = ?, edited_at = CURRENT_TIMESTAMP
+			 WHERE id = ? AND channel_id = ? AND sender_id = ? AND deleted_at IS NULL`,
+		)
+		.bind(storedContent, numMessageId, numChannelId, numUserId)
+		.run();
+
+	return getMessageById(env, numMessageId);
+}
+

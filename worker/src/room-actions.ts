@@ -8,14 +8,15 @@ import { processAiBotResponse } from './integrations/ai-bot.ts';
 
 /** 客户端提交的会话操作，按 type 判别。 */
 export type RoomAction =
-	| {
-			type: 'send';
-			content?: string;
-			clientMessageId?: string | null;
-			attachment?: unknown;
-			mentionUserIds?: unknown;
-			replyMessageId?: unknown;
-	  }
+		| {
+				type: 'send';
+				content?: string;
+				clientMessageId?: string | null;
+				attachment?: unknown;
+				mentionUserIds?: unknown;
+				replyMessageId?: unknown;
+				forwardFromName?: string | null;
+		  }
 	| { type: 'delete_message'; messageId: number | string }
 	| { type: 'pin_message'; messageId: number | string }
 	| { type: 'unpin_message'; messageId: number | string };
