@@ -15,6 +15,8 @@ import CreateGroupDialog from '../components/chat/CreateGroupDialog.vue';
 import ForwardMessageDialog from '../components/chat/ForwardMessageDialog.vue';
 import GlobalSearchPanel from '../components/chat/GlobalSearchPanel.vue';
 import InChatSearchBar from '../components/chat/InChatSearchBar.vue';
+import InlineMediaPreview from '../components/chat/InlineMediaPreview.vue';
+import MediaLightbox from '../components/chat/MediaLightbox.vue';
 import GroupSettingsDialog from '../components/chat/GroupSettingsDialog.vue';
 import InAppNotificationStack from '../components/chat/InAppNotificationStack.vue';
 import MemberPanel from '../components/chat/MemberPanel.vue';
@@ -66,6 +68,9 @@ const forwarding = ref(false);
 const isSelecting = ref(false);
 const selectedMessageIds = ref(new Set());
 const showInChatSearch = ref(false);
+const showLightbox = ref(false);
+const lightboxUrl = ref('');
+const lightboxTitle = ref('');
 const roomDrafts = reactive({});
 const messageComposer = ref(null);
 const showMobileNavigation = ref(false);
@@ -447,6 +452,12 @@ async function handleSelectSearchMessage(item) {
 	} catch (e) {
 		error.value = e?.message || t('common.unknown');
 	}
+}
+
+function openMediaLightbox(url, title = '') {
+	lightboxUrl.value = url;
+	lightboxTitle.value = title;
+	showLightbox.value = true;
 }
 
 function exportChatHistory() {
@@ -1182,14 +1193,15 @@ onBeforeUnmount(() => {
                 :clickable="!msg.replyTo.deleted"
                 @reveal="revealMessage(msg.replyToMessageId)"
               />
-              <MessageMarkdown
-                v-if="msg.content"
-                :content="messageContent(msg)"
-                :mentions="msg.mentions"
-                :current-user-id="session?.userId"
-                :streaming="isStreamingMessage(msg)"
-              />
-              <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
+	              <MessageMarkdown
+	                v-if="msg.content"
+	                :content="messageContent(msg)"
+	                :mentions="msg.mentions"
+	                :current-user-id="session?.userId"
+	                :streaming="isStreamingMessage(msg)"
+	              />
+	              <InlineMediaPreview v-if="msg.content" :content="msg.content" @preview="openMediaLightbox" />
+	              <MessageAttachment v-if="msg.attachment" :attachment="msg.attachment" />
               <MessageReactions
                 v-if="msg.reactions && msg.reactions.length"
                 :reactions="msg.reactions"
@@ -1438,10 +1450,16 @@ onBeforeUnmount(() => {
 	      @forward="handleForwardConfirm"
 	    />
 	    <InAppNotificationStack
-      :notifications="inAppNotifications"
-      @open="openInAppNotification"
-      @dismiss="dismissInAppNotification"
-    />
+	      :notifications="inAppNotifications"
+	      @open="openInAppNotification"
+	      @dismiss="dismissInAppNotification"
+	    />
+	    <MediaLightbox
+	      :show="showLightbox"
+	      :url="lightboxUrl"
+	      :title="lightboxTitle"
+	      @close="showLightbox = false"
+	    />
   </div>
 </template>
 
