@@ -1,5 +1,5 @@
 <script setup>
-import { ChevronDown, LoaderCircle, Mic, Paperclip, Send, Trash2, Type, X } from "@lucide/vue";
+import { ChevronDown, LoaderCircle, Mic, Paperclip, Send, Smile, Trash2, Type, X } from "@lucide/vue";
 import { computed, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { isCapacitorAndroid, openNativeAppSettings, pickNativeFile } from "../../capacitor-platform.ts";
 import { getLocale, t } from "../../i18n.js";
@@ -8,6 +8,7 @@ import { useVoiceRecorder } from "../../composables/useVoiceRecorder.ts";
 import { formatVoiceDuration } from "../../voice-message.js";
 import UiTextarea from "../ui/Textarea.vue";
 import UiAvatar from "../ui/Avatar.vue";
+import EmojiGifPicker from "./EmojiGifPicker.vue";
 import PendingAttachmentPreview from "./PendingAttachmentPreview.vue";
 import MessageReplyPreview from "./MessageReplyPreview.vue";
 
@@ -71,6 +72,18 @@ const activeMentionIndex = ref(0);
 const recordingError = ref("");
 const pickerError = ref("");
 const showPermissionSettings = ref(false);
+const showEmojiPicker = ref(false);
+
+function handleSelectEmoji(emoji) {
+	emit("update:modelValue", (props.modelValue || "") + emoji);
+	nextTick(() => textarea.value?.focus());
+}
+
+function handleSelectGif(gif) {
+	showEmojiPicker.value = false;
+	emit("update:modelValue", (props.modelValue ? props.modelValue + "\n" : "") + `![](${gif.url})`);
+	nextTick(() => textarea.value?.focus());
+}
 const finishingRecording = ref(false);
 const composing = ref(false);
 const richEditor = ref(null);
@@ -502,10 +515,27 @@ onBeforeUnmount(() => {
 					</button>
 				</div>
 			</div>
-			<div v-else class="composer-row">
+				<div v-else class="composer-row">
+					<EmojiGifPicker
+						:open="showEmojiPicker"
+						@close="showEmojiPicker = false"
+						@select-emoji="handleSelectEmoji"
+						@select-gif="handleSelectGif"
+					/>
 					<button
-					type="button"
-				class="composer-btn"
+						type="button"
+						class="composer-btn composer-emoji-trigger"
+						:class="{ 'composer-btn--active': showEmojiPicker }"
+						:disabled="disabled || starting"
+						:title="t('chat.emoji')"
+						:aria-label="t('chat.emoji')"
+						@click="showEmojiPicker = !showEmojiPicker"
+					>
+						<Smile :size="20" aria-hidden="true" />
+					</button>
+						<button
+						type="button"
+					class="composer-btn"
 				:disabled="disabled || starting"
 				:title="t('chat.addAttachment')"
 				:aria-label="t('chat.addAttachment')"

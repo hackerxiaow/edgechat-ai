@@ -5,6 +5,7 @@ import { useOverlayLifecycle } from '../../composables/useOverlayLifecycle.js';
 import { t } from '../../i18n.js';
 import { isPreviewableImageAttachment } from './attachment-utils.js';
 import { isAudioAttachment } from '../../voice-message.js';
+import MediaLightbox from './MediaLightbox.vue';
 import VoiceMessage from './VoiceMessage.vue';
 
 const props = defineProps({
@@ -78,35 +79,12 @@ watch(
         {{ displayName }}
       </a>
 
-      <Teleport to="body">
-        <div
-          v-if="previewOpen"
-          ref="previewEl"
-          class="image-preview-overlay"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="t('attachments.imagePreviewNamed', { name: displayName })"
-          tabindex="-1"
-          @click.self="closePreview"
-        >
-          <div class="image-preview-overlay__toolbar">
-            <span class="image-preview-overlay__title">{{ displayName }}</span>
-            <a
-              class="image-preview-overlay__action"
-              :href="attachmentUrl"
-              target="_blank"
-              rel="noreferrer"
-              :aria-label="openOriginalLabel"
-            >
-              {{ t('attachments.openOriginal') }}
-            </a>
-            <button type="button" class="image-preview-overlay__close" :aria-label="t('attachments.closePreview')" @click="closePreview">
-              {{ t('common.close') }}
-            </button>
-          </div>
-          <img class="image-preview-overlay__image" :src="attachmentUrl" :alt="displayName" />
-        </div>
-      </Teleport>
+      <MediaLightbox
+        :show="previewOpen"
+        :url="attachmentUrl"
+        :title="displayName"
+        @close="closePreview"
+      />
     </template>
 
     <a
