@@ -460,6 +460,11 @@ async function handleSelectSearchMessage(item) {
 	}
 }
 
+function isPureMediaContent(content) {
+	const text = String(content || '').trim();
+	return /^(?:https?:\/\/[^\s]+(?:\.gif|\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s]+)?|https?:\/\/(?:media\d*\.giphy\.com|c\.tenor\.com|media\.tenor\.com)\/[^\s]+|!\[.*?\]\(https?:\/\/[^\s)]+\))$/i.test(text);
+}
+
 function openMediaLightbox(url, title = '') {
 	lightboxUrl.value = url;
 	lightboxTitle.value = title;
@@ -1200,7 +1205,7 @@ onBeforeUnmount(() => {
                 @reveal="revealMessage(msg.replyToMessageId)"
               />
 	              <MessageMarkdown
-	                v-if="msg.content"
+	                v-if="msg.content && !isPureMediaContent(msg.content)"
 	                :content="messageContent(msg)"
 	                :mentions="msg.mentions"
 	                :current-user-id="session?.userId"
