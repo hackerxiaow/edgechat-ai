@@ -1,11 +1,11 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { resetPassword } from '../api.js';
 import { useTheme } from '../composables/useTheme.js';
 import LanguageSwitch from '../components/ui/LanguageSwitch.vue';
 import { Sun, Moon } from '@lucide/vue';
-import { useI18n } from '../i18n.js';
+import { useI18n, localizeServerError } from '../i18n.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -15,26 +15,35 @@ const { isDark, toggleTheme } = useTheme();
 const password = ref('');
 const confirmPassword = ref('');
 const loading = ref(false);
-const error = ref('');
-const success = ref('');
+const rawError = ref('');
+const passwordMismatch = ref(false);
+const isSuccess = ref(false);
+
+const errorMessage = computed(() => {
+  if (passwordMismatch.value) {
+    return t('auth.passwordMismatch');
+  }
+  return rawError.value ? localizeServerError(rawError.value) : '';
+});
 
 const token = route.params.token;
 
 async function submit() {
+  passwordMismatch.value = false;
+  rawError.value = '';
   if (password.value !== confirmPassword.value) {
-    error.value = '两次输入的密码不一致';
+    passwordMismatch.value = true;
     return;
   }
   loading.value = true;
-  error.value = '';
   try {
     await resetPassword(token, password.value);
-    success.value = '密码重置成功，请使用新密码登录。';
+    isSuccess.value = true;
     setTimeout(() => {
       router.push('/login');
     }, 2000);
   } catch (err) {
-    error.value = err.message;
+    rawError.value = err.rawMessage || err.message;
   } finally {
     loading.value = false;
   }
@@ -53,17 +62,17 @@ async function submit() {
       </div>
       <div class="login-brand">
         <div class="login-brand-text">
-          <h1 class="login-title">重置密码</h1>
-          <p class="login-subtitle">请设置您的新密码</p>
+          <h1 class="login-title">{{ t('auth.resetPasswordTitle') }}</h1>
+          <p class="login-subtitle">{{ t('auth.resetPasswordSubtitle') }}</p>
         </div>
       </div>
 
-      <p v-if="success" class="login-hint" role="status">{{ success }}</p>
-      <p v-if="error" class="login-error" role="alert">{{ error }}</p>
+      <p v-if="isSuccess" class="login-hint" role="status">{{ t('auth.resetPasswordSuccess') }}</p>
+      <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
-      <form v-if="!success" class="login-form" @submit.prevent="submit">
+      <form v-if="!isSuccess" class="login-form" @submit.prevent="submit">
         <label class="login-field">
-          <span class="login-label">新密码</span>
+          <span class="login-label">{{ t('auth.newPassword') }}</span>
           <span class="input-wrapper">
             <input
               v-model="password"
@@ -75,7 +84,7 @@ async function submit() {
           </span>
         </label>
         <label class="login-field">
-          <span class="login-label">确认新密码</span>
+          <span class="login-label">{{ t('auth.confirmNewPassword') }}</span>
           <span class="input-wrapper">
             <input
               v-model="confirmPassword"
@@ -88,9 +97,12 @@ async function submit() {
         </label>
 
         <button class="login-btn" :disabled="loading" type="submit">
-          {{ loading ? '提交中...' : '确认重置' }}
+          {{ loading ? t('common.submitting') : t('auth.confirmReset') }}
         </button>
       </form>
+      <div style="text-align: center; margin-top: 16px;">
+        <router-link to="/login" style="color: var(--cool); text-decoration: none; font-size: 0.9rem;">{{ t('auth.backToLogin') }}</router-link>
+      </div>
     </div>
   </div>
 </template>

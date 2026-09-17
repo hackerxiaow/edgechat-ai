@@ -79,7 +79,19 @@ const fixedErrorTranslations = new Map([
   ['请输入群组名称', 'Please enter a group name'],
   ['请输入新密码', 'Please enter a new password'],
   ['请输入 Bot Token', 'Please enter a Bot token'],
-	['请选择群组', 'Please select a group']
+		['请选择群组', 'Please select a group'],
+	  ['邮箱不能为空', 'Email cannot be empty'],
+	  ['请输入邮箱', 'Please enter your email'],
+	  ['系统未配置发件服务', 'Email service is not configured'],
+	  ['系统未配置发件服务，无法发送验证码', 'Email service is not configured, unable to send verification code'],
+	  ['重置链接无效或已过期', 'Reset link is invalid or has expired'],
+	  ['该邮箱未注册', 'This email is not registered'],
+	  ['该邮箱已被注册', 'This email is already registered'],
+	  ['邮件发送失败，请联系管理员核对发件配置', 'Failed to send email. Please contact the administrator to verify email configuration'],
+	  ['验证码无效或已过期', 'Verification code is invalid or has expired'],
+	  ['请输入邮箱和验证码', 'Please enter your email and verification code'],
+	  ['账户已被禁用', 'Account has been disabled'],
+	  ['账号不存在', 'Account does not exist']
 ]);
 
 const dynamicErrorTranslations = [

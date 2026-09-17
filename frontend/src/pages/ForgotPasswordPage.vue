@@ -1,11 +1,11 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { forgotPassword } from '../api.js';
 import { useTheme } from '../composables/useTheme.js';
 import LanguageSwitch from '../components/ui/LanguageSwitch.vue';
 import { Sun, Moon } from '@lucide/vue';
-import { useI18n } from '../i18n.js';
+import { useI18n, localizeServerError } from '../i18n.js';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -13,19 +13,23 @@ const { isDark, toggleTheme } = useTheme();
 
 const email = ref('');
 const loading = ref(false);
-const error = ref('');
-const success = ref('');
+const rawError = ref('');
+const isSuccess = ref(false);
+
+const errorMessage = computed(() => {
+  return rawError.value ? localizeServerError(rawError.value) : '';
+});
 
 async function submit() {
   if (!email.value) return;
   loading.value = true;
-  error.value = '';
-  success.value = '';
+  rawError.value = '';
+  isSuccess.value = false;
   try {
     await forgotPassword(email.value);
-    success.value = '如果该邮箱已注册，包含重置链接的邮件将在几分钟内送达。';
+    isSuccess.value = true;
   } catch (err) {
-    error.value = err.message;
+    rawError.value = err.rawMessage || err.message;
   } finally {
     loading.value = false;
   }
@@ -44,15 +48,15 @@ async function submit() {
       </div>
       <div class="login-brand">
         <div class="login-brand-text">
-          <h1 class="login-title">找回密码</h1>
-          <p class="login-subtitle">请输入您的注册邮箱</p>
+          <h1 class="login-title">{{ t('auth.forgotPasswordTitle') }}</h1>
+          <p class="login-subtitle">{{ t('auth.forgotPasswordSubtitle') }}</p>
         </div>
       </div>
 
-      <p v-if="success" class="login-hint" role="status">{{ success }}</p>
-      <p v-if="error" class="login-error" role="alert">{{ error }}</p>
+      <p v-if="isSuccess" class="login-hint" role="status">{{ t('auth.forgotPasswordSuccess') }}</p>
+      <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
-      <form v-if="!success" class="login-form" @submit.prevent="submit">
+      <form v-if="!isSuccess" class="login-form" @submit.prevent="submit">
         <label class="login-field">
           <span class="login-label">{{ t('auth.email') }}</span>
           <span class="input-wrapper">
@@ -67,7 +71,7 @@ async function submit() {
         </label>
 
         <button class="login-btn" :disabled="loading" type="submit">
-          {{ loading ? '提交中...' : '发送重置邮件' }}
+          {{ loading ? t('common.submitting') : t('auth.sendResetEmail') }}
         </button>
       </form>
       <div style="text-align: center; margin-top: 16px;">

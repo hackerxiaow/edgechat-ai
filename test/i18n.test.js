@@ -102,3 +102,47 @@ test('服务端固定与动态错误会按当前语言本地化', async () => {
   await setLocale(CHINESE_LOCALE);
   assert.equal(localizeErrorMessage('账号或密码错误'), '账号或密码错误');
 });
+
+test('重置密码与找回密码相关文案与错误在各语言下完整翻译', async () => {
+  // 繁体中文
+  await setLocale(TRADITIONAL_CHINESE_LOCALE);
+  assert.equal(t('auth.forgotPasswordTitle'), '找回密碼');
+  assert.equal(t('auth.forgotPasswordSubtitle'), '請輸入您的註冊信箱');
+  assert.equal(t('auth.sendResetEmail'), '發送重置郵件');
+  assert.equal(t('auth.forgotPasswordSuccess'), '若該信箱已註冊，包含重置連結的郵件將在數分鐘內送達。');
+  assert.equal(t('auth.resetPasswordTitle'), '重設密碼');
+  assert.equal(t('auth.resetPasswordSubtitle'), '請設定您的新密碼');
+  assert.equal(t('auth.newPassword'), '新密碼');
+  assert.equal(t('auth.confirmNewPassword'), '確認新密碼');
+  assert.equal(t('auth.confirmReset'), '確認重設');
+  assert.equal(t('auth.resetPasswordSuccess'), '密碼重設成功，請使用新密碼登入。');
+  assert.equal(t('auth.passwordMismatch'), '兩次輸入的密碼不一致');
+  assert.equal(t('common.submitting'), '提交中...');
+  assert.equal(localizeErrorMessage('邮箱不能为空'), '信箱不能為空');
+  assert.equal(localizeErrorMessage('系统未配置发件服务'), '系統未配置發件服務');
+  assert.equal(localizeErrorMessage('重置链接无效或已过期'), '重設連結無效或已過期');
+
+  // 英文
+  await setLocale(ENGLISH_LOCALE);
+  assert.equal(t('auth.forgotPasswordTitle'), 'Forgot Password');
+  assert.equal(t('auth.forgotPasswordSubtitle'), 'Please enter your registered email');
+  assert.equal(t('auth.sendResetEmail'), 'Send Reset Email');
+  assert.equal(t('auth.forgotPasswordSuccess'), 'If the email is registered, an email with a reset link will arrive in a few minutes.');
+  assert.equal(t('auth.resetPasswordTitle'), 'Reset Password');
+  assert.equal(t('auth.resetPasswordSubtitle'), 'Please set your new password');
+  assert.equal(t('auth.newPassword'), 'New Password');
+  assert.equal(t('auth.confirmNewPassword'), 'Confirm New Password');
+  assert.equal(t('auth.confirmReset'), 'Confirm Reset');
+  assert.equal(t('auth.resetPasswordSuccess'), 'Password reset successfully. Please sign in with your new password.');
+  assert.equal(t('auth.passwordMismatch'), 'The passwords do not match.');
+  assert.equal(t('common.submitting'), 'Submitting...');
+  assert.equal(localizeErrorMessage('邮箱不能为空'), 'Email cannot be empty');
+  assert.equal(localizeErrorMessage('系统未配置发件服务'), 'Email service is not configured');
+  assert.equal(localizeErrorMessage('重置链接无效或已过期'), 'Reset link is invalid or has expired');
+
+  // 恢复默认简体中文
+  await setLocale(CHINESE_LOCALE);
+  assert.equal(t('auth.forgotPasswordTitle'), '找回密码');
+  assert.equal(t('auth.resetPasswordTitle'), '重置密码');
+});
+
