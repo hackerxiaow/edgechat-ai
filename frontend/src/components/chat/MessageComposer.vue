@@ -90,6 +90,39 @@ function handleSelectSticker(sticker) {
 	showEmojiPicker.value = false;
 	emit("send-sticker", sticker);
 }
+
+const showFormatToolbar = ref(false);
+const formatSelection = ref({ start: 0, end: 0, text: '' });
+
+function handleTextareaSelect(event) {
+	const el = event.target;
+	if (el && el.selectionStart !== el.selectionEnd) {
+		const sel = el.value.slice(el.selectionStart, el.selectionEnd).trim();
+		if (sel) {
+			formatSelection.value = { start: el.selectionStart, end: el.selectionEnd, text: sel };
+			showFormatToolbar.value = true;
+			return;
+		}
+	}
+	showFormatToolbar.value = false;
+}
+
+function applyFormat(prefix, suffix = prefix) {
+	const { start, end } = formatSelection.value;
+	if (start === end) return;
+	const current = props.modelValue || '';
+	const selected = current.slice(start, end);
+	const next = current.slice(0, start) + prefix + selected + suffix + current.slice(end);
+	emit('update:modelValue', next);
+	showFormatToolbar.value = false;
+	nextTick(() => {
+		const el = textarea.value?.element;
+		if (el) {
+			el.focus();
+			el.setSelectionRange(start + prefix.length, end + prefix.length);
+		}
+	});
+}
 const finishingRecording = ref(false);
 const composing = ref(false);
 const richEditor = ref(null);
@@ -563,22 +596,42 @@ onBeforeUnmount(() => {
 					<LoaderCircle v-if="richEditorLoading" :size="20" class="composer-spinner" aria-hidden="true" />
 					<Type v-else :size="20" aria-hidden="true" />
 				</button>
-			<UiTextarea
-				ref="textarea"
-				:model-value="modelValue"
-				class="composer-input"
-				auto-grow
-				:max-height="120"
-				rows="1"
-				:disabled="disabled || starting"
-				:placeholder="t('chat.messagePlaceholder')"
-				:aria-label="t('chat.messagePlaceholder')"
-				@update:model-value="emit('update:modelValue', $event)"
-				@input="syncMentionQuery"
-				@keydown="handleKeydown"
-				@compositionstart="composing = true"
-				@compositionend="composing = false"
-				/>
+				<div v-if="showFormatToolbar" class="composer-format-toolbar">
+					<button type="button" class="format-btn" title="Bold" @mousedown.prevent="applyFormat('**')">
+						<strong>B</strong>
+					</button>
+					<button type="button" class="format-btn" title="Italic" @mousedown.prevent="applyFormat('*')">
+						<em>I</em>
+					</button>
+					<button type="button" class="format-btn" title="Strikethrough" @mousedown.prevent="applyFormat('~~')">
+						<s>S</s>
+					</button>
+					<button type="button" class="format-btn" title="Monospace" @mousedown.prevent="applyFormat('`')">
+						&lt;/&gt;
+					</button>
+					<button type="button" class="format-btn" title="Quote" @mousedown.prevent="applyFormat('\n> ', '')">
+						&ldquo;
+					</button>
+				</div>
+				<UiTextarea
+					ref="textarea"
+					:model-value="modelValue"
+					class="composer-input"
+					auto-grow
+					:max-height="120"
+					rows="1"
+					:disabled="disabled || starting"
+					:placeholder="t('chat.messagePlaceholder')"
+					:aria-label="t('chat.messagePlaceholder')"
+					@update:model-value="emit('update:modelValue', $event)"
+					@input="syncMentionQuery"
+					@keydown="handleKeydown"
+					@select="handleTextareaSelect"
+					@keyup="handleTextareaSelect"
+					@mouseup="handleTextareaSelect"
+					@compositionstart="composing = true"
+					@compositionend="composing = false"
+					/>
 				<button
 					type="button"
 					class="composer-btn composer-voice"
@@ -618,6 +671,55 @@ onBeforeUnmount(() => {
 	border-top: 1px solid var(--chat-line);
 	border-radius: 0;
 	background: var(--chat-canvas);
+}
+
+.composer-format-toolbar {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	right: 60px;
+	z-index: 50;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 6px;
+	border-radius: 20px;
+	background: var(--surface-solid, #ffffff);
+	border: 1px solid var(--chat-line, rgba(0, 0, 0, 0.12));
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-theme='dark'] .composer-format-toolbar {
+	background: #1e293b;
+	border-color: rgba(255, 255, 255, 0.12);
+}
+
+.format-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--chat-ink, #0f172a);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	transition: background 120ms ease;
+	padding: 0;
+}
+
+.format-btn:hover {
+	background: var(--chat-hover, rgba(0, 0, 0, 0.08));
+}
+
+:root[data-theme='dark'] .format-btn {
+	color: #f1f5f9;
+}
+
+:root[data-theme='dark'] .format-btn:hover {
+	background: rgba(255, 255, 255, 0.12);
 }
 
 .composer-attachment {

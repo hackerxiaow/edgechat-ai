@@ -376,6 +376,11 @@ async function handleReact(emoji, messageId) {
 	await reactToMessage(messageId, emoji);
 }
 
+function handleBubbleDblClick(msg) {
+	if (isSelecting.value || !msg) return;
+	handleReact('❤️', msg.id);
+}
+
 function openForwardDialog(message) {
 	closeMessageMenu();
 	forwardTargetMessage.value = message || null;
@@ -704,10 +709,29 @@ watch(composerText, (text) => {
   }
 });
 
-watch(activeRoomKey, async (k) => {
+watch(activeRoomKey, async (k, oldKey) => {
   closeMessageMenu();
   cancelMessageLongPress();
   replyingTo.value = null;
+  editingMessage.value = null;
+
+  // 离开旧房间：暂存草稿
+  if (oldKey) {
+    const text = composerText.value.trim();
+    if (text) {
+      roomDrafts[oldKey] = text;
+    } else {
+      delete roomDrafts[oldKey];
+    }
+  }
+
+  // 进入新房间：恢复已存草稿
+  if (k && roomDrafts[k]) {
+    composerText.value = roomDrafts[k];
+  } else {
+    composerText.value = '';
+  }
+
   if (!k) {
     deactivateRoom();
     return;
@@ -1268,15 +1292,16 @@ onBeforeUnmount(() => {
               >
                 <UiAvatar class="message-avatar" :src="msg.sender.avatarUrl" :alt="msg.sender.displayName" :fallback="msg.sender.displayName" size="sm" />
               </button>
-              <div
-                class="message-bubble"
-                :class="{
-                  'message-bubble--with-attachment': msg.attachment,
-                  'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id),
-                  'message-bubble--media-only': isPureMediaMessage(msg)
-                }"
-                @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
-                @contextmenu="openMessageContextMenu($event, msg)"
+	              <div
+	                class="message-bubble"
+	                :class="{
+	                  'message-bubble--with-attachment': msg.attachment,
+	                  'message-bubble--highlighted': Number(highlightedMessageId) === Number(msg.id),
+	                  'message-bubble--media-only': isPureMediaMessage(msg)
+	                }"
+	                @click="isSelecting ? toggleSelectMessage(msg.id) : undefined"
+	                @dblclick="handleBubbleDblClick(msg)"
+	                @contextmenu="openMessageContextMenu($event, msg)"
                 @pointerdown="startMessageLongPress($event, msg)"
                 @pointermove="trackMessageLongPress"
                 @pointerup="cancelMessageLongPress"
@@ -1470,6 +1495,7 @@ onBeforeUnmount(() => {
         <MemberPanel
           :room="activeRoom"
           :members="groupMembers"
+          :messages="messages"
           :loading="memberLoading"
           :can-manage="canManageActiveRoom"
           :invite-user-id="inviteUserId"
@@ -1480,6 +1506,7 @@ onBeforeUnmount(() => {
           @invite="inviteMember"
           @remove-member="removeMember"
           @open-profile="openLocalUserProfile"
+          @open-media="openMediaLightbox"
           @delete-group="deleteGroup"
         />
       </aside>
