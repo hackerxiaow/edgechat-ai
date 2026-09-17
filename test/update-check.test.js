@@ -8,8 +8,10 @@ import {
 import { CHINESE_LOCALE, setLocale, t } from "../frontend/src/i18n.js";
 import { checkForUpdates } from "../frontend/src/update-check.js";
 
-beforeEach(() => {
-	setLocale(CHINESE_LOCALE);
+// setLocale 会异步加载语言包，不等它完成时 t() 会回退成 key 本身，
+// 而本文件断言的是「错误文案 == 当前语言文案」，会随加载时序时通时不通。
+beforeEach(async () => {
+	await setLocale(CHINESE_LOCALE);
 });
 
 const build = {
