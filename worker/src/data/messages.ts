@@ -433,6 +433,40 @@ export async function getMessageById(
 	return results[0] ? mapDecryptedMessage(env, results[0]) : null;
 }
 
+/** D1 单条语句的绑定参数上限为 100，分批时留出余量。 */
+const MESSAGE_ID_BATCH_SIZE = 90;
+
+/**
+ * 一次取回多条消息，供同步游标这类「一页 N 条」的场景使用。
+ * 原先是每条事件单独 getMessageById，轮询频繁时会把 D1 读放大成 N+1。
+ */
+export async function getMessagesByIds(
+	env: MessageEnv,
+	messageIds: Array<number | string>,
+): Promise<Map<number, Message>> {
+	const ids = [
+		...new Set(
+			messageIds
+				.map((id) => Number(id))
+				.filter((id) => Number.isInteger(id) && id > 0),
+		),
+	];
+	const messagesById = new Map<number, Message>();
+	for (let offset = 0; offset < ids.length; offset += MESSAGE_ID_BATCH_SIZE) {
+		const chunk = ids.slice(offset, offset + MESSAGE_ID_BATCH_SIZE);
+		const placeholders = chunk.map(() => "?").join(", ");
+		const { results } = await env.DB.prepare(
+			`${MESSAGE_SELECT} WHERE m.id IN (${placeholders}) AND m.deleted_at IS NULL`,
+		)
+			.bind(...chunk)
+			.all<MessageRow>();
+		for (const row of results) {
+			messagesById.set(Number(row.id), await mapDecryptedMessage(env, row));
+		}
+	}
+	return messagesById;
+}
+
 export async function getMessageBySource(
 	env: MessageEnv,
 	source: string,
@@ -556,6 +590,11 @@ export async function listRoomMessageEvents(
 		.bind(Number(channelId), normalizedCursor, pageSize + 1)
 		.all<{ sequence: number; message_id: number; event_type: string; created_at: string }>();
 	const page = results.slice(0, pageSize);
+	// 批量取回本页消息：原实现对每条事件单独查一次 D1，高频轮询时是纯读放大。
+	const messagesById = await getMessagesByIds(
+		env,
+		page.map((row) => row.message_id),
+	);
 	const events: RoomMessageEvent[] = [];
 	for (const row of page) {
 		if (row.event_type === "deleted") {
@@ -567,23 +606,11 @@ export async function listRoomMessageEvents(
 			});
 			continue;
 		}
-		if (row.event_type === "updated") {
-			const message = await getMessageById(env, row.message_id);
-			if (message) {
-				events.push({
-					sequence: Number(row.sequence),
-					type: "message_updated",
-					message,
-					createdAt: row.created_at,
-				});
-			}
-			continue;
-		}
-		const message = await getMessageById(env, row.message_id);
+		const message = messagesById.get(Number(row.message_id));
 		if (message) {
 			events.push({
 				sequence: Number(row.sequence),
-				type: "message",
+				type: row.event_type === "updated" ? "message_updated" : "message",
 				message,
 				createdAt: row.created_at,
 			});

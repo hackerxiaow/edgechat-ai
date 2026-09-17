@@ -5,7 +5,7 @@ import {
 	parseGithubRepository,
 	resolveBuildMetadata,
 } from "../frontend/build-metadata.js";
-import { CHINESE_LOCALE, setLocale } from "../frontend/src/i18n.js";
+import { CHINESE_LOCALE, setLocale, t } from "../frontend/src/i18n.js";
 import { checkForUpdates } from "../frontend/src/update-check.js";
 
 beforeEach(() => {
@@ -148,42 +148,52 @@ test("前端 Compare 检查不会把当前部署领先误报成可更新", async
 	assert.equal(result.updateAvailable, false);
 });
 
+/** 断言错误文案等于该 key 在当前语言下的文案，且没有回退成 key 本身。 */
+async function assertRejectsWithKey(promise, key) {
+	const expected = t(key);
+	assert.notEqual(expected, key, `${key} 缺少可读文案`);
+	await assert.rejects(promise, (error) => {
+		assert.equal(error.message, expected);
+		return true;
+	});
+}
+
 test("未提交构建与 GitHub 限流会返回可理解的检查结果", async () => {
-	// update-check 抛出的是 i18n key（测试环境未初始化 i18n，t() 会回退成 key 本身）。
-	// 这里断言 key，并单独校验每个 key 在中文包里都有可读文案。
-	await assert.rejects(
+	// 本文件的 beforeEach 会把语言设为中文，t() 返回的是可读文案而不是 key 本身，
+	// 因此这里断言「错误文案 == 当前语言文案」，并在末尾单独校验每个 key 都有中文文案。
+	await assertRejectsWithKey(
 		checkForUpdates({ build: { ...build, dirty: true }, fetchImpl: async () => null }),
-		/updates\.errors\.dirtyBuild/,
+		"updates.errors.dirtyBuild",
 	);
-	await assert.rejects(
+	await assertRejectsWithKey(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({}, 403),
 		}),
-		/updates\.errors\.rateLimited/,
+		"updates.errors.rateLimited",
 	);
-	await assert.rejects(
+	await assertRejectsWithKey(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({}, 404),
 		}),
-		/updates\.errors\.commitNotSynced/,
+		"updates.errors.commitNotSynced",
 	);
-	await assert.rejects(
+	await assertRejectsWithKey(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => {
 				throw new TypeError("Failed to fetch");
 			},
 		}),
-		/updates\.errors\.network/,
+		"updates.errors.network",
 	);
-	await assert.rejects(
+	await assertRejectsWithKey(
 		checkForUpdates({
 			build,
 			fetchImpl: async () => createResponse({ status: "identical" }),
 		}),
-		/updates\.errors\.invalidResponse/,
+		"updates.errors.invalidResponse",
 	);
 
 	const zhLocale = readFileSync(
