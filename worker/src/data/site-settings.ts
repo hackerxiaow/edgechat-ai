@@ -28,6 +28,15 @@ export interface RuntimeSettings extends SiteSettings {
 	smtpApiKey: string;
 	/** 外部图床的上传接口；配置后附件走图床直链，不再进 D1。留空则回退本地加密存储。 */
 	externalUploadUrl: string;
+	/** AI 助手（ZeroClaw）开关与配置。 */
+	aiBotEnabled: boolean;
+	aiApiUrl: string;
+	aiApiKey: string;
+	aiModel: string;
+	aiSystemPrompt: string;
+	aiBotName: string;
+	aiBotAvatarUrl: string;
+	aiTriggerMode: 'all' | 'mention';
 }
 
 export interface UpdateSiteSettingsInput {
@@ -45,6 +54,14 @@ export interface UpdateSiteSettingsInput {
 	smtpRelayUrl?: unknown;
 	smtpApiKey?: unknown;
 	externalUploadUrl?: unknown;
+	aiBotEnabled?: unknown;
+	aiApiUrl?: unknown;
+	aiApiKey?: unknown;
+	aiModel?: unknown;
+	aiSystemPrompt?: unknown;
+	aiBotName?: unknown;
+	aiBotAvatarUrl?: unknown;
+	aiTriggerMode?: unknown;
 }
 
 interface SiteSettingRow {
@@ -75,6 +92,14 @@ export const RUNTIME_SETTING_DEFAULTS: RuntimeSettings = {
 	smtpRelayUrl: '',
 	smtpApiKey: '',
 	externalUploadUrl: '',
+	aiBotEnabled: true,
+	aiApiUrl: 'https://api.seurl.eu.org/v1/chat/completions',
+	aiApiKey: '',
+	aiModel: 'chatgpt/gpt-5.6-luna',
+	aiSystemPrompt: '你是运行在 ZeroClaw 架构上的 AI 智能体助手，名字叫 ZeroClaw。你的回答风格专业、友好、富有洞察力，排版优美，支持 Markdown。',
+	aiBotName: 'ZeroClaw',
+	aiBotAvatarUrl: 'https://img.xiaow.eu.org/avatar.png',
+	aiTriggerMode: 'all',
 };
 
 /** 设置项在表里的键名，导出给后台表单复用，避免两处写死字符串。 */
@@ -92,6 +117,14 @@ export const RUNTIME_SETTING_KEYS = {
 	smtpRelayUrl: "smtp_relay_url",
 	smtpApiKey: "smtp_api_key",
 	externalUploadUrl: "external_upload_url",
+	aiBotEnabled: "ai_bot_enabled",
+	aiApiUrl: "ai_api_url",
+	aiApiKey: "ai_api_key",
+	aiModel: "ai_model",
+	aiSystemPrompt: "ai_system_prompt",
+	aiBotName: "ai_bot_name",
+	aiBotAvatarUrl: "ai_bot_avatar_url",
+	aiTriggerMode: "ai_trigger_mode",
 } as const;
 
 function toPositiveInteger(value: unknown, fallback: number, { min = 1, max = 3650 } = {}): number {
@@ -161,6 +194,14 @@ export async function getRuntimeSettings(db: D1Database): Promise<RuntimeSetting
 		smtpRelayUrl: map.smtp_relay_url || defaults.smtpRelayUrl,
 		smtpApiKey: map.smtp_api_key || defaults.smtpApiKey,
 		externalUploadUrl: String(map.external_upload_url || '').trim(),
+		aiBotEnabled: map.ai_bot_enabled === undefined ? defaults.aiBotEnabled : map.ai_bot_enabled === "1",
+		aiApiUrl: map.ai_api_url !== undefined ? String(map.ai_api_url).trim() : defaults.aiApiUrl,
+		aiApiKey: map.ai_api_key !== undefined ? String(map.ai_api_key).trim() : defaults.aiApiKey,
+		aiModel: map.ai_model !== undefined ? String(map.ai_model).trim() || defaults.aiModel : defaults.aiModel,
+		aiSystemPrompt: map.ai_system_prompt !== undefined ? String(map.ai_system_prompt) : defaults.aiSystemPrompt,
+		aiBotName: map.ai_bot_name !== undefined ? String(map.ai_bot_name).trim() || defaults.aiBotName : defaults.aiBotName,
+		aiBotAvatarUrl: map.ai_bot_avatar_url !== undefined ? String(map.ai_bot_avatar_url).trim() : defaults.aiBotAvatarUrl,
+		aiTriggerMode: map.ai_trigger_mode === "mention" ? "mention" : "all",
 	};
 }
 
@@ -307,13 +348,53 @@ export async function updateSiteSettings(
 			upsert(db, RUNTIME_SETTING_KEYS.smtpApiKey, String(input.smtpApiKey || "").trim()),
 		);
 	}
-	if (input.externalUploadUrl !== undefined) {
-		const raw = String(input.externalUploadUrl || "").trim();
-		if (raw && !/^https:\/\//i.test(raw)) {
-			throw new ApiError("外部图床地址必须是 https 链接");
+		if (input.externalUploadUrl !== undefined) {
+			const raw = String(input.externalUploadUrl || "").trim();
+			if (raw && !/^https:\/\//i.test(raw)) {
+				throw new ApiError("外部图床地址必须是 https 链接");
+			}
+			statements.push(upsert(db, RUNTIME_SETTING_KEYS.externalUploadUrl, raw));
 		}
-		statements.push(upsert(db, RUNTIME_SETTING_KEYS.externalUploadUrl, raw));
-	}
+		if (input.aiBotEnabled !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiBotEnabled, input.aiBotEnabled ? "1" : "0"),
+			);
+		}
+		if (input.aiApiUrl !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiApiUrl, String(input.aiApiUrl || "").trim()),
+			);
+		}
+		if (input.aiApiKey !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiApiKey, String(input.aiApiKey || "").trim()),
+			);
+		}
+		if (input.aiModel !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiModel, String(input.aiModel || "").trim()),
+			);
+		}
+		if (input.aiSystemPrompt !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiSystemPrompt, String(input.aiSystemPrompt || "")),
+			);
+		}
+		if (input.aiBotName !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiBotName, String(input.aiBotName || "").trim()),
+			);
+		}
+		if (input.aiBotAvatarUrl !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiBotAvatarUrl, String(input.aiBotAvatarUrl || "").trim()),
+			);
+		}
+		if (input.aiTriggerMode !== undefined) {
+			statements.push(
+				upsert(db, RUNTIME_SETTING_KEYS.aiTriggerMode, input.aiTriggerMode === "mention" ? "mention" : "all"),
+			);
+		}
 
 	if (statements.length) {
 		await db.batch(statements);

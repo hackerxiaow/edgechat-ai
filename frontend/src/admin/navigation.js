@@ -1,4 +1,4 @@
-import { Database, Gauge, Send, Settings, UserCog, UserPlus, Wrench } from '@lucide/vue';
+import { Bot, Database, Gauge, Send, Settings, UserCog, UserPlus, Wrench } from '@lucide/vue';
 
 export const adminNavigation = [
   {
@@ -41,6 +41,13 @@ export const adminNavigation = [
     icon: Send
   },
   {
+    id: 'ai',
+    labelKey: 'admin.nav.ai',
+    descriptionKey: 'admin.nav.aiDescription',
+    to: '/admin/ai',
+    icon: Bot
+  },
+  {
     id: 'site',
     labelKey: 'admin.nav.site',
     descriptionKey: 'admin.nav.siteDescription',
@@ -67,6 +74,7 @@ export const adminRouteIcons = {
   storage: Database,
   invites: UserPlus,
   telegram: Send,
+  ai: Bot,
   site: Settings,
   maintenance: Wrench
 };

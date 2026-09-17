@@ -78,6 +78,138 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     return c.json({ site });
   });
 
+  app.get('/api/admin/ai-bot', async (c) => {
+    const site = await getRuntimeSettings(c.env.DB);
+    const apiKey = site.aiApiKey || (typeof c.env.AI_BOT_API_KEY === 'string' ? c.env.AI_BOT_API_KEY : '');
+    return c.json({
+      config: {
+        enabled: site.aiBotEnabled,
+        apiUrl: site.aiApiUrl,
+        apiKey: apiKey,
+        model: site.aiModel,
+        systemPrompt: site.aiSystemPrompt,
+        botName: site.aiBotName,
+        botAvatarUrl: site.aiBotAvatarUrl,
+        triggerMode: site.aiTriggerMode,
+      }
+    });
+  });
+
+  app.post('/api/admin/ai-bot', async (c) => {
+    const payload = await parseJsonRequest(c.req.raw);
+    const site = await updateSiteSettings(c.env.DB, {
+      aiBotEnabled: payload.enabled,
+      aiApiUrl: payload.apiUrl,
+      aiApiKey: payload.apiKey,
+      aiModel: payload.model,
+      aiSystemPrompt: payload.systemPrompt,
+      aiBotName: payload.botName,
+      aiBotAvatarUrl: payload.botAvatarUrl,
+      aiTriggerMode: payload.triggerMode,
+    });
+    const apiKey = site.aiApiKey || (typeof c.env.AI_BOT_API_KEY === 'string' ? c.env.AI_BOT_API_KEY : '');
+    return c.json({
+      ok: true,
+      config: {
+        enabled: site.aiBotEnabled,
+        apiUrl: site.aiApiUrl,
+        apiKey: apiKey,
+        model: site.aiModel,
+        systemPrompt: site.aiSystemPrompt,
+        botName: site.aiBotName,
+        botAvatarUrl: site.aiBotAvatarUrl,
+        triggerMode: site.aiTriggerMode,
+      }
+    });
+  });
+
+  app.patch('/api/admin/ai-bot', async (c) => {
+    const payload = await parseJsonRequest(c.req.raw);
+    const site = await updateSiteSettings(c.env.DB, {
+      aiBotEnabled: payload.enabled,
+      aiApiUrl: payload.apiUrl,
+      aiApiKey: payload.apiKey,
+      aiModel: payload.model,
+      aiSystemPrompt: payload.systemPrompt,
+      aiBotName: payload.botName,
+      aiBotAvatarUrl: payload.botAvatarUrl,
+      aiTriggerMode: payload.triggerMode,
+    });
+    const apiKey = site.aiApiKey || (typeof c.env.AI_BOT_API_KEY === 'string' ? c.env.AI_BOT_API_KEY : '');
+    return c.json({
+      ok: true,
+      config: {
+        enabled: site.aiBotEnabled,
+        apiUrl: site.aiApiUrl,
+        apiKey: apiKey,
+        model: site.aiModel,
+        systemPrompt: site.aiSystemPrompt,
+        botName: site.aiBotName,
+        botAvatarUrl: site.aiBotAvatarUrl,
+        triggerMode: site.aiTriggerMode,
+      }
+    });
+  });
+
+  app.post('/api/admin/ai-bot/test', async (c) => {
+    const payload = await parseJsonRequest(c.req.raw);
+    const site = await getRuntimeSettings(c.env.DB);
+    const apiUrl = String(payload.apiUrl || site.aiApiUrl || '').trim();
+    const apiKey = String(payload.apiKey || site.aiApiKey || (typeof c.env.AI_BOT_API_KEY === 'string' ? c.env.AI_BOT_API_KEY : '') || '').trim();
+    const model = String(payload.model || site.aiModel || '').trim();
+
+    if (!apiUrl) {
+      return errorResponse('API 接口地址不能为空');
+    }
+    if (!model) {
+      return errorResponse('模型名称不能为空');
+    }
+
+    const startTime = Date.now();
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'user', content: 'Ping' }
+          ],
+          max_tokens: 20
+        })
+      });
+
+      const latencyMs = Date.now() - startTime;
+      if (!res.ok) {
+        const errorText = await res.text();
+        return c.json({
+          ok: false,
+          status: res.status,
+          latencyMs,
+          error: `接口返回 HTTP ${res.status}: ${errorText.slice(0, 200)}`
+        });
+      }
+
+      const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const reply = data.choices?.[0]?.message?.content?.trim() || '（无返回内容）';
+      return c.json({
+        ok: true,
+        latencyMs,
+        reply
+      });
+    } catch (err: unknown) {
+      const latencyMs = Date.now() - startTime;
+      return c.json({
+        ok: false,
+        latencyMs,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  });
+
   app.patch('/api/admin/site-settings', async (c) => {
     const payload = await parseJsonRequest(c.req.raw);
     const siteName = String(payload.siteName || '').trim();

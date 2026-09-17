@@ -282,6 +282,23 @@ export default {
   adminTelegram() {
     return request('/admin/telegram');
   },
+  adminAiBot() {
+    return request('/admin/ai-bot');
+  },
+  saveAdminAiBotConfig(payload) {
+    return request('/admin/ai-bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  },
+  testAdminAiBot(payload) {
+    return request('/admin/ai-bot/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+  },
   saveAdminTelegramConfig(payload) {
     return request('/admin/telegram/config', {
       method: 'PUT',
