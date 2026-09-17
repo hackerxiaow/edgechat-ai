@@ -85,7 +85,11 @@ const activeRoomAvatar = computed(() => {
 const {
   channels, dms, users, sidebarLoading, conversationItems, publicGroupItems,
   refreshSidebar, openConversation, joinPublicChannel, markConversationRead, applyConversationActivity
-} = useChatSidebar({ applyActiveChannel, selectDm });
+} = useChatSidebar({
+  applyActiveChannel,
+  selectDm,
+  currentUserId: computed(() => session.value?.userId)
+});
 const { openConversationItem, openByIdentity, refreshAndOpen } = useConversationFlow({
   conversationItems,
   refreshSidebar,
@@ -136,9 +140,10 @@ function handleRoomActivity({ room, message }) {
   applyConversationActivity({
     kind: room.kind,
     roomId: room.id,
-	    lastMessageAt: message.createdAt,
-	    unreadCount: 0,
-	    mentionUnreadCount: 0
+    lastMessageAt: message.createdAt,
+    lastMessage: message,
+    unreadCount: 0,
+    mentionUnreadCount: 0
   });
   markConversationRead(room.kind, room.id);
 }
@@ -802,7 +807,18 @@ onBeforeUnmount(() => {
             size="sm"
           />
           <div class="chat-header__identity">
-            <h2>{{ roomLabel(activeRoom) }}</h2>
+            <div class="chat-header__title-row">
+              <h2>{{ roomLabel(activeRoom) }}</h2>
+              <span
+                v-if="activeRoomMuted"
+                class="chat-header__muted-card"
+                :title="t('chat.muted')"
+                :aria-label="t('chat.muted')"
+              >
+                <BellOff :size="12" aria-hidden="true" />
+                <span>{{ t('chat.mutedShort') }}</span>
+              </span>
+            </div>
             <span>{{ activeRoomSubtitle }}</span>
           </div>
           <div class="chat-header__actions">
@@ -1417,6 +1433,41 @@ onBeforeUnmount(() => {
   flex: 1;
   gap: 4px;
   min-width: 0;
+}
+
+.chat-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chat-header__title-row h2 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-header__muted-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill, 12px);
+  background: var(--chat-hover, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--chat-line, rgba(0, 0, 0, 0.08));
+  color: var(--chat-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+:root[data-theme='dark'] .chat-header__muted-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--chat-muted);
 }
 
 .chat-header__identity span {

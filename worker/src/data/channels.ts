@@ -1,6 +1,14 @@
 import { publicFileUrl } from "../utils.ts";
 import { PRESENCE_TTL_SECONDS } from "./presence.ts";
 
+export interface LastMessageSummary {
+	senderId: number | string | null;
+	senderName: string;
+	content: string;
+	attachmentKind: string | null;
+	createdAt: string;
+}
+
 export interface VisibleChannel {
 	id: number;
 	name: string;
@@ -15,6 +23,7 @@ export interface VisibleChannel {
 	canManage: boolean;
 	memberCount: number;
 	lastMessageAt: string | null;
+	lastMessage?: LastMessageSummary | null;
 	unreadCount: number;
 	mentionUnreadCount: number;
 	/** 群组创建时间，群组信息页展示用。 */
@@ -62,6 +71,10 @@ interface VisibleChannelRow {
 	can_manage: number;
 	member_count: number;
 	last_message_at: string | null;
+	last_message_sender_id: string | number | null;
+	last_message_sender_name: string | null;
+	last_message_content: string | null;
+	last_message_attachment_kind: string | null;
 	unread_count: number;
 	attention_unread_count: number;
 	created_at: string | null;
@@ -94,7 +107,7 @@ interface ChannelMemberRow {
 }
 
 function mapVisibleChannel(row: VisibleChannelRow): VisibleChannel {
-	return {
+	const channel: VisibleChannel = {
 		id: Number(row.id),
 		name: row.name,
 		description: row.description,
@@ -115,6 +128,16 @@ function mapVisibleChannel(row: VisibleChannelRow): VisibleChannel {
 		slowModeDelay: Number(row.slow_mode_delay) || 0,
 		historyVisibility: row.history_visibility || "visible",
 	};
+	if (row.last_message_at) {
+		channel.lastMessage = {
+			senderId: row.last_message_sender_id ?? null,
+			senderName: row.last_message_sender_name || "",
+			content: row.last_message_content || "",
+			attachmentKind: row.last_message_attachment_kind || null,
+			createdAt: row.last_message_at,
+		};
+	}
+	return channel;
 }
 
 function mapAdminChannel(row: AdminChannelRow, includeAvatar: boolean): AdminChannel {
@@ -151,9 +174,15 @@ export async function listVisibleChannels(
 		   EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?) AS is_member,
 		   COALESCE((SELECT cm.role FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ? LIMIT 1), '') AS my_role,
 		   EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ? AND cm.role = 'owner') AS can_manage,
-		   (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_id = c.id) AS member_count,
-		   (SELECT MAX(m.created_at) FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL) AS last_message_at,
-			   CASE WHEN EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?)
+			   (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_id = c.id) AS member_count,
+			   (SELECT MAX(m.created_at) FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL) AS last_message_at,
+			   (SELECT m.sender_id FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_sender_id,
+			   (SELECT COALESCE(u.display_name, m.external_sender_name, '')
+			    FROM messages m LEFT JOIN users u ON u.id = m.sender_id
+			    WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_sender_name,
+			   (SELECT m.content FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_content,
+			   (SELECT m.attachment_kind FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_attachment_kind,
+				   CASE WHEN EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?)
 			     THEN (SELECT COUNT(*) FROM messages m
 			           WHERE m.channel_id = c.id AND m.deleted_at IS NULL
 			             AND (m.sender_id IS NULL OR m.sender_id != ?)

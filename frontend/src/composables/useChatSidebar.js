@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import api from "../api.js";
 import { compareLocalized, formatDate, t } from "../i18n.js";
+import { formatConversationPreview } from "../utils/conversation-preview.js";
 
 function formatListTime(value) {
 	if (!value) {
@@ -9,14 +10,18 @@ function formatListTime(value) {
 	return formatDate(value, { month: "short", day: "numeric" });
 }
 
-function mapChannelItem(channel, subtitle) {
+function mapChannelItem(channel, defaultSubtitle, currentUserId) {
+	const preview = formatConversationPreview(channel, currentUserId);
 	return {
 		key: `${channel.kind}:${channel.id}`,
 		id: channel.id,
 		kind: channel.kind,
 		isGeneral: Boolean(channel.isGeneral),
 		title: channel.name,
-		subtitle,
+		subtitle: preview?.preview || defaultSubtitle,
+		lastMessageSender: preview?.sender || '',
+		lastMessageText: preview?.text || '',
+		hasLastMessage: Boolean(preview),
 		avatarUrl: channel.avatarUrl || "",
 		fallback: channel.name ? channel.name.slice(0, 1) : t('publicGroups.fallback'),
 		lastMessageAt: channel.lastMessageAt || "",
@@ -27,27 +32,37 @@ function mapChannelItem(channel, subtitle) {
 	};
 }
 
-export function useChatSidebar({ applyActiveChannel, selectDm, sidebarApi = api }) {
+export function useChatSidebar({ applyActiveChannel, selectDm, currentUserId = null, sidebarApi = api }) {
 	const channels = ref([]);
 	const dms = ref([]);
 	const users = ref([]);
 	const sidebarLoading = ref(false);
 
 	const conversationItems = computed(() => {
-		const dmItems = dms.value.map((dm) => ({
-			key: `dm:${dm.id}`,
-			id: dm.id,
-			kind: "dm",
-			title: dm.otherUser.displayName,
-				subtitle: t('chat.contact', { username: dm.otherUser.username }),
-			avatarUrl: dm.otherUser.avatarUrl,
+		const uid = typeof currentUserId === 'object' && currentUserId !== null && 'value' in currentUserId
+			? currentUserId.value
+			: currentUserId;
+
+		const dmItems = dms.value.map((dm) => {
+			const preview = formatConversationPreview(dm, uid);
+			return {
+				key: `dm:${dm.id}`,
+				id: dm.id,
+				kind: "dm",
+				title: dm.otherUser.displayName,
+				subtitle: preview?.preview || t('chat.contact', { username: dm.otherUser.username }),
+				lastMessageSender: preview?.sender || '',
+				lastMessageText: preview?.text || '',
+				hasLastMessage: Boolean(preview),
+				avatarUrl: dm.otherUser.avatarUrl,
 				fallback: dm.otherUser.displayName,
 				lastMessageAt: dm.lastMessageAt || "",
 				dateLabel: formatListTime(dm.lastMessageAt),
-					unreadCount: Number(dm.unreadCount || 0),
-					mentionUnreadCount: Number(dm.mentionUnreadCount || 0),
-			source: dm,
-		}));
+				unreadCount: Number(dm.unreadCount || 0),
+				mentionUnreadCount: Number(dm.mentionUnreadCount || 0),
+				source: dm,
+			};
+		});
 
 		const channelItems = channels.value
 			.filter((channel) => channel.isMember)
@@ -59,6 +74,7 @@ export function useChatSidebar({ applyActiveChannel, selectDm, sidebarApi = api 
 							: t('chat.owner', {
 								name: channel.ownerDisplayName || t('common.unknown'),
 							}),
+					uid,
 				),
 			);
 
@@ -104,27 +120,39 @@ export function useChatSidebar({ applyActiveChannel, selectDm, sidebarApi = api 
 		}
 	}
 
-	function applyConversationActivity({
-		kind,
-		roomId,
-		lastMessageAt,
+		function applyConversationActivity({
+			kind,
+			roomId,
+			lastMessageAt,
+			lastMessage,
 			unreadCount,
 			mentionUnreadCount,
 		}) {
-		const source = findConversationSource(kind, roomId);
-		if (!source) {
-			return;
-		}
-
-		if (lastMessageAt) {
-			const currentTime = source.lastMessageAt
-				? new Date(source.lastMessageAt).getTime()
-				: 0;
-			const nextTime = new Date(lastMessageAt).getTime();
-			if (!currentTime || nextTime >= currentTime) {
-				source.lastMessageAt = lastMessageAt;
+			const source = findConversationSource(kind, roomId);
+			if (!source) {
+				return;
 			}
-		}
+
+			if (lastMessage) {
+				source.lastMessage = {
+					senderId: lastMessage.senderId ?? lastMessage.sender?.id,
+					senderName: lastMessage.senderName || lastMessage.sender?.displayName || lastMessage.sender?.username || '',
+					content: lastMessage.content || '',
+					attachment: lastMessage.attachment || null,
+					attachmentKind: lastMessage.attachmentKind || lastMessage.attachment?.kind || null,
+					createdAt: lastMessage.createdAt || lastMessageAt || new Date().toISOString()
+				};
+			}
+
+			if (lastMessageAt) {
+				const currentTime = source.lastMessageAt
+					? new Date(source.lastMessageAt).getTime()
+					: 0;
+				const nextTime = new Date(lastMessageAt).getTime();
+				if (!currentTime || nextTime >= currentTime) {
+					source.lastMessageAt = lastMessageAt;
+				}
+			}
 
 			if (unreadCount !== undefined) {
 				source.unreadCount = Math.max(0, Number(unreadCount || 0));
@@ -132,7 +160,7 @@ export function useChatSidebar({ applyActiveChannel, selectDm, sidebarApi = api 
 			if (mentionUnreadCount !== undefined) {
 				source.mentionUnreadCount = Math.max(0, Number(mentionUnreadCount || 0));
 			}
-	}
+		}
 
 	async function refreshSidebar() {
 		sidebarLoading.value = true;

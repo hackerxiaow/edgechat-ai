@@ -269,6 +269,7 @@ export default {
   'messages.loadEarlier': '加载更早消息',
   'messages.loading': '正在加载消息...',
   'messages.you': '我',
+  'chat.you': '你',
   'messages.actions': '消息操作',
   'messages.reply': '回复',
   'messages.cancelReply': '取消回复',

@@ -381,9 +381,10 @@ export function useChatRoom({
 					mentionUserIds,
 					replyMessageId: replyMessageId ? Number(replyMessageId) : null
 				});
-				if (res?.message) {
-					upsertMessage(res.message);
-				}
+					if (res?.message) {
+						upsertMessage(res.message);
+						applyActiveRoomActivity(res.message);
+					}
 				return true;
 			} catch (currentError) {
 				error.value = currentError.message;

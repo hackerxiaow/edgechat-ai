@@ -330,6 +330,7 @@ export default {
   "messages.loadEarlier": "加載更早消息",
   "messages.loading": "正在加載消息...",
   "messages.you": "我",
+  "chat.you": "你",
   "messages.actions": "消息操作",
   "messages.reply": "回覆",
   "messages.cancelReply": "取消回覆",

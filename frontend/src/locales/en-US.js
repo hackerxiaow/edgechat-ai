@@ -269,6 +269,7 @@ export default {
   'messages.loadEarlier': 'Load earlier messages',
   'messages.loading': 'Loading messages...',
   'messages.you': 'You',
+  'chat.you': 'You',
   'messages.actions': 'Message actions',
   'messages.reply': 'Reply',
   'messages.cancelReply': 'Cancel reply',

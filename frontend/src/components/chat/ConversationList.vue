@@ -48,30 +48,42 @@ const emit = defineEmits(["select"]);
 				:fallback="item.fallback?.[0] || '?'"
 				size="sm"
 			/>
-			<div class="sidebar-label-group">
-				<div class="sidebar-item__top">
-					<strong>{{ item.title }}</strong>
-					<span class="sidebar-item__time">{{ item.dateLabel }}</span>
-				</div>
-				<div class="sidebar-item__bottom">
-					<p class="sidebar-item__preview">{{ item.subtitle }}</p>
-					<span
-						v-if="isRoomMuted(item)"
-						class="sidebar-muted-indicator"
-						:title="t('chat.muted')"
-						:aria-label="t('chat.muted')"
-					>
-						<BellOff :size="14" aria-hidden="true" />
-						</span>
+				<div class="sidebar-label-group">
+					<div class="sidebar-item__top">
+						<div class="sidebar-item__title-wrap">
+							<strong>{{ item.title }}</strong>
+							<span
+								v-if="isRoomMuted(item)"
+								class="sidebar-muted-pill"
+								:title="t('chat.muted')"
+								:aria-label="t('chat.muted')"
+							>
+								<BellOff :size="11" aria-hidden="true" />
+							</span>
+						</div>
+						<span class="sidebar-item__time">{{ item.dateLabel }}</span>
+					</div>
+					<div class="sidebar-item__bottom">
+						<p class="sidebar-item__preview">
+							<template v-if="item.lastMessageSender">
+								<span class="sidebar-item__sender">{{ item.lastMessageSender }}: </span>
+								<span class="sidebar-item__text">{{ item.lastMessageText }}</span>
+							</template>
+							<span v-else class="sidebar-item__text">{{ item.subtitle }}</span>
+						</p>
 						<span v-if="item.mentionUnreadCount > 0" class="sidebar-mention-badge">
 							<AtSign :size="13" aria-hidden="true" />
 							{{ t("chat.mentionedMe") }}
 						</span>
-						<span v-if="item.unreadCount > 0" class="sidebar-unread-badge">
-						{{ item.unreadCount > 99 ? "99+" : item.unreadCount }}
-					</span>
+						<span
+							v-if="item.unreadCount > 0"
+							class="sidebar-unread-badge"
+							:class="{ 'sidebar-unread-badge--muted': isRoomMuted(item) }"
+						>
+							{{ item.unreadCount > 99 ? "99+" : item.unreadCount }}
+						</span>
+					</div>
 				</div>
-			</div>
 		</button>
 	</div>
 </template>
@@ -162,6 +174,29 @@ const emit = defineEmits(["select"]);
 	gap: 8px;
 }
 
+.sidebar-item__title-wrap {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.sidebar-muted-pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	padding: 2px 4px;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.05);
+	color: var(--chat-muted);
+}
+
+:root[data-theme='dark'] .sidebar-muted-pill {
+	background: rgba(255, 255, 255, 0.08);
+}
+
 .sidebar-item__top strong {
 	overflow: hidden;
 	color: var(--chat-ink);
@@ -195,6 +230,20 @@ const emit = defineEmits(["select"]);
 	font-size: 13px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.sidebar-item__sender {
+	font-weight: 600;
+	color: var(--chat-ink);
+}
+
+.sidebar-item--active .sidebar-item__sender {
+	color: inherit;
+}
+
+.sidebar-item .sidebar-unread-badge--muted {
+	background: var(--chat-muted);
+	opacity: 0.85;
 }
 
 .sidebar-item--unread .sidebar-item__preview {

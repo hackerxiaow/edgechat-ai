@@ -1,10 +1,12 @@
 import { publicFileUrl } from "../utils.ts";
+import type { LastMessageSummary } from "./channels.ts";
 
 export interface UserDm {
 	id: number;
 	kind: "dm";
 	name: string;
 	lastMessageAt: string | null;
+	lastMessage?: LastMessageSummary | null;
 	unreadCount: number;
 	mentionUnreadCount: number;
 	otherUser: {
@@ -33,6 +35,10 @@ interface UserDmRow {
 	other_avatar_key: string | null;
 	blocked_by_me: number;
 	last_message_at: string | null;
+	last_message_sender_id: string | number | null;
+	last_message_sender_name: string | null;
+	last_message_content: string | null;
+	last_message_attachment_kind: string | null;
 	unread_count: number;
 	attention_unread_count: number;
 }
@@ -46,7 +52,7 @@ interface AdminDmRow {
 }
 
 function mapUserDm(row: UserDmRow): UserDm {
-	return {
+	const dm: UserDm = {
 		id: Number(row.id),
 		kind: "dm",
 		name: row.dm_key,
@@ -61,6 +67,16 @@ function mapUserDm(row: UserDmRow): UserDm {
 		},
 		isBlockedByMe: Boolean(row.blocked_by_me),
 	};
+	if (row.last_message_at) {
+		dm.lastMessage = {
+			senderId: row.last_message_sender_id ?? null,
+			senderName: row.last_message_sender_name || "",
+			content: row.last_message_content || "",
+			attachmentKind: row.last_message_attachment_kind || null,
+			createdAt: row.last_message_at,
+		};
+	}
+	return dm;
 }
 
 function mapAdminDm(row: AdminDmRow): AdminDm {
@@ -86,9 +102,15 @@ export async function listUserDms(
 			   other.username AS other_username,
 			   other.display_name AS other_display_name,
 			   other.avatar_key AS other_avatar_key,
-			   EXISTS(SELECT 1 FROM user_blocks ub WHERE ub.blocker_id = ? AND ub.blocked_id = other.id) AS blocked_by_me,
-			   (SELECT MAX(m.created_at) FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL) AS last_message_at,
-				   (SELECT COUNT(*) FROM messages m
+				   EXISTS(SELECT 1 FROM user_blocks ub WHERE ub.blocker_id = ? AND ub.blocked_id = other.id) AS blocked_by_me,
+				   (SELECT MAX(m.created_at) FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL) AS last_message_at,
+				   (SELECT m.sender_id FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_sender_id,
+				   (SELECT COALESCE(u.display_name, m.external_sender_name, '')
+				    FROM messages m LEFT JOIN users u ON u.id = m.sender_id
+				    WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_sender_name,
+				   (SELECT m.content FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_content,
+				   (SELECT m.attachment_kind FROM messages m WHERE m.channel_id = c.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) AS last_message_attachment_kind,
+					   (SELECT COUNT(*) FROM messages m
 				    WHERE m.channel_id = c.id AND m.deleted_at IS NULL
 				      AND (m.sender_id IS NULL OR m.sender_id != ?)
 					      AND m.id > COALESCE((SELECT mr.last_read_message_id FROM message_reads mr WHERE mr.channel_id = c.id AND mr.user_id = ?), 0)) AS unread_count,
