@@ -195,6 +195,14 @@ export default {
     const query = new URLSearchParams(cursor ? { cursor: String(cursor) } : {});
     return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/sync?${query.toString()}`);
   },
+  searchRoomMessages(kind, roomId, query) {
+    const params = new URLSearchParams({ q: String(query || '') });
+    return request(`/v1/rooms/${encodeURIComponent(kind)}/${Number(roomId)}/search?${params.toString()}`);
+  },
+  searchGlobal(query) {
+    const params = new URLSearchParams({ q: String(query || '') });
+    return request(`/v1/search?${params.toString()}`);
+  },
   sendPresence() {
     return request('/v1/presence', { method: 'POST' });
   },

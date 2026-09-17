@@ -385,7 +385,55 @@ export async function requestDemo(path, options = {}) {
       pinnedMessage: cloneDemo(demoState.pinnedMessages[key] || null)
     };
   }
-		  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/messages$/);
+	  if (method === 'GET' && pathname === '/v1/search') {
+	    const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+	    if (!q) return { rooms: [], users: [], messages: [] };
+
+	    const rooms = demoState.channels
+	      .filter((c) => c.name.toLowerCase().includes(q))
+	      .map((c) => ({
+	        id: c.id,
+	        kind: c.kind,
+	        name: c.name,
+	        description: '',
+	        avatarUrl: c.avatarUrl || ''
+	      }));
+
+	    const users = demoState.users
+	      .filter((u) => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
+	      .map((u) => ({
+	        id: u.id,
+	        username: u.username,
+	        displayName: u.displayName,
+	        avatarUrl: u.avatarUrl || ''
+	      }));
+
+	    const matchingMessages = [];
+	    for (const [k, msgs] of Object.entries(demoState.messages)) {
+	      const [kKind, kId] = k.split(':');
+	      const room = demoState.channels.find((c) => String(c.id) === kId) || { id: Number(kId), kind: kKind, name: kKind };
+	      for (const m of msgs) {
+	        if (String(m.content || '').toLowerCase().includes(q)) {
+	          matchingMessages.push({
+	            message: cloneDemo(m),
+	            room: { id: Number(room.id), kind: room.kind, name: room.name }
+	          });
+	        }
+	      }
+	    }
+	    return { rooms, users, messages: matchingMessages.slice(0, 30) };
+	  }
+
+	  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/search$/);
+	  if (method === 'GET' && match) {
+	    const key = roomKey(match[1], match[2]);
+	    const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+	    const msgs = demoState.messages[key] || [];
+	    const filtered = q ? msgs.filter((m) => String(m.content || '').toLowerCase().includes(q)) : [];
+	    return { messages: cloneDemo(filtered) };
+	  }
+
+	  match = pathname.match(/^\/v1\/rooms\/([^/]+)\/(\d+)\/messages$/);
 		  if (method === 'POST' && match) {
 		    const key = roomKey(match[1], match[2]);
 		    const msgId = demoState.nextMessageId++;

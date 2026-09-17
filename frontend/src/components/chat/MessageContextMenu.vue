@@ -1,5 +1,5 @@
 <script setup>
-import { CheckSquare, Copy, Forward, Pencil, Pin, PinOff, Reply, Trash2 } from '@lucide/vue';
+import { CheckSquare, Copy, Forward, Link, Pencil, Pin, PinOff, Reply, Trash2 } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { t } from '../../i18n.js';
 
@@ -16,12 +16,11 @@ const props = defineProps({
   pinned: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['close', 'copy', 'reply', 'pin', 'unpin', 'delete', 'react', 'edit', 'forward', 'select']);
+const emit = defineEmits(['close', 'copy', 'copy-link', 'reply', 'pin', 'unpin', 'delete', 'react', 'edit', 'forward', 'select']);
 
 const menuEl = ref(null);
 const itemCount = computed(() =>
-  2 + // reply, forward, select (always available)
-  1 + // select
+  4 + // reply, forward, select, copy-link
   Number(props.canEdit) +
   Number(props.canCopy) +
   Number(props.canPin) +
@@ -124,6 +123,11 @@ onBeforeUnmount(() => {
         <button v-if="canCopy" type="button" role="menuitem" @click="emit('copy')">
           <Copy :size="16" :stroke-width="1.8" aria-hidden="true" />
           <span>{{ t('messages.copyMarkdown') }}</span>
+        </button>
+
+        <button type="button" role="menuitem" @click="emit('copy-link')">
+          <Link :size="16" :stroke-width="1.8" aria-hidden="true" />
+          <span>{{ t('chat.copyLink') }}</span>
         </button>
 
         <button type="button" role="menuitem" @click="emit('forward')">

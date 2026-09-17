@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowLeft, Ban, Bell, BellOff, Check, ContactRound, Forward as ForwardIcon, Menu, MessageCircle, Pencil as PencilIcon, Settings, Trash2 as TrashIcon, UsersRound, X as CloseIcon } from '@lucide/vue';
+import { ArrowLeft, Ban, Bell, BellOff, Check, ContactRound, Forward as ForwardIcon, Menu, MessageCircle, Pencil as PencilIcon, Search as SearchIcon, Settings, Trash2 as TrashIcon, UsersRound, X as CloseIcon } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from '../composables/useTheme.js';
@@ -13,6 +13,8 @@ import AddConversationDialog from '../components/chat/AddConversationDialog.vue'
 import ConversationList from '../components/chat/ConversationList.vue';
 import CreateGroupDialog from '../components/chat/CreateGroupDialog.vue';
 import ForwardMessageDialog from '../components/chat/ForwardMessageDialog.vue';
+import GlobalSearchPanel from '../components/chat/GlobalSearchPanel.vue';
+import InChatSearchBar from '../components/chat/InChatSearchBar.vue';
 import GroupSettingsDialog from '../components/chat/GroupSettingsDialog.vue';
 import InAppNotificationStack from '../components/chat/InAppNotificationStack.vue';
 import MemberPanel from '../components/chat/MemberPanel.vue';
@@ -63,6 +65,7 @@ const forwardTargetMessage = ref(null);
 const forwarding = ref(false);
 const isSelecting = ref(false);
 const selectedMessageIds = ref(new Set());
+const showInChatSearch = ref(false);
 const messageComposer = ref(null);
 const showMobileNavigation = ref(false);
 const publicGroupPreview = ref(null);
@@ -423,6 +426,28 @@ function forwardSelectedMessages() {
 	showForwardDialog.value = true;
 }
 
+async function copyMessageLink() {
+	const msg = messageMenu.value?.message;
+	closeMessageMenu();
+	if (!msg || !activeRoom.value) return;
+	const link = `${window.location.origin}/#/?room=${activeRoom.value.kind}:${activeRoom.value.id}&msg=${msg.id}`;
+	try {
+		await navigator.clipboard.writeText(link);
+	} catch {
+		error.value = t('messages.copyFailed');
+	}
+}
+
+async function handleSelectSearchMessage(item) {
+	try {
+		await openByIdentity({ kind: item.room.kind, id: item.room.id, name: item.room.name });
+		await nextTick();
+		await revealMessage(item.message.id);
+	} catch (e) {
+		error.value = e?.message || t('common.unknown');
+	}
+}
+
 async function sendComposerVoice(recording) {
 	const sent = await sendVoiceMessage(recording, replyingTo.value?.id);
 	if (sent) replyingTo.value = null;
@@ -511,11 +536,29 @@ function returnToMobileConversationList() {
   returnToConversationList();
 }
 
+async function checkDeepLink() {
+  const qRoom = route.query.room;
+  const qMsg = route.query.msg;
+  if (qRoom) {
+    const [kind, id] = String(qRoom).split(':');
+    if (kind && id) {
+      await openByIdentity({ kind, id: Number(id) });
+      if (qMsg) {
+        await nextTick();
+        await revealMessage(Number(qMsg));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 async function bootstrap() {
   error.value = '';
   try {
     await refreshSidebar();
-    if (isDemoMode && !activeRoom.value) {
+    const handledDeepLink = await checkDeepLink();
+    if (!handledDeepLink && isDemoMode && !activeRoom.value) {
       const general = conversationItems.value.find((item) => item.isGeneral);
       if (general) await selectConversation(general);
     }
@@ -870,7 +913,12 @@ onBeforeUnmount(() => {
           <span>{{ conversationItems.length }}</span>
         </div>
 
-		<ConversationList
+        <GlobalSearchPanel
+          @select-room="selectConversation"
+          @select-message="handleSelectSearchMessage"
+        />
+
+			<ConversationList
 		  :items="conversationItems"
 		  :active-key="activeRoomKey"
 		  :loading="sidebarLoading"
@@ -981,19 +1029,38 @@ onBeforeUnmount(() => {
               <UsersRound :size="19" aria-hidden="true" />
               <span>{{ showMemberPanel ? t('chat.collapseMembers') : t('chat.members') }}</span>
             </button>
-            <button
-              v-if="canManageActiveRoom"
-              type="button"
-              class="chat-header__button"
-              :aria-label="t('chat.openGroupSettings')"
-              :title="t('chat.openGroupSettings')"
-              @click="openGroupEditor"
-            >
-              <Settings :size="19" aria-hidden="true" />
-              <span>{{ t('chat.groupSettings') }}</span>
-            </button>
-          </div>
-        </header>
+	            <button
+	              type="button"
+	              class="chat-header__button"
+	              :class="{ 'chat-header__button--active': showInChatSearch }"
+	              :title="t('chat.searchInChat')"
+	              :aria-label="t('chat.searchInChat')"
+	              :aria-pressed="showInChatSearch"
+	              @click="showInChatSearch = !showInChatSearch"
+	            >
+	              <SearchIcon :size="19" aria-hidden="true" />
+	              <span>{{ t('chat.searchInChat') }}</span>
+	            </button>
+	            <button
+	              v-if="canManageActiveRoom"
+	              type="button"
+	              class="chat-header__button"
+	              :aria-label="t('chat.openGroupSettings')"
+	              :title="t('chat.openGroupSettings')"
+	              @click="openGroupEditor"
+	            >
+	              <Settings :size="19" aria-hidden="true" />
+	              <span>{{ t('chat.groupSettings') }}</span>
+	            </button>
+	          </div>
+	        </header>
+
+	        <InChatSearchBar
+	          :show="showInChatSearch"
+	          :messages="messages"
+	          @close="showInChatSearch = false"
+	          @jump="revealMessage"
+	        />
 
         <PinnedMessageBar
           v-if="pinnedMessage && activeRoom.kind !== 'dm'"
@@ -1116,6 +1183,7 @@ onBeforeUnmount(() => {
           :pinned="selectedMessageIsPinned"
           @close="closeMessageMenu"
           @copy="copySelectedMessage"
+          @copy-link="copyMessageLink"
           @reply="replyToSelectedMessage"
           @pin="pinSelectedMessage"
           @unpin="unpinSelectedMessage"

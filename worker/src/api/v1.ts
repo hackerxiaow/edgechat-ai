@@ -9,6 +9,7 @@ import {
   updateMessageContent
 } from '../data/messages.ts';
 import { toggleMessageReaction } from '../data/reactions.ts';
+import { searchRoomMessages, searchGlobal } from '../data/search.ts';
 import { getRuntimeSettings } from '../data/site-settings.ts';
 import { getUserByUsername } from '../data/users.ts';
 import { submitClientRoomAction } from '../room-actions.ts';
@@ -225,6 +226,30 @@ export function registerV1Routes(app: Hono<AppEnv>) {
     ]);
     // typing 是后加的字段：老客户端忽略即可，移动端 v1 契约保持向后兼容。
     return c.json({ ...result, typing });
+  });
+
+  app.get('/api/v1/search', authMiddleware, async (c) => {
+    const session = c.get('session');
+    const query = String(c.req.query('q') || '').trim();
+    const limit = sanitizeLimit(c.req.query('limit'), 30, 50);
+    const result = await searchGlobal(c.env, {
+      userId: session.userId,
+      query,
+      limit
+    });
+    return c.json(result);
+  });
+
+  app.get('/api/v1/rooms/:kind/:id/search', authMiddleware, async (c) => {
+    const { room } = await requireRoom(c);
+    const query = String(c.req.query('q') || '').trim();
+    const limit = sanitizeLimit(c.req.query('limit'), 50, 100);
+    const messages = await searchRoomMessages(c.env, {
+      roomId: room.id,
+      query,
+      limit
+    });
+    return c.json({ messages });
   });
 
   app.post('/api/v1/rooms/:kind/:id/messages', authMiddleware, async (c) => {
