@@ -182,6 +182,7 @@ export default {
   'chat.zoomIn': 'Zoom in',
   'chat.zoomOut': 'Zoom out',
   'chat.download': 'Download',
+  'chat.exportHistory': 'Export Chat History',
 	'chat.blockUser': 'Block this user',
 	'chat.unblockUser': 'Unblock user',
 	'chat.block': 'Block',

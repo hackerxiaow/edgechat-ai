@@ -449,6 +449,41 @@ async function handleSelectSearchMessage(item) {
 	}
 }
 
+function exportChatHistory() {
+	if (!activeRoom.value) return;
+	const name = roomLabel(activeRoom.value) || 'chat';
+	const lines = [
+		`# EdgeChat History Export - ${name}`,
+		`Time: ${new Date().toLocaleString()}`,
+		`Total messages: ${messages.value.length}`,
+		'',
+		'---',
+		''
+	];
+	for (const msg of messages.value) {
+		const sender = msg.sender?.displayName || msg.sender?.username || 'Unknown';
+		const time = msg.createdAt ? new Date(msg.createdAt).toLocaleString() : '';
+		lines.push(`[${time}] ${sender}:`);
+		if (msg.forwardFromName) {
+			lines.push(`  > [Forwarded from ${msg.forwardFromName}]`);
+		}
+		if (msg.content) {
+			lines.push(`  ${msg.content}`);
+		}
+		if (msg.attachment) {
+			lines.push(`  [Attachment: ${msg.attachment.name || msg.attachment.type}]`);
+		}
+		lines.push('');
+	}
+	const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = `edgechat-${name}-${new Date().toISOString().slice(0, 10)}.md`;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
 async function sendComposerVoice(recording) {
 	const sent = await sendVoiceMessage(recording, replyingTo.value?.id);
 	if (sent) replyingTo.value = null;
@@ -1391,9 +1426,10 @@ onBeforeUnmount(() => {
       @upload-avatar="uploadGroupAvatar"
       @save="saveGroupSettings"
       @delete-group="deleteGroup"
-	      @leave-group="leaveGroup"
-	      @transfer-owner="transferOwner"
-	    />
+		      @leave-group="leaveGroup"
+		      @transfer-owner="transferOwner"
+		      @export-history="exportChatHistory"
+		    />
 	    <ForwardMessageDialog
 	      :show="showForwardDialog"
 	      :conversation-items="conversationItems"

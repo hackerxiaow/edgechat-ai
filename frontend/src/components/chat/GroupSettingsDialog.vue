@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, toRef } from 'vue';
+import { Download } from '@lucide/vue';
 import { isCapacitorAndroid, pickNativeFile } from '../../capacitor-platform.ts';
 import { useOverlayLifecycle } from '../../composables/useOverlayLifecycle.js';
 import { t } from '../../i18n.js';
@@ -21,7 +22,8 @@ const emit = defineEmits([
   'save',
   'delete-group',
   'leave-group',
-  'transfer-owner'
+  'transfer-owner',
+  'export-history'
 ]);
 const avatarInput = ref(null);
 const nameInputEl = ref(null);
@@ -161,6 +163,13 @@ async function openAvatarPicker() {
             {{ transferring ? t('common.saving') : t('group.transferOwnerAction') }}
           </button>
         </label>
+
+        <div class="room-dialog__export-zone" style="margin-top: 16px;">
+          <button type="button" class="room-dialog__secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;" @click="emit('export-history')">
+            <Download :size="16" aria-hidden="true" />
+            <span>{{ t('chat.exportHistory') }}</span>
+          </button>
+        </div>
 
         <div v-if="room && !room.isGeneral" class="room-dialog__danger-zone">
           <button v-if="room.canManage" type="button" class="room-dialog__danger" @click="emit('delete-group')">

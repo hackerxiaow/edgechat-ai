@@ -243,6 +243,7 @@ export default {
   "chat.zoomIn": "放大",
   "chat.zoomOut": "縮小",
   "chat.download": "下載",
+  "chat.exportHistory": "匯出聊天記錄",
   "chat.blockUser": "拉黑此用戶",
   "chat.unblockUser": "解除拉黑",
   "chat.block": "拉黑",
