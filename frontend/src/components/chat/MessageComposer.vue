@@ -50,6 +50,7 @@ const props = defineProps({
 const emit = defineEmits([
 	"update:modelValue",
 	"send",
+	"send-gif",
 	"upload",
 	"clear-attachment",
 	"voice-recorded",
@@ -81,8 +82,7 @@ function handleSelectEmoji(emoji) {
 
 function handleSelectGif(gif) {
 	showEmojiPicker.value = false;
-	emit("update:modelValue", (props.modelValue ? props.modelValue + "\n" : "") + `![](${gif.url})`);
-	nextTick(() => textarea.value?.focus());
+	emit("send-gif", gif);
 }
 const finishingRecording = ref(false);
 const composing = ref(false);

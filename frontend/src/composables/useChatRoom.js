@@ -338,9 +338,11 @@ export function useChatRoom({
 		roomSession.disconnect();
 	}
 
-			async function sendMessage(mentionUserIds = [], replyMessageId = null, forwardFromName = null) {
+			async function sendMessage(mentionUserIds = [], replyMessageId = null, forwardFromName = null, overrideContent = null) {
 				if (!activeRoom.value) return false;
-				if (!composerText.value.trim() && !pendingAttachment.value) {
+				const isCustom = overrideContent !== null && overrideContent !== undefined;
+				const content = isCustom ? String(overrideContent) : composerText.value;
+				if (!content.trim() && !pendingAttachment.value) {
 					return false;
 				}
 
@@ -348,10 +350,11 @@ export function useChatRoom({
 			reportTyping(false);
 				error.value = "";
 				const clientMessageId = crypto.randomUUID();
-				const content = composerText.value;
-				const attachment = pendingAttachment.value;
-				composerText.value = "";
-				pendingAttachment.value = null;
+				const attachment = isCustom ? null : pendingAttachment.value;
+				if (!isCustom) {
+					composerText.value = "";
+					pendingAttachment.value = null;
+				}
 
 				// 乐观立即上屏：0ms 即刻看到自己的消息！
 				const tempId = -Date.now();

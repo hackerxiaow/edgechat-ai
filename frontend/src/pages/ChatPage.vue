@@ -340,6 +340,12 @@ async function sendComposerMessage() {
 	return sent;
 }
 
+async function handleSendGif(gif) {
+	if (!gif?.url || !activeRoom.value) return;
+	await sendMessage([], replyingTo.value?.id, null, gif.url);
+	replyingTo.value = null;
+}
+
 function startEditMessage(message) {
 	closeMessageMenu();
 	if (!message) return;
@@ -1321,8 +1327,9 @@ onBeforeUnmount(() => {
 				  :mention-candidates="mentionCandidates"
 				  :replying-to="replyingTo"
 				  :context-key="activeRoomKey"
-				  @send="sendComposerMessage"
-				  @voice-recorded="sendComposerVoice"
+					  @send="sendComposerMessage"
+					  @send-gif="handleSendGif"
+					  @voice-recorded="sendComposerVoice"
 				  @cancel-reply="replyingTo = null"
 			  @typing="reportTyping"
 			  @upload="uploadAttachment"
