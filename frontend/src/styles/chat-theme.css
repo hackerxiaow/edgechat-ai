@@ -254,12 +254,14 @@ html.dark .message-row--own .message-bubble .message-markdown,
 }
 
 /* 纯图片/动图/贴纸气泡：完全透明无边框、无底色包边，时间戳浮于右下角 */
-.message-bubble.message-bubble--media-only {
+.message-bubble.message-bubble--media-only,
+.message-row--own .message-bubble.message-bubble--media-only,
+html[data-theme="dark"] .message-row--own .message-bubble.message-bubble--media-only,
+html.dark .message-row--own .message-bubble.message-bubble--media-only {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
-  overflow: hidden !important;
 }
 
 .message-bubble.message-bubble--media-only .message-time {

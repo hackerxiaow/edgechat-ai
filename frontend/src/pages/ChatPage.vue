@@ -469,7 +469,7 @@ async function handleSelectSearchMessage(item) {
 
 function isPureMediaContent(content) {
 	const text = String(content || '').trim();
-	return /^(?:https?:\/\/[^\s]+(?:\.gif|\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s]+)?|https?:\/\/(?:media\d*\.giphy\.com|c\.tenor\.com|media\.tenor\.com)\/[^\s]+|!\[.*?\]\(https?:\/\/[^\s)]+\))$/i.test(text);
+	return /^(?:https?:\/\/[^\s]+(?:\.gif|\.png|\.jpg|\.jpeg|\.webp)(?:\?[^\s]+)?|\/stickers\/[^\s]+\.(?:svg|webp|png)|https?:\/\/(?:media\d*\.giphy\.com|c\.tenor\.com|media\.tenor\.com)\/[^\s]+|!\[.*?\]\(https?:\/\/[^\s)]+\))$/i.test(text);
 }
 
 function isPureMediaMessage(msg) {
