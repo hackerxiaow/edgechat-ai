@@ -142,7 +142,7 @@ onMounted(() => {
       <p v-if="validating" class="login-info" role="status">{{ t('auth.validatingInvite') }}</p>
       <p v-else-if="invite?.note" class="login-info">{{ t('auth.invitationNote', { note: invite.note }) }}</p>
       <p v-if="openRegistrationClosed" class="login-info" role="status">
-        本站未开放自由注册，请向管理员索取邀请链接。
+        {{ t('auth.registrationClosed') }}
       </p>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
 

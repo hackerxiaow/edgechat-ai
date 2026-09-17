@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 import enUS from '../frontend/src/locales/en-US.js';
 import zhCN from '../frontend/src/locales/zh-CN.js';
@@ -144,5 +144,107 @@ test('重置密码与找回密码相关文案与错误在各语言下完整翻�
   await setLocale(CHINESE_LOCALE);
   assert.equal(t('auth.forgotPasswordTitle'), '找回密码');
   assert.equal(t('auth.resetPasswordTitle'), '重置密码');
+});
+
+test('前端硬编码文案已改为可翻译键', async () => {
+  const hardcoded = [
+    'frontend/src/utils/conversation-preview.js',
+    'frontend/src/pages/RegisterPage.vue',
+    'frontend/src/pages/AdminAiPage.vue',
+    'frontend/src/components/chat/MessageComposer.vue'
+  ];
+  const removed = {
+    'frontend/src/utils/conversation-preview.js': /'\[加密消息\]'/,
+    'frontend/src/pages/RegisterPage.vue': /本站未开放自由注册/,
+    'frontend/src/pages/AdminAiPage.vue': /隐藏密钥|常用快捷：|（默认头像）/,
+    'frontend/src/components/chat/MessageComposer.vue': /文件大小不能超过 \$\{/
+  };
+  for (const file of hardcoded) {
+    const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, removed[file], `${file} 仍包含硬编码中文界面文案`);
+  }
+});
+
+test('界面新增文案在三种语言下均有翻译', async () => {
+  await setLocale(TRADITIONAL_CHINESE_LOCALE);
+  assert.equal(`[${t('messages.encrypted')}]`, '[加密訊息]');
+  assert.equal(t('auth.registrationClosed'), '本站未開放自由註冊，請向管理員索取邀請連結。');
+  assert.equal(t('ai.showApiKey'), '顯示密鑰');
+  assert.equal(t('ai.hideApiKey'), '隱藏密鑰');
+  assert.equal(t('ai.presetModels'), '常用快捷：');
+  assert.equal(t('ai.defaultAvatar'), '（預設頭像）');
+  assert.equal(t('composer.fileTooLarge', { size: 16 }), '檔案大小不能超過 16MB');
+
+  await setLocale(ENGLISH_LOCALE);
+  assert.equal(`[${t('messages.encrypted')}]`, '[Encrypted message]');
+  assert.equal(
+    t('auth.registrationClosed'),
+    'Open registration is disabled on this site. Please ask an administrator for an invitation link.'
+  );
+  assert.equal(t('ai.showApiKey'), 'Show API key');
+  assert.equal(t('ai.hideApiKey'), 'Hide API key');
+  assert.equal(t('ai.presetModels'), 'Quick presets:');
+  assert.equal(t('ai.defaultAvatar'), '(default avatar)');
+  assert.equal(t('composer.fileTooLarge', { size: 16 }), 'File size cannot exceed 16 MB');
+
+  await setLocale(CHINESE_LOCALE);
+});
+
+test('服务端每一处中文错误文案都能被繁体与英文翻译', async () => {
+  // 服务端错误以中文原文为键，缺一条就会在英文/繁体界面直接漏出简体中文。
+  const workerRoot = new URL('../worker/src/', import.meta.url);
+  const literalPattern = /(?:errorResponse|ApiError)\(\s*(?:`([^`]*)`|'([^']*)'|"([^"]*)")/g;
+  const han = /[\u4e00-\u9fff]/;
+
+  async function collect(dir) {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const found = new Set();
+    for (const entry of entries) {
+      const target = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dir);
+      if (entry.isDirectory()) {
+        for (const value of await collect(target)) found.add(value);
+      } else if (entry.name.endsWith('.ts')) {
+        const source = await readFile(target, 'utf8');
+        for (const match of source.matchAll(literalPattern)) {
+          const message = match[1] ?? match[2] ?? match[3] ?? '';
+          if (han.test(message)) found.add(message);
+        }
+      }
+    }
+    return found;
+  }
+
+  // 错误映射里的值可能与键完全相同（“接口不存在”简繁同形），所以只看键是否存在，
+  // 不能用「翻译结果等于原文」反推缺失。
+  async function loadErrorCatalog(locale) {
+    const source = await readFile(
+      new URL(`../frontend/src/locales/server-errors/${locale}.js`, import.meta.url),
+      'utf8'
+    );
+    const [fixedSection] = source.split('const dynamicErrorTranslations');
+    const fixed = new Set(
+      [...fixedSection.matchAll(/^\s*\[?\s*['"](.+?)['"]\s*,\s*['"]/gm)].map((match) => match[1])
+    );
+    const dynamic = [...source.matchAll(/^\s*\[\/(.+?)\/,\s*\(match\)/gm)].map(
+      (match) => new RegExp(match[1])
+    );
+    return { fixed, dynamic };
+  }
+
+  const messages = await collect(workerRoot);
+  assert.ok(messages.size > 100, `只扫描到 ${messages.size} 条服务端错误文案，检查扫描逻辑`);
+
+  for (const locale of [TRADITIONAL_CHINESE_LOCALE, ENGLISH_LOCALE]) {
+    const { fixed, dynamic } = await loadErrorCatalog(locale);
+    const missing = [];
+    for (const message of messages) {
+      if (fixed.has(message)) continue;
+      // 模板字面量在运行时会插入数字，按动态规则匹配。
+      const probe = message.replaceAll(/\$\{[^}]*\}/g, '5');
+      if (dynamic.some((pattern) => pattern.test(probe))) continue;
+      missing.push(message);
+    }
+    assert.deepEqual(missing, [], `${locale} 缺少以下服务端错误翻译：${missing.join(' / ')}`);
+  }
 });
 

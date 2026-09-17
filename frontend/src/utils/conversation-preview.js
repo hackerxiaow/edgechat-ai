@@ -52,7 +52,7 @@ export function formatConversationPreview(source, currentUserId) {
 
   let text = '';
   if (isEncrypted) {
-    text = attachLabel || '[加密消息]';
+    text = attachLabel || `[${t('messages.encrypted')}]`;
   } else if (rawContent) {
     const plain = messageMarkdownToPlainText(rawContent);
     text = attachLabel ? `${attachLabel} ${plain}` : plain;

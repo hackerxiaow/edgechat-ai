@@ -181,7 +181,7 @@ onMounted(loadConfig);
               <button
                 type="button"
                 class="ai-password-toggle"
-                :title="showApiKey ? '隐藏密钥' : '显示密钥'"
+                :title="showApiKey ? t('ai.hideApiKey') : t('ai.showApiKey')"
                 @click="showApiKey = !showApiKey"
               >
                 <EyeOff v-if="showApiKey" :size="16" />
@@ -200,7 +200,7 @@ onMounted(loadConfig);
               :placeholder="t('ai.modelPlaceholder')"
             />
             <div class="ai-preset-chips">
-              <span class="ai-chips-label">常用快捷：</span>
+              <span class="ai-chips-label">{{ t('ai.presetModels') }}</span>
               <button
                 v-for="preset in presetModels"
                 :key="preset"
@@ -291,7 +291,7 @@ onMounted(loadConfig);
           </div>
           <div class="ai-avatar-preview-meta">
             <strong>{{ aiForm.botName || 'ZeroClaw' }}</strong>
-            <span>{{ aiForm.botAvatarUrl || '（默认头像）' }}</span>
+            <span>{{ aiForm.botAvatarUrl || t('ai.defaultAvatar') }}</span>
           </div>
         </div>
 

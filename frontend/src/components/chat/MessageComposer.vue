@@ -269,7 +269,7 @@ function handleFileSelected(event) {
 	// 上传前先按服务端下发的上限挡一次，避免超限文件白传一遍。
 	const limit = Number(store.site?.maxFileSize) || 0;
 	if (limit && file.size > limit) {
-		pickerError.value = `文件大小不能超过 ${Math.round(limit / 1024 / 1024)}MB`;
+		pickerError.value = t("composer.fileTooLarge", { size: Math.round(limit / 1024 / 1024) });
 		return;
 	}
 	pickerError.value = '';
